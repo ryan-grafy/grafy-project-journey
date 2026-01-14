@@ -1,0 +1,99 @@
+
+export enum Role {
+  ALL = 'all',
+  CLIENT = 'client',
+  PM = 'pm',
+  DESIGNER = 'designer',
+  MANAGER = 'manager'
+}
+
+export interface User {
+  id: string;
+  userId: string;
+  name: string;
+  password?: string;
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  title: string;
+  phone: string;
+  email: string;
+}
+
+export interface Log {
+  id: string;
+  timestamp: string;
+  userName: string;
+  projectName: string;
+  action: string;
+  details: string;
+}
+
+export interface Task {
+  id: string;
+  role: Role;
+  title: string;
+  description?: string;
+  hasFile?: boolean;
+  toolLabel?: string;
+  toolIcon?: string;
+  isDynamic?: boolean;
+  completed_date?: string; // Manually entryable date
+}
+
+export interface Step {
+  id: number;
+  title: string;
+  colorClass: string;
+  borderColorClass: string;
+  tasks: Task[];
+}
+
+export interface PopoverState {
+  isOpen: boolean;
+  taskId: string | null;
+  currentUrl: string;
+  currentLabel: string;
+  x: number;
+  y: number;
+}
+
+export interface TaskEditPopoverState {
+  isOpen: boolean;
+  taskId: string | null;
+  role: Role;
+  title: string;
+  description: string;
+  completed_date: string;
+  x: number;
+  y: number;
+}
+
+export interface Project {
+  id: string;
+  created_at: string;
+  name: string;
+  pm_name: string;
+  pm_phone?: string;
+  pm_email?: string;
+  designer_name: string; // Designer A
+  designer_phone?: string;
+  designer_email?: string;
+  designer_2_name?: string; // Designer B
+  designer_2_phone?: string;
+  designer_2_email?: string;
+  designer_3_name?: string; // Designer C
+  designer_3_phone?: string;
+  designer_3_email?: string;
+  status: number;
+  last_updated: string;
+  rounds_count: number;
+  is_locked?: boolean;
+  custom_tasks?: Record<number, Task[]>;
+  task_order?: Record<number, string[]>;
+  deleted_tasks?: string[]; // IDs of hidden/deleted tasks
+  start_date?: string; // Project start date
+  end_date?: string; // Project completion/lock date
+}
