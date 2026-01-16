@@ -7,13 +7,14 @@ import TaskCard from './components/TaskCard.tsx';
 import ProjectList from './components/ProjectList.tsx';
 import CreateProjectModal from './components/CreateProjectModal.tsx';
 import TeamManagementModal from './components/TeamManagementModal.tsx';
-import { supabase, isSupabaseReady } from './supabaseClient.ts';
+import WelcomeScreen from './components/WelcomeScreen.tsx';
+import { supabase, isSupabaseReady, signInWithGoogle, signOut } from './supabaseClient.ts';
 import { STEPS_STATIC, TEAM_MEMBERS as INITIAL_TEAM_MEMBERS } from './constants.ts';
 import { Role, Task, PopoverState, Project, User, TaskEditPopoverState, TeamMember } from './types.ts';
 
 const App: React.FC = () => {
-  const [user] = useState<User>({ id: 'user-1', userId: 'user', name: '사용자' });
-  const [currentView, setCurrentView] = useState<'list' | 'detail'>('list');
+  const [user, setUser] = useState<User>({ id: 'guest', userId: 'guest', name: '게스트', avatarUrl: '' });
+  const [currentView, setCurrentView] = useState<'welcome' | 'list' | 'detail'>('welcome');
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
@@ -26,19 +27,157 @@ const App: React.FC = () => {
   const [taskLinks, setTaskLinks] = useState<Map<string, { url: string, label: string }>>(new Map());
   const [rounds, setRounds] = useState<number>(2);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
 
   const [popover, setPopover] = useState<PopoverState>({
     isOpen: false, taskId: null, currentUrl: '', currentLabel: '', x: 0, y: 0
   });
+
+  const [isSnapshotMode, setIsSnapshotMode] = useState(false);
+  const [snapshotSelectedTasks, setSnapshotSelectedTasks] = useState<Set<string>>(new Set());
 
   const [taskEditPopover, setTaskEditPopover] = useState<TaskEditPopoverState>({
     isOpen: false, taskId: null, role: Role.PM, title: '', description: '', completed_date: '', x: 0, y: 0
   });
 
   useEffect(() => {
-    fetchTeamMembers();
-    fetchProjects();
+    // Supabase Auth State Subscription
+    if (isSupabaseReady && supabase) {
+      console.log("Supabase is ready, initializing auth check...");
+
+      const performSessionCheck = async (retryCount = 0) => {
+        // 1. Manually check URL hash for tokens (Super robust for clock skew)
+        const hash = window.location.hash.substring(1);
+        if (hash.includes('access_token=')) {
+          console.log("Found access_token in hash, attempting manual session recovery...");
+          const params = new URLSearchParams(hash);
+          const accessToken = params.get('access_token');
+          const refreshToken = params.get('refresh_token');
+
+          if (accessToken) {
+            try {
+              // Try to force set the session
+              const { data, error } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken || '',
+              });
+
+              if (error) {
+                console.error("setSession error (possible clock skew):", error.message);
+                // Even if there's an error, if data.user exists, we might proceed
+              }
+
+              if (data?.user) {
+                console.log("Manual session recovery successful!");
+                // Clear hash to prevent loops and keep URL clean
+                window.history.replaceState(null, '', window.location.pathname);
+                return; // onAuthStateChange will handle the rest
+              }
+            } catch (e) {
+              console.error("Manual recovery failed:", e);
+            }
+          }
+        }
+
+        // 2. Standard session check
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log(`Session check #${retryCount + 1}:`, session ? "Session exists" : "No session");
+
+        if (session?.user) {
+          const u = {
+            id: session.user.id,
+            userId: session.user.id,
+            name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || '사용자',
+            avatarUrl: session.user.user_metadata.avatar_url
+          };
+          setUser(u);
+          setCurrentView('list');
+          fetchTeamMembers();
+          fetchProjects();
+          setIsAuthLoading(false); // Make sure to turn off loading
+        } else if (window.location.hash.includes('access_token') && retryCount < 10) {
+          // Increase retry count and keep loading state
+          setIsAuthLoading(true);
+          console.log("Token detected but session not ready, retrying in 1s...");
+          setTimeout(() => performSessionCheck(retryCount + 1), 1000);
+        } else {
+          setIsAuthLoading(false);
+          setCurrentView('welcome');
+        }
+      };
+
+      performSessionCheck();
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log("Auth state change event:", event, session ? "Session exists" : "No session");
+
+        if (session?.user) {
+          setUser({
+            id: session.user.id,
+            userId: session.user.id,
+            name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || '사용자',
+            avatarUrl: session.user.user_metadata.avatar_url
+          });
+          setCurrentView('list');
+          fetchTeamMembers();
+          fetchProjects();
+          setIsAuthLoading(false);
+        } else if (event === 'SIGNED_OUT' && !window.location.hash.includes('access_token')) {
+          setUser({ id: 'guest', userId: 'guest', name: '게스트', avatarUrl: '' });
+          setCurrentView('welcome');
+          setIsAuthLoading(false);
+        }
+      });
+
+      return () => subscription.unsubscribe();
+    } else {
+      console.warn("Supabase not ready or missing. Using welcome screen as default.");
+      setCurrentView('welcome');
+    }
   }, []);
+
+  const handleGoogleLogin = async () => {
+    setIsAuthLoading(true);
+    console.log("Initiating Google OAuth Login...");
+    try {
+      const result: any = await signInWithGoogle();
+      console.log("signInWithGoogle result:", result);
+
+      // If result has session (Mock/Immediate), we process it. 
+      // If it's a real redirect, the page will reload soon.
+      const sessionUser = result?.data?.session?.user;
+
+      if (sessionUser) {
+        setUser({
+          id: sessionUser.id,
+          userId: sessionUser.id,
+          name: sessionUser.user_metadata.full_name || sessionUser.email?.split('@')[0] || '사용자',
+          avatarUrl: sessionUser.user_metadata.avatar_url
+        });
+        setCurrentView('list');
+        fetchTeamMembers();
+        fetchProjects();
+        showToast("성공적으로 로그인되었습니다.");
+      } else if (result?.data?.url) {
+        console.log("Redirect URL received, window should redirect to:", result.data.url);
+      }
+    } catch (error) {
+      console.error("Login component error:", error);
+      showToast("로그인 중 오류가 발생했습니다.");
+    } finally {
+      // Keep loading on for a while to prevent multi-clicks during redirect
+      setTimeout(() => setIsAuthLoading(false), 3000);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      showToast("로그아웃 되었습니다.");
+    } catch (error) {
+      showToast("로그아웃 중 오류가 발생했습니다.");
+    }
+  };
 
   const fetchTeamMembers = async () => {
     try {
@@ -80,18 +219,43 @@ const App: React.FC = () => {
     setIsProjectLoading(false);
   };
 
-  const saveProjectsLocal = (updatedProjects: Project[]) => {
-    localStorage.setItem('grafy_projects', JSON.stringify(updatedProjects));
+  const saveProjectsLocal = async (updatedProjects: Project[]) => {
     setProjects(updatedProjects);
+    localStorage.setItem('grafy_projects', JSON.stringify(updatedProjects));
+
+    // Persist to Supabase if ready
+    if (isSupabaseReady && supabase) {
+      try {
+        // Find the specific project that was changed and upsert it
+        // Or if we deleted, handle that separately.
+        // For simplicity during transition, we try to upsert all or just the current one if applicable.
+        // Usually, we'd only sync the one that changed.
+      } catch (e) {
+        console.error("Supabase sync error:", e);
+      }
+    }
   };
 
-  const handleDeleteProject = (projectId: string) => {
+  const syncProjectToSupabase = async (project: Project) => {
+    if (isSupabaseReady && supabase) {
+      const { error } = await supabase.from('projects').upsert(project);
+      if (error) console.error("Supabase upsert error:", error);
+    }
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
     const next = projects.filter(p => p.id !== projectId);
-    saveProjectsLocal(next);
+    setProjects(next);
+    localStorage.setItem('grafy_projects', JSON.stringify(next));
+
+    if (isSupabaseReady && supabase) {
+      const { error } = await supabase.from('projects').delete().eq('id', projectId);
+      if (error) console.error("Supabase delete error:", error);
+    }
     showToast("프로젝트가 삭제되었습니다.");
   };
 
-  const handleToggleLock = (locked: boolean) => {
+  const handleToggleLock = async (locked: boolean) => {
     if (!currentProject) return;
 
     let end_date = currentProject.end_date;
@@ -103,9 +267,14 @@ const App: React.FC = () => {
       end_date = `${yy}-${mm}-${dd}`;
     }
 
-    const updated = { ...currentProject, is_locked: locked, end_date };
+    const updated = { ...currentProject, is_locked: locked, end_date, last_updated: new Date().toISOString() };
     setCurrentProject(updated);
-    saveProjectsLocal(projects.map(p => p.id === currentProject.id ? updated : p));
+
+    const nextProjects = projects.map(p => p.id === currentProject.id ? updated : p);
+    setProjects(nextProjects);
+    localStorage.setItem('grafy_projects', JSON.stringify(nextProjects));
+
+    await syncProjectToSupabase(updated);
     showToast(locked ? "프로젝트가 잠겼습니다. 종료일이 기록되었습니다." : "프로젝트 잠금이 해제되었습니다.");
   };
 
@@ -450,7 +619,7 @@ const App: React.FC = () => {
     showToast("태스크가 추가되었습니다.");
   };
 
-  const handleReorderTasks = (stepId: number, fromIdx: number, toIdx: number) => {
+  const handleReorderTasks = async (stepId: number, fromIdx: number, toIdx: number) => {
     if (!currentProject || currentProject.is_locked) return;
     if (isLockedStep(stepId)) {
       showToast("이전 스텝 완료가 필요합니다.");
@@ -518,7 +687,10 @@ const App: React.FC = () => {
 
     const updatedProject = { ...currentProject, task_order: nextTaskOrder, last_updated: new Date().toISOString() };
     setCurrentProject(updatedProject);
-    saveProjectsLocal(projects.map(p => p.id === currentProject.id ? updatedProject : p));
+    const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
+    setProjects(nextProjects);
+    localStorage.setItem('grafy_projects', JSON.stringify(nextProjects));
+    await syncProjectToSupabase(updatedProject);
   };
 
   const handleSaveTaskInfo = (taskId: string, role: Role, title: string, description: string, completed_date: string) => {
@@ -570,6 +742,7 @@ const App: React.FC = () => {
     if (found) {
       const updatedProject = { ...currentProject, custom_tasks: nextCustomTasks, last_updated: new Date().toISOString() };
       updateProjectProgress(completedTasks, updatedProject);
+      syncProjectToSupabase(updatedProject); // Async sync
       showToast("태스크 정보 저장 완료");
     }
     setTaskEditPopover(prev => ({ ...prev, isOpen: false }));
@@ -600,13 +773,16 @@ const App: React.FC = () => {
       deleted_tasks: []
     };
     const updatedProjects = [newProject, ...projects];
-    saveProjectsLocal(updatedProjects);
+    setProjects(updatedProjects);
+    localStorage.setItem('grafy_projects', JSON.stringify(updatedProjects));
+    await syncProjectToSupabase(newProject);
+
     setShowCreateModal(false);
     selectProject(newProject);
     showToast("프로젝트가 생성되었습니다.");
   };
 
-  const handleSaveUrl = (taskId: string, url: string, label: string) => {
+  const handleSaveUrl = async (taskId: string, url: string, label: string) => {
     if (!currentProject || currentProject.is_locked) return;
     const nextLinks = new Map<string, { url: string, label: string }>(taskLinks);
     nextLinks.set(taskId, { url, label });
@@ -615,38 +791,127 @@ const App: React.FC = () => {
 
     const updatedProject = { ...currentProject, last_updated: new Date().toISOString() };
     setCurrentProject(updatedProject);
-    saveProjectsLocal(projects.map(p => p.id === currentProject.id ? updatedProject : p));
+    const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
+    setProjects(nextProjects);
+    localStorage.setItem('grafy_projects', JSON.stringify(nextProjects));
+    await syncProjectToSupabase(updatedProject);
     showToast("링크가 저장되었습니다.");
+  };
+
+  /* Snapshot Logic */
+  const handleSnapshotToggle = () => {
+    if (!currentProject || currentProject.is_locked) return;
+    if (!isSnapshotMode) {
+      // Enter Snapshot Mode: Load existing visible tasks
+      setSnapshotSelectedTasks(new Set(currentProject.client_visible_tasks || []));
+      setIsSnapshotMode(true);
+      showToast("클라이언트 스냅샷 모드가 활성화되었습니다.");
+    } else {
+      // Exit without saving
+      setIsSnapshotMode(false);
+      setSnapshotSelectedTasks(new Set());
+    }
+  };
+
+  const handleSnapshotTaskSelect = (taskId: string) => {
+    const next = new Set(snapshotSelectedTasks);
+    if (next.has(taskId)) next.delete(taskId);
+    else next.add(taskId);
+    setSnapshotSelectedTasks(next);
+  };
+
+  const handleSaveSnapshot = async () => {
+    if (!currentProject) return;
+    const visibleList = Array.from(snapshotSelectedTasks);
+
+    // Update Local
+    const updated = { ...currentProject, client_visible_tasks: visibleList, last_updated: new Date().toISOString() };
+    setCurrentProject(updated);
+    saveProjectsLocal(projects.map(p => p.id === currentProject.id ? updated : p));
+
+    // Update DB
+    if (isSupabaseReady && supabase) {
+      await supabase.from('projects').update({
+        client_visible_tasks: visibleList,
+        last_updated: updated.last_updated
+      }).eq('id', updated.id);
+    }
+
+    setIsSnapshotMode(false);
+    showToast("클라이언트 뷰 설정이 저장되었습니다.");
   };
 
   const status = currentProject?.status || 0;
 
   return (
-    <div className="min-h-screen pb-10 md:pb-20 bg-[#e3e7ed]" onClick={() => {
-      setPopover(p => ({ ...p, isOpen: false }));
-      setTaskEditPopover(p => ({ ...p, isOpen: false }));
-    }}>
-      {currentView === 'list' ? (
+    <div className="min-h-screen pb-20 bg-[#e3e7ed] selection:bg-black selection:text-white">
+      {/* Snapshot Mode Header Message */}
+      {isSnapshotMode && (
+        <div className="sticky top-[73px] md:top-[88px] z-30 bg-black text-white px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-3 shadow-md animate-in slide-in-from-top-2">
+          <div className="flex items-center gap-3">
+            <i className="fa-solid fa-camera text-red-500 animate-pulse"></i>
+            <span className="font-bold text-sm md:text-base">클라이언트에게 보여질 목록을 선택 후 결정 버튼을 눌러 주세요</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setIsSnapshotMode(false)} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 hover:bg-white/20 transition-colors">취소</button>
+            <button onClick={handleSaveSnapshot} className="px-4 py-1.5 rounded-lg text-xs font-bold bg-white text-black hover:bg-slate-200 transition-colors shadow-sm">결정 완료</button>
+          </div>
+        </div>
+      )}
+
+      {currentView === 'welcome' && <WelcomeScreen onLogin={handleGoogleLogin} isLoading={isAuthLoading} />}
+
+      {currentView === 'list' && (
         <>
-          <ProjectList projects={projects} user={user} onSelectProject={selectProject} onNewProject={() => setShowCreateModal(true)} onManageTeam={() => setShowTeamModal(true)} isLoading={isProjectLoading} onDeleteProject={handleDeleteProject} />
-          {showCreateModal && <CreateProjectModal teamMembers={teamMembers} onClose={() => setShowCreateModal(false)} onCreate={handleCreateProject} />}
-          {showTeamModal && <TeamManagementModal members={teamMembers} onClose={() => setShowTeamModal(false)} onUpdate={(t) => { setTeamMembers(t); localStorage.setItem('grafy_team', JSON.stringify(t)); showToast("팀 명단 저장"); }} />}
-        </>
-      ) : (
-        <div className="relative">
           <Navbar
-            project={currentProject!}
+            project={{ name: 'GRAFY PROJECT JOURNEY', start_date: '', status: 0, pm_name: '', designer_name: '', id: 'temp', created_at: '', last_updated: '', rounds_count: 2 }}
             user={user}
             teamMembers={teamMembers}
             activeRole={activeRole}
             onRoleChange={setActiveRole}
-            onBack={() => { setCurrentView('list'); fetchProjects(); }}
+            onBack={() => { }}
+            onUpdateInfo={() => { }}
+            onLogout={handleLogout}
+            onLogin={handleGoogleLogin}
+            onToast={showToast}
+            isSnapshotMode={false} // List view no snapshot
+          />
+          <ProjectList
+            projects={projects}
+            onSelectProject={selectProject}
+            onNewProject={() => setShowCreateModal(true)}
+            onManageTeam={() => setShowTeamModal(true)}
+            isLoading={isProjectLoading}
+            onDeleteProject={handleDeleteProject}
+            onLogout={handleLogout}
+            onLogin={handleGoogleLogin}
+          />
+          {showCreateModal && <CreateProjectModal teamMembers={teamMembers} onClose={() => setShowCreateModal(false)} onCreate={handleCreateProject} />}
+          {showTeamModal && <TeamManagementModal members={teamMembers} onClose={() => setShowTeamModal(false)} onUpdate={(t) => { setTeamMembers(t); localStorage.setItem('grafy_team', JSON.stringify(t)); showToast("팀 명단 저장"); }} />}
+        </>
+      )}
+
+      {currentView === 'detail' && currentProject && (
+        <div className="relative" onClick={() => {
+          setPopover(p => ({ ...p, isOpen: false }));
+          setTaskEditPopover(p => ({ ...p, isOpen: false }));
+        }}>
+          <Navbar
+            project={currentProject}
+            user={user}
+            teamMembers={teamMembers}
+            activeRole={activeRole}
+            onRoleChange={setActiveRole}
+            onBack={() => { setCurrentProject(null); setCurrentView('list'); }}
             onUpdateInfo={updateProjectInfo}
             onToast={showToast}
             onToggleLock={handleToggleLock}
-            onLogout={() => { }}
+            onLogout={handleLogout}
+            onLogin={handleGoogleLogin}
+            isSnapshotMode={isSnapshotMode}
+            onSnapshotToggle={handleSnapshotToggle}
           />
-          <main className="w-full px-4 md:px-6 py-6 md:py-10">
+          <main className="w-full px-4 md:px-6 py-10 max-w-[1800px] mx-auto">
             <div className="max-w-[1800px] mx-auto">
               {/* Progress Section */}
               <div className="bg-white p-6 md:p-8 rounded-[1.25rem] md:rounded-[1.5rem] mb-6 md:mb-10 flex flex-col md:flex-row items-center gap-6 md:gap-10 border border-slate-200 shadow-sm relative overflow-visible">
@@ -691,13 +956,18 @@ const App: React.FC = () => {
                           setPopover({ isOpen: true, taskId: id, currentUrl: url || '', currentLabel: label || '', x: e.pageX, y: e.pageY });
                           setTaskEditPopover(p => ({ ...p, isOpen: false }));
                         }}
-                        onEditContextMenu={(e, t) => {
-                          setTaskEditPopover({ isOpen: true, taskId: t.id, role: t.role, title: t.title, description: t.description || '', completed_date: t.completed_date || '00-00-00', x: e.pageX, y: e.pageY });
-                          setPopover(p => ({ ...p, isOpen: false }));
+                        onEditContextMenu={(e, task) => {
+                          if (isSnapshotMode) return;
+                          setTaskEditPopover({
+                            isOpen: true, taskId: task.id, role: task.role, title: task.title, description: task.description || '', completed_date: task.completed_date || '00-00-00', x: e.clientX, y: e.clientY
+                          });
                         }}
                         onToast={showToast}
-                        isLockedProject={currentProject?.is_locked}
-                        projectId={currentProject?.id || ''}
+                        isLockedProject={currentProject.is_locked}
+                        projectId={currentProject.id}
+                        isSnapshotMode={isSnapshotMode}
+                        snapshotSelectedTasks={snapshotSelectedTasks}
+                        onSnapshotTaskSelect={handleSnapshotTaskSelect}
                         onAddTask={() => handleAddCustomTask(step.id)}
                       >
                         {step.id === 3 && (
@@ -732,15 +1002,17 @@ const App: React.FC = () => {
               <TaskEditPopover state={taskEditPopover} onClose={() => setTaskEditPopover(p => ({ ...p, isOpen: false }))} onSave={handleSaveTaskInfo} isAbsolute={true} />
             </div>
           </div>
-        </div>
+        </div >
       )}
-      {toastMsg && (
-        <div className={`fixed bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 text-white px-8 md:px-12 py-4 md:py-6 rounded-full text-sm md:text-[18px] font-bold z-[9999] shadow-2xl animate-in fade-in slide-in-from-bottom-10 duration-500 flex items-center gap-3 md:gap-4 ${toastMsg.includes("이전 스텝") ? "bg-red-500" : "bg-black"}`}>
-          {toastMsg.includes("이전 스텝") ? <i className="fa-solid fa-circle-xmark text-white"></i> : <i className="fa-solid fa-circle-info text-white"></i>}
-          {toastMsg}
-        </div>
-      )}
-    </div>
+      {
+        toastMsg && (
+          <div className={`fixed bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 text-white px-8 md:px-12 py-4 md:py-6 rounded-full text-sm md:text-[18px] font-bold z-[9999] shadow-2xl animate-in fade-in slide-in-from-bottom-10 duration-500 flex items-center gap-3 md:gap-4 ${toastMsg.includes("이전 스텝") ? "bg-red-500" : "bg-black"}`}>
+            {toastMsg.includes("이전 스텝") ? <i className="fa-solid fa-circle-xmark text-white"></i> : <i className="fa-solid fa-circle-info text-white"></i>}
+            {toastMsg}
+          </div>
+        )
+      }
+    </div >
   );
 };
 

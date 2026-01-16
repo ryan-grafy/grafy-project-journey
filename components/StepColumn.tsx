@@ -19,6 +19,9 @@ interface StepColumnProps {
   projectId: string; // New
   onAddTask?: () => void;
   children?: React.ReactNode;
+  isSnapshotMode?: boolean;
+  snapshotSelectedTasks?: Set<string>;
+  onSnapshotTaskSelect?: (taskId: string) => void;
 }
 
 const StepColumn: React.FC<StepColumnProps> = ({
@@ -37,7 +40,10 @@ const StepColumn: React.FC<StepColumnProps> = ({
   isLockedProject,
   projectId,
   onAddTask,
-  children
+  children,
+  isSnapshotMode,
+  snapshotSelectedTasks,
+  onSnapshotTaskSelect
 }) => {
   const visibleTasks = tasks.filter(t => filter === Role.ALL || t.role === filter);
 
@@ -146,7 +152,10 @@ const StepColumn: React.FC<StepColumnProps> = ({
     onDelete: onDeleteTask,
     onToast,
     isLockedProject,
-    projectId
+    projectId,
+    isSnapshotMode,
+    isSelectedForSnapshot: snapshotSelectedTasks?.has(task.id),
+    onSnapshotSelect: () => onSnapshotTaskSelect?.(task.id)
   });
 
   const renderTasks = () => {
@@ -251,7 +260,7 @@ const StepColumn: React.FC<StepColumnProps> = ({
 
   return (
     <div
-      className={`relative h-fit flex flex-col flex-1 w-[85vw] md:w-auto md:min-w-[410px] p-5 md:p-8 rounded-[1.25rem] md:rounded-[1.5rem] border transition-all duration-700 ${bgColor} ${borderColor} ${isLocked ? 'opacity-40 grayscale blur-[0.5px]' : 'opacity-100 shadow-2xl shadow-black/5'}`}
+      className={`relative h-fit flex flex-col flex-1 w-[85vw] md:w-auto md:min-w-[410px] p-5 md:p-8 rounded-[1.25rem] md:rounded-[1.5rem] border transition-all duration-700 ${bgColor} ${borderColor} ${isLocked && !isSnapshotMode ? 'opacity-40 grayscale blur-[0.5px]' : 'opacity-100 shadow-2xl shadow-black/5'}`}
       onDragOver={(e) => {
         e.preventDefault();
         if (draggedIndex !== null && dragOverIndex === null) setDragOverIndex(visibleTasks.length);

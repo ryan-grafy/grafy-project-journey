@@ -16,6 +16,9 @@ interface TaskCardProps {
   onToast: (msg: string) => void;
   isLockedProject?: boolean;
   projectId: string; // New
+  isSnapshotMode?: boolean;
+  isSelectedForSnapshot?: boolean;
+  onSnapshotSelect?: () => void;
 }
 
 const roleStyles: Record<Role, { style: string; icon: string }> = {
@@ -39,7 +42,8 @@ const accentColors: Record<number, string> = {
 };
 
 const TaskCard: React.FC<TaskCardProps> = ({
-  task, isCompleted, isLockedStep, stepId, linkUrl, linkLabel, onToggle, onContextMenu, onEditContextMenu, onDelete, onToast, isLockedProject, projectId
+  task, isCompleted, isLockedStep, stepId, linkUrl, linkLabel, onToggle, onContextMenu, onEditContextMenu, onDelete, onToast, isLockedProject, projectId,
+  isSnapshotMode, isSelectedForSnapshot, onSnapshotSelect
 }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
@@ -72,6 +76,10 @@ const TaskCard: React.FC<TaskCardProps> = ({
 
   const handleToggleClick = (e: React.MouseEvent) => {
     // 팝업이 떠 있는 상태에서 태스크 클릭 시 팝업이 닫힐 수 있도록 stopPropagation을 제거합니다.
+    if (isSnapshotMode) {
+      onSnapshotSelect?.();
+      return;
+    }
     if (isLockedStep && !isCompleted) {
       onToast("이전 스텝 완료가 필요합니다.");
       return;
@@ -112,7 +120,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
     <div
       onClick={handleToggleClick}
       onContextMenu={handleRightClickInfo}
-      className={`relative flex flex-col p-4 mb-2 bg-white border rounded-2xl cursor-pointer transition-all duration-300 min-h-[100px] group ${isCompleted ? 'bg-white border-black/10 opacity-80 shadow-inner' : 'border-black/25 hover:border-black/50 hover:-translate-y-1 hover:shadow-xl shadow-sm'} ${isLockedStep ? 'cursor-not-allowed grayscale-[0.5]' : ''}`}
+      className={`relative flex flex-col p-4 mb-2 bg-white border rounded-2xl cursor-pointer transition-all duration-300 min-h-[100px] group ${isCompleted ? 'bg-white border-black/10 opacity-80 shadow-inner' : 'border-black/25 hover:border-black/50 hover:-translate-y-1 hover:shadow-xl shadow-sm'} ${isLockedStep && !isSnapshotMode ? 'cursor-not-allowed grayscale-[0.5]' : ''} ${isSelectedForSnapshot ? '!border-red-500 !border-4 !ring-2 !ring-red-200 z-50' : ''}`}
     >
       <div className="absolute top-3 right-3 flex items-center gap-2 z-20">
         {isCompleted ? (

@@ -110,26 +110,62 @@ const ClientShareView: React.FC = () => {
         const step = STEPS_STATIC.find(s => s.id === stepId);
         if (!step) return [];
 
-        let tasks: Task[] = [...step.tasks];
+        let allVisibleTasks: Task[] = [];
 
-        // Round Expansion Logic
-        if (step.id === 3 && project.rounds_count && project.rounds_count > 2) {
-            // ... logic to add extra rounds ...
-            for (let r = 3; r <= project.rounds_count; r++) {
-                // Insert round tasks
-                // Simply cloning logic from App.tsx manually or assume standard structure
-                // This is getting complex to duplicate. Ideally extract `getVisibleTasks` to a helper.
+        // Base Tasks & Round Logic (Copied from App.tsx)
+        const stepTasks = step.tasks;
+        if (step.id === 3) {
+            const rounds = project.rounds_count || 2;
+            const round1Pm = stepTasks.find(t => t.id === 't3-round-1-pm');
+            const round1Des = stepTasks.find(t => t.id === 't3-round-1-des');
+            const round2Pm = stepTasks.find(t => t.id === 't3-round-2-pm');
+            const round2Des = stepTasks.find(t => t.id === 't3-round-2-des');
+
+            if (round1Pm) allVisibleTasks.push(round1Pm);
+            if (round1Des) allVisibleTasks.push(round1Des);
+            if (round2Pm) allVisibleTasks.push(round2Pm);
+            if (round2Des) allVisibleTasks.push(round2Des);
+
+            for (let i = 3; i <= rounds; i++) {
+                if (round1Pm) allVisibleTasks.push({ ...round1Pm, id: `t3-round-${i}-pm`, title: `Round ${i} Feedback` });
+                if (round1Des) allVisibleTasks.push({ ...round1Des, id: `t3-round-${i}-des`, title: `Round ${i} Design` });
             }
+
+            // Other tasks in Step 3
+            stepTasks.forEach(t => {
+                if (!t.id.startsWith('t3-round-')) allVisibleTasks.push(t);
+            });
+        } else {
+            allVisibleTasks = [...stepTasks];
         }
-        // Ignoring dynamic rounds for MVP client view for a sec to ensure safety, 
-        // OR basic implementation:
-        // Just show base tasks filtered.
 
-        // Let's assume user wants to see what's in `client_visible_tasks`.
-        // We should allow all tasks that are in that list, regardless of rounds logic?
-        // But StepColumn needs order.
+        // Custom tasks
+        const stepCustomTasks = project.custom_tasks?.[stepId] || [];
+        allVisibleTasks = [...allVisibleTasks, ...stepCustomTasks];
 
-        return tasks.filter(t => (project.client_visible_tasks || []).includes(t.id));
+        // Deleted filter
+        const deletedSet = new Set(project.deleted_tasks || []);
+        allVisibleTasks = allVisibleTasks.filter(t => !deletedSet.has(t.id));
+
+        // Sorting
+        const order = project.task_order?.[stepId];
+        if (order && order.length > 0) {
+            allVisibleTasks.sort((a, b) => {
+                const idxA = order.indexOf(a.id);
+                const idxB = order.indexOf(b.id);
+                if (idxA === -1 && idxB === -1) return 0;
+                if (idxA === -1) return 1;
+                if (idxB === -1) return -1;
+                return idxA - idxB;
+            });
+        }
+
+        // Final Client Visibility Filter
+        const clientVisibleSet = new Set(project.client_visible_tasks || []);
+        // If client_visible_tasks is empty/undefined, show NOTHING? or ALL? 
+        // User said "클라이언트에게 보여질 목록을 선택 후 결정". So default should be empty or user explicit selection.
+        // Assuming strict filtering: only show what is in the set.
+        return allVisibleTasks.filter(t => clientVisibleSet.has(t.id));
     };
 
     if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50">Loading...</div>;
@@ -139,8 +175,8 @@ const ClientShareView: React.FC = () => {
     return (
         <div className="min-h-screen pb-20 bg-[#e3e7ed]">
             {/* Read Only Header */}
-            <div className="bg-black text-white px-6 py-4 flex justify-between items-center">
-                <h1 className="font-bold text-xl tracking-tight uppercase">PROJECT JOURNEY (CLIENT VIEW)</h1>
+            <div className="bg-black text-white px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-md">
+                <h1 className="font-bold text-xl tracking-tight uppercase">PROJECT JOURNEY <span className="text-white/50 text-base ml-2">CLIENT VIEW</span></h1>
                 <div className="text-sm font-bold opacity-70">{project.name}</div>
             </div>
 
@@ -149,15 +185,13 @@ const ClientShareView: React.FC = () => {
                     <div className="flex gap-8 min-w-max">
                         {STEPS_STATIC.map((step) => {
                             const tasks = getProjectTasks(step.id);
-                            // If no tasks visible in this step, maybe skip step? or show empty.
-                            if (tasks.length === 0) return null;
-
+                            // Show step even if empty? Layout consistency.
                             return (
                                 <StepColumn
                                     key={step.id}
                                     step={step}
                                     tasks={tasks}
-                                    isLocked={true} // Read only
+                                    isLocked={false} // Always unlocked for visibility
                                     filter={Role.ALL}
                                     completedTasks={completedTasks}
                                     taskLinks={taskLinks}
