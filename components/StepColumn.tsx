@@ -16,6 +16,7 @@ interface StepColumnProps {
   onDeleteTask: (taskId: string) => void;
   onToast: (msg: string) => void;
   isLockedProject?: boolean;
+  projectId: string; // New
   onAddTask?: () => void;
   children?: React.ReactNode;
 }
@@ -34,6 +35,7 @@ const StepColumn: React.FC<StepColumnProps> = ({
   onDeleteTask,
   onToast,
   isLockedProject,
+  projectId,
   onAddTask,
   children
 }) => {
@@ -143,7 +145,8 @@ const StepColumn: React.FC<StepColumnProps> = ({
     onEditContextMenu,
     onDelete: onDeleteTask,
     onToast,
-    isLockedProject
+    isLockedProject,
+    projectId
   });
 
   const renderTasks = () => {

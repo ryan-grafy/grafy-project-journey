@@ -15,6 +15,7 @@ interface TaskCardProps {
   onDelete?: (taskId: string) => void;
   onToast: (msg: string) => void;
   isLockedProject?: boolean;
+  projectId: string; // New
 }
 
 const roleStyles: Record<Role, { style: string; icon: string }> = {
@@ -38,7 +39,7 @@ const accentColors: Record<number, string> = {
 };
 
 const TaskCard: React.FC<TaskCardProps> = ({
-  task, isCompleted, isLockedStep, stepId, linkUrl, linkLabel, onToggle, onContextMenu, onEditContextMenu, onDelete, onToast, isLockedProject
+  task, isCompleted, isLockedStep, stepId, linkUrl, linkLabel, onToggle, onContextMenu, onEditContextMenu, onDelete, onToast, isLockedProject, projectId
 }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
@@ -150,7 +151,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
 
       <div className="flex flex-col gap-[5px] mt-2">
         <div onClick={(e) => e.stopPropagation()}>
-          <FileDropzone onToast={onToast} isCompleted={isCompleted} accentColor={pointColor} isLockedProject={isLockedProject || isLockedStep} />
+          <FileDropzone onToast={onToast} isCompleted={isCompleted} accentColor={pointColor} isLockedProject={isLockedProject || isLockedStep} projectId={projectId} taskId={task.id} />
         </div>
         <button
           type="button"

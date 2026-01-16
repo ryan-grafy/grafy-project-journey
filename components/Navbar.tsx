@@ -191,7 +191,16 @@ const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
             <div className="flex items-center gap-2 md:gap-3 ml-auto h-full">
-              <button onClick={() => { navigator.clipboard.writeText(window.location.href); onToast("링크가 복사되었습니다."); }} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 border border-slate-200 hover:bg-black hover:text-white hover:border-black transition-all"><i className="fa-solid fa-share-nodes text-sm"></i></button>
+              <button onClick={async () => {
+                try {
+                  const token = crypto.randomUUID();
+                  const shareUrl = `${window.location.origin}/share/${token}`;
+                  await navigator.clipboard.writeText(shareUrl);
+                  onToast("클라이언트 공유 링크가 복사되었습니다!");
+                } catch (e) {
+                  onToast("링크 복사 실패");
+                }
+              }} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 border border-slate-200 hover:bg-black hover:text-white hover:border-black transition-all"><i className="fa-solid fa-share-nodes text-sm"></i></button>
               <button onClick={onBack} className="hidden lg:flex w-10 h-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600 border border-slate-200 hover:bg-black hover:text-white hover:border-black transition-all"><i className="fa-solid fa-list-ul text-sm"></i></button>
             </div>
           </div>

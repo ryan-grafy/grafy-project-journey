@@ -96,4 +96,9 @@ export interface Project {
   deleted_tasks?: string[]; // IDs of hidden/deleted tasks
   start_date?: string; // Project start date
   end_date?: string; // Project completion/lock date
+  task_states?: {
+    completed: string[];
+    links: Record<string, { url: string; label: string }>;
+  };
+  client_visible_tasks?: string[]; // IDs of tasks visible to clients
 }

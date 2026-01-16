@@ -36,16 +36,33 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
-    const savedTeam = localStorage.getItem('grafy_team');
-    if (savedTeam) {
-      setTeamMembers(JSON.parse(savedTeam));
-    } else {
-      const initial = INITIAL_TEAM_MEMBERS.map((m, i) => ({ ...m, id: `team-${i}` }));
-      setTeamMembers(initial);
-      localStorage.setItem('grafy_team', JSON.stringify(initial));
-    }
+    fetchTeamMembers();
     fetchProjects();
   }, []);
+
+  const fetchTeamMembers = async () => {
+    try {
+      if (isSupabaseReady && supabase) {
+        const { data, error } = await supabase.from('team_members').select('*');
+        if (!error && data && data.length > 0) {
+          setTeamMembers(data);
+          return;
+        }
+      }
+      // Fallback to localStorage or default
+      const savedTeam = localStorage.getItem('grafy_team');
+      if (savedTeam) {
+        setTeamMembers(JSON.parse(savedTeam));
+      } else {
+        const initial = INITIAL_TEAM_MEMBERS.map((m, i) => ({ ...m, id: `team-${i}` }));
+        setTeamMembers(initial);
+      }
+    } catch (e) {
+      console.error(e);
+      const initial = INITIAL_TEAM_MEMBERS.map((m, i) => ({ ...m, id: `team-${i}` }));
+      setTeamMembers(initial);
+    }
+  };
 
   const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); };
 
@@ -95,13 +112,23 @@ const App: React.FC = () => {
   const selectProject = (project: Project) => {
     setCurrentProject(project);
     setRounds(project.rounds_count || 2);
-    loadTasksLocal(project.id);
+    loadTasks(project);
     setCurrentView('detail');
     setActiveRole(Role.ALL);
   };
 
-  const loadTasksLocal = (projectId: string) => {
-    const localTasks = localStorage.getItem(`tasks_${projectId}`);
+  const loadTasks = (project: Project) => {
+    // 1. Load from DB (task_states) if available
+    if (project.task_states) {
+      setCompletedTasks(new Set<string>(project.task_states.completed || []));
+      const linkMap = new Map<string, { url: string, label: string }>();
+      Object.entries(project.task_states.links || {}).forEach(([id, val]: [string, any]) => linkMap.set(id, val));
+      setTaskLinks(linkMap);
+      return;
+    }
+
+    // 2. Fallback to LocalStorage
+    const localTasks = localStorage.getItem(`tasks_${project.id}`);
     if (localTasks) {
       const parsed = JSON.parse(localTasks);
       setCompletedTasks(new Set<string>(parsed.completed || []));
@@ -114,11 +141,16 @@ const App: React.FC = () => {
     }
   };
 
-  const syncTasksLocal = (projectId: string, completed: Set<string>, links: Map<string, { url: string, label: string }>) => {
-    localStorage.setItem(`tasks_${projectId}`, JSON.stringify({
+  const syncTasks = (project: Project, completed: Set<string>, links: Map<string, { url: string, label: string }>) => {
+    // 1. Sync to LocalStorage (Backup)
+    localStorage.setItem(`tasks_${project.id}`, JSON.stringify({
       completed: Array.from(completed),
       links: Object.fromEntries(links)
     }));
+
+    // 2. Sync to Supabase Update Object (State will be saved in updateProjectProgress)
+    // This helper just prepares local storage. The actual DB update happens in updateProjectProgress
+    // using the `updatedProject` object which includes `task_states`.
   };
 
   const updateProjectInfo = (updates: Partial<Project>) => {
@@ -312,13 +344,48 @@ const App: React.FC = () => {
     updateProjectProgress(nextCompleted, updatedProject);
   };
 
-  const updateProjectProgress = (nextCompleted: Set<string>, project: Project) => {
-    syncTasksLocal(project.id, nextCompleted, taskLinks);
+  const updateProjectProgress = async (nextCompleted: Set<string>, project: Project) => {
+    syncTasks(project, nextCompleted, taskLinks); // Save to local backup
+
     const total = calculateTotalTasks(project);
     const percent = total === 0 ? 0 : Math.round((nextCompleted.size / total) * 100);
-    const updatedProject = { ...project, status: Math.min(100, percent), last_updated: new Date().toISOString() };
+
+    // Prepare task_states for DB
+    const task_states = {
+      completed: Array.from(nextCompleted),
+      links: Object.fromEntries(taskLinks)
+    };
+
+    const updatedProject = {
+      ...project,
+      status: Math.min(100, percent),
+      last_updated: new Date().toISOString(),
+      task_states // Include in update
+    };
+
     setCurrentProject(updatedProject);
     saveProjectsLocal(projects.map(p => p.id === project.id ? updatedProject : p));
+
+    // Supabase Update
+    if (isSupabaseReady && supabase) {
+      // JSONB fields need to be stringified or passed as objects depending on driver, supabase-js handles objects fine.
+      try {
+        await supabase.from('projects').update({
+          status: updatedProject.status,
+          last_updated: updatedProject.last_updated,
+          custom_tasks: updatedProject.custom_tasks,
+          task_order: updatedProject.task_order,
+          deleted_tasks: updatedProject.deleted_tasks,
+          start_date: updatedProject.start_date,
+          end_date: updatedProject.end_date,
+          is_locked: updatedProject.is_locked,
+          rounds_count: updatedProject.rounds_count,
+          task_states: task_states // Sync this!
+        }).eq('id', project.id);
+      } catch (e) {
+        console.error("Failed to sync to Supabase", e);
+      }
+    }
   };
 
   const calculateTotalTasks = (project: Project) => {
@@ -511,7 +578,7 @@ const App: React.FC = () => {
   const handleCreateProject = async (name: string, pm: TeamMember | null, designers: (TeamMember | null)[], startDate: string) => {
     const [dLead, d1, d2] = designers;
     const newProject: Project = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       created_at: new Date().toISOString(),
       name,
       pm_name: pm ? `${pm.name} ${pm.title}` : '',
@@ -544,7 +611,7 @@ const App: React.FC = () => {
     const nextLinks = new Map<string, { url: string, label: string }>(taskLinks);
     nextLinks.set(taskId, { url, label });
     setTaskLinks(nextLinks);
-    syncTasksLocal(currentProject.id, completedTasks, nextLinks);
+    updateProjectProgress(completedTasks, { ...currentProject }); // Trigger save with new links
 
     const updatedProject = { ...currentProject, last_updated: new Date().toISOString() };
     setCurrentProject(updatedProject);
@@ -620,6 +687,7 @@ const App: React.FC = () => {
                         onReorder={handleReorderTasks}
                         onDeleteTask={handleDeleteTask}
                         onContextMenu={(e, id, url, label) => {
+                          // Client Visibility Logic to be implemented in popover or context menu
                           setPopover({ isOpen: true, taskId: id, currentUrl: url || '', currentLabel: label || '', x: e.pageX, y: e.pageY });
                           setTaskEditPopover(p => ({ ...p, isOpen: false }));
                         }}
@@ -629,6 +697,7 @@ const App: React.FC = () => {
                         }}
                         onToast={showToast}
                         isLockedProject={currentProject?.is_locked}
+                        projectId={currentProject?.id || ''}
                         onAddTask={() => handleAddCustomTask(step.id)}
                       >
                         {step.id === 3 && (

@@ -1,22 +1,51 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
 
 interface FileDropzoneProps {
+  projectId: string;
+  taskId: string;
   onToast: (msg: string) => void;
   isCompleted?: boolean;
   accentColor?: string;
   isLockedProject?: boolean;
 }
 
-const FileDropzone: React.FC<FileDropzoneProps> = ({ onToast, isCompleted = false, accentColor = 'bg-slate-600', isLockedProject = false }) => {
-  const [file, setFile] = useState<File | null>(null);
+interface FileMetadata {
+  id: string;
+  file_name: string;
+  file_path: string;
+  file_size: number;
+}
+
+const FileDropzone: React.FC<FileDropzoneProps> = ({
+  projectId, taskId, onToast, isCompleted = false, accentColor = 'bg-slate-600', isLockedProject = false
+}) => {
+  const [fileMeta, setFileMeta] = useState<FileMetadata | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetchFileMetadata();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, taskId]);
+
+  const fetchFileMetadata = async () => {
+    if (!projectId || !taskId || !supabase) return;
+    const { data } = await supabase.from('task_files')
+      .select('*')
+      .eq('project_id', projectId)
+      .eq('task_id', taskId)
+      .single();
+    if (data) setFileMeta(data);
+    else setFileMeta(null);
+  };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     if (isLockedProject) return;
-    if (!file && !isCompleted) setIsDragActive(true);
+    if (!fileMeta && !isCompleted && !isUploading) setIsDragActive(true);
   };
 
   const handleDragLeave = () => {
@@ -27,67 +56,141 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({ onToast, isCompleted = fals
     e.preventDefault();
     setIsDragActive(false);
     if (isLockedProject) {
-        onToast("이전 스텝 완료가 필요합니다.");
-        return;
+      onToast("이전 스텝 완료가 필요합니다.");
+      return;
     }
-    if (file || isCompleted) return;
+    if (fileMeta || isCompleted || isUploading) return;
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      validateAndSetFile(e.dataTransfer.files[0]);
+      uploadFile(e.dataTransfer.files[0]);
     }
   };
 
   const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); 
+    e.stopPropagation();
     if (isLockedProject) {
-        onToast("이전 스텝 완료가 필요합니다.");
-        return;
+      onToast("이전 스텝 완료가 필요합니다.");
+      return;
     }
-    if (!file && !isCompleted) {
+    if (!fileMeta && !isCompleted && !isUploading) {
       fileInputRef.current?.click();
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      validateAndSetFile(e.target.files[0]);
+      uploadFile(e.target.files[0]);
     }
   };
 
-  const validateAndSetFile = (uploadedFile: File) => {
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (uploadedFile.size > maxSize) {
-      onToast("10MB 이하의 파일만 업로드 가능합니다.");
+  const uploadFile = async (file: File) => {
+    if (!supabase || !projectId) {
+      onToast("데이터베이스 연결 실패");
       return;
     }
-    setFile(uploadedFile);
+
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxSize) {
+      onToast("50MB 이하의 파일만 업로드 가능합니다.");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      // 1. Storage Upload
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${taskId}_${Date.now()}.${fileExt}`;
+      const filePath = `${projectId}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('project-files')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // 2. DB Insert
+      const { data, error: dbError } = await supabase.from('task_files').insert({
+        project_id: projectId,
+        task_id: taskId,
+        file_name: file.name,
+        file_size: file.size,
+        file_path: filePath
+      }).select().single();
+
+      if (dbError) throw dbError;
+
+      setFileMeta(data);
+      onToast("파일 업로드 완료");
+    } catch (e: any) {
+      console.error(e);
+      onToast("업로드 실패: " + (e.message || "알 수 없는 오류"));
+    } finally {
+      setIsUploading(false);
+    }
   };
 
-  const handleDownload = (e: React.MouseEvent) => {
+  const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    onToast("파일 다운로드를 시작합니다.");
+    if (!fileMeta || !supabase) return;
+
+    onToast("다운로드 준비 중...");
+    try {
+      const { data, error } = await supabase.storage
+        .from('project-files')
+        .download(fileMeta.file_path);
+
+      if (error) throw error;
+      if (!data) return;
+
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileMeta.file_name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+      onToast("다운로드 실패");
+    }
   };
 
-  const handleReset = (e: React.MouseEvent) => {
+  const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isLockedProject) {
-        onToast("이전 스텝 완료가 필요합니다.");
-        return;
+      onToast("이전 스텝 완료가 필요합니다.");
+      return;
     }
     if (isCompleted) {
-        onToast("수정할 수 없는 상태입니다.");
-        return;
+      onToast("수정할 수 없는 상태입니다.");
+      return;
     }
-    setFile(null);
+    if (!fileMeta || !supabase) return;
+
+    if (!confirm("정말 파일을 삭제하시겠습니까?")) return;
+
+    try {
+      // 1. Storage Delete
+      const { error: storageError } = await supabase.storage
+        .from('project-files')
+        .remove([fileMeta.file_path]);
+
+      if (storageError) console.error("Storage delete fail", storageError);
+
+      // 2. DB Delete
+      const { error: dbError } = await supabase.from('task_files')
+        .delete()
+        .eq('id', fileMeta.id);
+
+      if (dbError) throw dbError;
+
+      setFileMeta(null);
+      onToast("파일이 삭제되었습니다.");
+    } catch (e) {
+      console.error(e);
+      onToast("삭제 실패");
+    }
   };
 
   const dashedBgStyle = {
@@ -104,23 +207,28 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({ onToast, isCompleted = fals
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      style={isDragActive ? activeBgStyle : (!file ? dashedBgStyle : {})}
+      style={isDragActive ? activeBgStyle : (!fileMeta ? dashedBgStyle : {})}
       className={`
         rounded-xl p-2 text-center text-[13px] 
         transition-all duration-200 min-h-[44px] flex flex-col justify-center items-center
         ${isDragActive ? 'bg-blue-50 text-blue-500' : 'bg-slate-100 text-slate-500 font-black'}
-        ${file ? '!bg-white border-2 border-slate-300' : ''}
-        ${(isCompleted || isLockedProject) && !file ? 'opacity-40 grayscale cursor-not-allowed' : ''}
+        ${fileMeta ? '!bg-white border-2 border-slate-300' : ''}
+        ${(isCompleted || isLockedProject) && !fileMeta ? 'opacity-40 grayscale cursor-not-allowed' : ''}
       `}
     >
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        onChange={handleFileSelect} 
-        className="hidden" 
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        className="hidden"
       />
-      
-      {!file ? (
+
+      {isUploading ? (
+        <div className="flex items-center gap-2 text-blue-500">
+          <i className="fa-solid fa-spinner fa-spin"></i>
+          <span>업로드 중...</span>
+        </div>
+      ) : !fileMeta ? (
         <div className="pointer-events-none flex items-center gap-2">
           <i className="fa-solid fa-cloud-arrow-up text-base opacity-70"></i>
           <span>파일 드래그 앤 드롭</span>
@@ -128,7 +236,9 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({ onToast, isCompleted = fals
       ) : (
         <div className="w-full">
           <div className="flex items-center justify-between w-full p-1 bg-white border border-slate-300 rounded-[0.8rem] gap-1">
-            <span className="truncate pr-2 font-bold text-slate-900 text-[11px] text-left flex-1">{file.name}</span>
+            <span className="truncate pr-2 font-bold text-slate-900 text-[11px] text-left flex-1" title={fileMeta.file_name}>
+              {fileMeta.file_name} <span className="text-[9px] text-slate-400">({Math.round(fileMeta.file_size / 1024)}KB)</span>
+            </span>
             <button
               onClick={handleDownload}
               className={`flex-1 min-w-[50%] shrink-0 ${accentColor} text-white py-2 rounded-xl border border-transparent hover:brightness-90 transition-all text-[13px] font-black uppercase flex items-center justify-center gap-1.5 shadow-sm`}
@@ -138,10 +248,10 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({ onToast, isCompleted = fals
           </div>
           {(!isCompleted && !isLockedProject) && (
             <button
-              onClick={handleReset}
-              className="text-[9.5px] text-slate-400 mt-1 hover:text-black font-black"
+              onClick={handleDelete}
+              className="text-[9.5px] text-slate-400 mt-1 hover:text-red-500 font-black transition-colors"
             >
-              다시 업로드
+              삭제하기
             </button>
           )}
         </div>
