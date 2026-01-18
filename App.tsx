@@ -43,7 +43,30 @@ const App: React.FC = () => {
     isOpen: false, taskId: null, role: Role.PM, title: '', description: '', completed_date: '', x: 0, y: 0
   });
 
+  // --- SAFEGUARDS ---
+  // Force Welcome if Guest is on List
   useEffect(() => {
+    if (currentView === 'list' && user.userId === 'guest') {
+      console.warn("Detected Guest state on List view. Forcing Welcome screen.");
+      setCurrentView('welcome');
+    }
+  }, [currentView, user.userId]);
+
+  // Global Safety Timeout for Initialization
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (isInitializing) {
+        console.warn("Initialization timed out (5s). Forcing completion.");
+        setIsInitializing(false);
+      }
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [isInitializing]);
+  // ------------------
+
+  useEffect(() => {
+    let active = true; // cleanup guard
+
     // 0. Check for Shared Link first
     const path = window.location.pathname;
     if (path.startsWith('/share/')) {
@@ -52,7 +75,7 @@ const App: React.FC = () => {
         setSharedProjectId(pid);
         setCurrentView('share');
         setIsInitializing(false);
-        return; // Skip auth check for share view
+        return;
       }
     }
 
@@ -61,74 +84,66 @@ const App: React.FC = () => {
       console.log("Supabase is ready, initializing auth check...");
 
       const performSessionCheck = async (retryCount = 0) => {
-        // 1. Manually check URL hash for tokens (Super robust for clock skew)
-        const hash = window.location.hash.substring(1);
-        if (hash.includes('access_token=')) {
-          console.log("Found access_token in hash, attempting manual session recovery...");
-          const params = new URLSearchParams(hash);
-          const accessToken = params.get('access_token');
-          const refreshToken = params.get('refresh_token');
+        try {
+          // 1. Manually check URL hash
+          const hash = window.location.hash.substring(1);
+          if (hash.includes('access_token=')) {
+            console.log("Found access_token in hash, attempting manual session recovery...");
+            const params = new URLSearchParams(hash);
+            const accessToken = params.get('access_token');
+            const refreshToken = params.get('refresh_token');
 
-          if (accessToken) {
-            try {
-              // Try to force set the session
+            if (accessToken) {
               const { data, error } = await supabase.auth.setSession({
                 access_token: accessToken,
                 refresh_token: refreshToken || '',
               });
-
-              if (error) {
-                console.error("setSession error (possible clock skew):", error.message);
-                // Even if there's an error, if data.user exists, we might proceed
-              }
-
+              if (error) console.error("setSession error:", error.message);
               if (data?.user) {
                 console.log("Manual session recovery successful!");
-                // Clear hash to prevent loops and keep URL clean
                 window.history.replaceState(null, '', window.location.pathname);
-                return; // onAuthStateChange will handle the rest
               }
-            } catch (e) {
-              console.error("Manual recovery failed:", e);
             }
           }
-        }
 
-        // 2. Standard session check
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        console.log(`Session check #${retryCount + 1}:`, session ? "Session exists" : "No session");
+          // 2. Standard session check
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          console.log(`Session check #${retryCount + 1}:`, session ? "Session exists" : "No session");
 
-        if (session?.user) {
-          const u = {
-            id: session.user.id,
-            userId: session.user.id,
-            name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || '사용자',
-            avatarUrl: session.user.user_metadata.avatar_url
-          };
-          setUser(u);
-          setCurrentView('list');
-          fetchTeamMembers();
-          fetchProjects();
-        } else if (window.location.hash.includes('access_token') && retryCount < 3) {
-          // Token exists but session retrieval failed or racing. Retry a few times.
-          console.log("Token in hash but no session yet, retrying...", sessionError);
-          setTimeout(() => performSessionCheck(retryCount + 1), 1000);
-          return;
-        } else {
-          setCurrentView('welcome');
-          if (window.location.hash.includes('access_token')) {
-            showToast("로그인 세션 복구에 실패했습니다. 다시 로그인해주세요.");
-            // Clear hash to avoid confusion
-            window.history.replaceState(null, '', window.location.pathname);
+          if (!active) return; // Unmounted
+
+          if (session?.user) {
+            const u = {
+              id: session.user.id,
+              userId: session.user.id,
+              name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || '사용자',
+              avatarUrl: session.user.user_metadata.avatar_url
+            };
+            setUser(u);
+            setCurrentView('list');
+            // Async fetches - don't await blocking UI
+            fetchTeamMembers();
+            fetchProjects();
+          } else if (window.location.hash.includes('access_token') && retryCount < 3) {
+            console.log("Token in hash but no session yet, retrying...", sessionError);
+            setTimeout(() => performSessionCheck(retryCount + 1), 1000);
+            return; // Don't turn off init yet
+          } else {
+            setCurrentView('welcome');
           }
+        } catch (e) {
+          console.error("Session check failed:", e);
+          if (active) setCurrentView('welcome');
+          showToast("로그인 세션 확인 중 오류가 발생했습니다.");
+        } finally {
+          if (active) setIsInitializing(false);
         }
-        setIsInitializing(false);
       };
 
       performSessionCheck();
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        console.log("Auth state change event:", event, session ? "Session exists" : "No session");
+        console.log("Auth state change event:", event);
 
         if (session?.user) {
           setUser({
@@ -141,16 +156,20 @@ const App: React.FC = () => {
           fetchTeamMembers();
           fetchProjects();
           setIsAuthLoading(false);
-        } else if (event === 'SIGNED_OUT' && !window.location.hash.includes('access_token')) {
+        } else if (event === 'SIGNED_OUT') {
+          // Explicitly clear query params on Sign Out if needed
           setUser({ id: 'guest', userId: 'guest', name: '게스트', avatarUrl: '' });
           setCurrentView('welcome');
           setIsAuthLoading(false);
         }
       });
 
-      return () => subscription.unsubscribe();
+      return () => {
+        active = false;
+        subscription.unsubscribe();
+      };
     } else {
-      console.warn("Supabase not ready or missing. Using welcome screen as default.");
+      console.warn("Supabase not ready. Using welcome screen.");
       setCurrentView('welcome');
       setIsInitializing(false);
     }
@@ -163,8 +182,6 @@ const App: React.FC = () => {
       const result: any = await signInWithGoogle();
       console.log("signInWithGoogle result:", result);
 
-      // If result has session (Mock/Immediate), we process it. 
-      // If it's a real redirect, the page will reload soon.
       const sessionUser = result?.data?.session?.user;
 
       if (sessionUser) {
@@ -185,7 +202,6 @@ const App: React.FC = () => {
       console.error("Login component error:", error);
       showToast("로그인 중 오류가 발생했습니다.");
     } finally {
-      // Keep loading on for a while to prevent multi-clicks during redirect
       setTimeout(() => setIsAuthLoading(false), 3000);
     }
   };
@@ -208,7 +224,6 @@ const App: React.FC = () => {
           return;
         }
       }
-      // Fallback to localStorage or default
       const savedTeam = localStorage.getItem('grafy_team');
       if (savedTeam) {
         setTeamMembers(JSON.parse(savedTeam));
@@ -242,14 +257,9 @@ const App: React.FC = () => {
   const saveProjectsLocal = async (updatedProjects: Project[]) => {
     setProjects(updatedProjects);
     localStorage.setItem('grafy_projects', JSON.stringify(updatedProjects));
-
-    // Persist to Supabase if ready
     if (isSupabaseReady && supabase) {
       try {
-        // Find the specific project that was changed and upsert it
-        // Or if we deleted, handle that separately.
-        // For simplicity during transition, we try to upsert all or just the current one if applicable.
-        // Usually, we'd only sync the one that changed.
+        // Sync logic could go here
       } catch (e) {
         console.error("Supabase sync error:", e);
       }
@@ -307,7 +317,6 @@ const App: React.FC = () => {
   };
 
   const loadTasks = (project: Project) => {
-    // 1. Load from DB (task_states) if available
     if (project.task_states) {
       setCompletedTasks(new Set<string>(project.task_states.completed || []));
       const linkMap = new Map<string, { url: string, label: string }>();
@@ -316,7 +325,6 @@ const App: React.FC = () => {
       return;
     }
 
-    // 2. Fallback to LocalStorage
     const localTasks = localStorage.getItem(`tasks_${project.id}`);
     if (localTasks) {
       const parsed = JSON.parse(localTasks);
@@ -331,15 +339,10 @@ const App: React.FC = () => {
   };
 
   const syncTasks = (project: Project, completed: Set<string>, links: Map<string, { url: string, label: string }>) => {
-    // 1. Sync to LocalStorage (Backup)
     localStorage.setItem(`tasks_${project.id}`, JSON.stringify({
       completed: Array.from(completed),
       links: Object.fromEntries(links)
     }));
-
-    // 2. Sync to Supabase Update Object (State will be saved in updateProjectProgress)
-    // This helper just prepares local storage. The actual DB update happens in updateProjectProgress
-    // using the `updatedProject` object which includes `task_states`.
   };
 
   const updateProjectInfo = (updates: Partial<Project>) => {
@@ -385,11 +388,8 @@ const App: React.FC = () => {
       allVisibleTasks.sort((a, b) => {
         const idxA = order.indexOf(a.id);
         const idxB = order.indexOf(b.id);
-
-        // 정렬 순서에 없는 태스크(예: 새로 추가된 태스크)는 기본적으로 뒤에 오도록 999 부여
         const valA = idxA === -1 ? 999 : idxA;
         const valB = idxB === -1 ? 999 : idxB;
-
         return valA - valB;
       });
     }
@@ -451,36 +451,25 @@ const App: React.FC = () => {
 
   const handleDeleteTask = (taskId: string) => {
     if (!currentProject || currentProject.is_locked) return;
-
     const nextCustomTasks = { ...(currentProject.custom_tasks || {}) };
     const nextTaskOrder = { ...(currentProject.task_order || {}) };
     const nextDeletedTasks = [...(currentProject.deleted_tasks || [])];
-
     let found = false;
 
     for (const stepId in nextCustomTasks) {
       const originalLen = nextCustomTasks[stepId].length;
       nextCustomTasks[stepId] = nextCustomTasks[stepId].filter(t => t.id !== taskId);
-      if (nextCustomTasks[stepId].length !== originalLen) {
-        found = true;
-      }
-      if (nextTaskOrder[stepId]) {
-        nextTaskOrder[stepId] = nextTaskOrder[stepId].filter(id => id !== taskId);
-      }
+      if (nextCustomTasks[stepId].length !== originalLen) found = true;
+      if (nextTaskOrder[stepId]) nextTaskOrder[stepId] = nextTaskOrder[stepId].filter(id => id !== taskId);
     }
-
     if (taskId.startsWith('t')) {
-      if (!nextDeletedTasks.includes(taskId)) {
-        nextDeletedTasks.push(taskId);
-      }
+      if (!nextDeletedTasks.includes(taskId)) nextDeletedTasks.push(taskId);
       found = true;
     }
-
     if (found) {
       const nextCompleted = new Set<string>(completedTasks);
       nextCompleted.delete(taskId);
       setCompletedTasks(nextCompleted);
-
       const updatedProject = {
         ...currentProject,
         custom_tasks: nextCustomTasks,
@@ -535,29 +524,21 @@ const App: React.FC = () => {
 
   const updateProjectProgress = async (nextCompleted: Set<string>, project: Project) => {
     syncTasks(project, nextCompleted, taskLinks); // Save to local backup
-
     const total = calculateTotalTasks(project);
     const percent = total === 0 ? 0 : Math.round((nextCompleted.size / total) * 100);
-
-    // Prepare task_states for DB
     const task_states = {
       completed: Array.from(nextCompleted),
       links: Object.fromEntries(taskLinks)
     };
-
     const updatedProject = {
       ...project,
       status: Math.min(100, percent),
       last_updated: new Date().toISOString(),
-      task_states // Include in update
+      task_states
     };
-
     setCurrentProject(updatedProject);
     saveProjectsLocal(projects.map(p => p.id === project.id ? updatedProject : p));
-
-    // Supabase Update
     if (isSupabaseReady && supabase) {
-      // JSONB fields need to be stringified or passed as objects depending on driver, supabase-js handles objects fine.
       try {
         await supabase.from('projects').update({
           status: updatedProject.status,
@@ -569,7 +550,7 @@ const App: React.FC = () => {
           end_date: updatedProject.end_date,
           is_locked: updatedProject.is_locked,
           rounds_count: updatedProject.rounds_count,
-          task_states: task_states // Sync this!
+          task_states: task_states
         }).eq('id', project.id);
       } catch (e) {
         console.error("Failed to sync to Supabase", e);
@@ -580,12 +561,10 @@ const App: React.FC = () => {
   const calculateTotalTasks = (project: Project) => {
     let count = 0;
     const deletedSet = new Set(project.deleted_tasks || []);
-
     STEPS_STATIC.forEach(step => {
       if (step.id === 3) {
         if (!deletedSet.has('t3-base-1')) count += 1;
         if (!deletedSet.has('t3-final')) count += 1;
-
         const roundCount = (project.rounds_count || 2);
         for (let r = 1; r <= roundCount; r++) {
           if (!deletedSet.has(`t3-round-${r}-pm`)) count += 1;
@@ -622,13 +601,9 @@ const App: React.FC = () => {
       role: Role.PM, title: '새로운 태스크', description: '', hasFile: true, completed_date: '00-00-00'
     };
     nextCustomTasks[stepId] = [...(nextCustomTasks[stepId] || []), newTask];
-
     const nextTaskOrder = { ...(currentProject.task_order || {}) };
     const currentOrder = nextTaskOrder[stepId] || getVisibleTasks(stepId, currentProject, rounds).map(t => t.id);
-
-    // 신규 태스크는 항상 맨 뒤에 오도록 순서 배열의 끝에 추가합니다.
     nextTaskOrder[stepId] = [...currentOrder, newTask.id];
-
     const updatedProject = {
       ...currentProject,
       custom_tasks: nextCustomTasks,
@@ -645,10 +620,7 @@ const App: React.FC = () => {
       showToast("이전 스텝 완료가 필요합니다.");
       return;
     }
-
     const allVisibleTasks = getVisibleTasks(stepId, currentProject, rounds);
-
-    // Step 3의 원자적 그룹 드래그 처리를 위해 데이터 구조를 일시적으로 그룹화합니다.
     if (stepId === 3) {
       const grouped: (Task | Task[])[] = [];
       let i = 0;
@@ -668,8 +640,6 @@ const App: React.FC = () => {
           i++;
         }
       }
-
-      // 그룹 리스트에서의 인덱스 찾기
       const findGroupIdx = (taskIdx: number) => {
         let currentIdx = 0;
         for (let gIdx = 0; gIdx < grouped.length; gIdx++) {
@@ -680,31 +650,23 @@ const App: React.FC = () => {
         }
         return grouped.length - 1;
       };
-
       const groupFromIdx = findGroupIdx(fromIdx);
       const groupToIdx = findGroupIdx(toIdx);
-
       const [removed] = grouped.splice(groupFromIdx, 1);
       grouped.splice(groupToIdx, 0, removed);
-
       const flattened = grouped.flat();
       const nextTaskOrder = { ...(currentProject.task_order || {}) };
       nextTaskOrder[stepId] = flattened.map(t => t.id);
-
       const updatedProject = { ...currentProject, task_order: nextTaskOrder, last_updated: new Date().toISOString() };
       setCurrentProject(updatedProject);
       saveProjectsLocal(projects.map(p => p.id === currentProject.id ? updatedProject : p));
       return;
     }
-
-    // 일반 스텝 재정렬
     const result = Array.from(allVisibleTasks);
     const [removed] = result.splice(fromIdx, 1);
     result.splice(toIdx, 0, removed);
-
     const nextTaskOrder = { ...(currentProject.task_order || {}) };
     nextTaskOrder[stepId] = result.map(t => t.id);
-
     const updatedProject = { ...currentProject, task_order: nextTaskOrder, last_updated: new Date().toISOString() };
     setCurrentProject(updatedProject);
     const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
@@ -717,8 +679,6 @@ const App: React.FC = () => {
     if (!currentProject || currentProject.is_locked) return;
     const nextCustomTasks = { ...(currentProject.custom_tasks || {}) };
     let found = false;
-
-    // 1. 기존 custom_tasks에서 검색 및 업데이트
     for (const stepId in nextCustomTasks) {
       const idx = nextCustomTasks[stepId].findIndex(t => t.id === taskId);
       if (idx > -1) {
@@ -726,8 +686,6 @@ const App: React.FC = () => {
         found = true; break;
       }
     }
-
-    // 2. static 태스크인 경우 custom_tasks에 구체화하여 저장
     if (!found) {
       for (const step of STEPS_STATIC) {
         const sTask = step.tasks.find(t => t.id === taskId);
@@ -739,8 +697,6 @@ const App: React.FC = () => {
         }
       }
     }
-
-    // 3. 피드백 라운드 동적 태스크인 경우 custom_tasks에 구체화하여 저장
     if (!found && taskId.startsWith('t3-round-')) {
       const sid = 3;
       if (!nextCustomTasks[sid]) nextCustomTasks[sid] = [];
@@ -748,7 +704,6 @@ const App: React.FC = () => {
       const roundNum = taskId.split('-')[2];
       const defaultTitle = isPm ? `${roundNum}차 피드백 수급` : `${roundNum}차 수정 및 업데이트`;
       const defaultRole = isPm ? Role.PM : Role.DESIGNER;
-
       nextCustomTasks[sid].push({
         id: taskId,
         role: role || defaultRole,
@@ -758,11 +713,10 @@ const App: React.FC = () => {
       });
       found = true;
     }
-
     if (found) {
       const updatedProject = { ...currentProject, custom_tasks: nextCustomTasks, last_updated: new Date().toISOString() };
       updateProjectProgress(completedTasks, updatedProject);
-      syncProjectToSupabase(updatedProject); // Async sync
+      syncProjectToSupabase(updatedProject);
       showToast("태스크 정보 저장 완료");
     }
     setTaskEditPopover(prev => ({ ...prev, isOpen: false }));
@@ -796,7 +750,6 @@ const App: React.FC = () => {
     setProjects(updatedProjects);
     localStorage.setItem('grafy_projects', JSON.stringify(updatedProjects));
     await syncProjectToSupabase(newProject);
-
     setShowCreateModal(false);
     selectProject(newProject);
     showToast("프로젝트가 생성되었습니다.");
@@ -807,8 +760,7 @@ const App: React.FC = () => {
     const nextLinks = new Map<string, { url: string, label: string }>(taskLinks);
     nextLinks.set(taskId, { url, label });
     setTaskLinks(nextLinks);
-    updateProjectProgress(completedTasks, { ...currentProject }); // Trigger save with new links
-
+    updateProjectProgress(completedTasks, { ...currentProject });
     const updatedProject = { ...currentProject, last_updated: new Date().toISOString() };
     setCurrentProject(updatedProject);
     const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
@@ -822,12 +774,10 @@ const App: React.FC = () => {
   const handleSnapshotToggle = () => {
     if (!currentProject || currentProject.is_locked) return;
     if (!isSnapshotMode) {
-      // Enter Snapshot Mode: Load existing visible tasks
       setSnapshotSelectedTasks(new Set(currentProject.client_visible_tasks || []));
       setIsSnapshotMode(true);
       showToast("클라이언트 스냅샷 모드가 활성화되었습니다.");
     } else {
-      // Exit without saving
       setIsSnapshotMode(false);
       setSnapshotSelectedTasks(new Set());
     }
@@ -843,20 +793,15 @@ const App: React.FC = () => {
   const handleSaveSnapshot = async () => {
     if (!currentProject) return;
     const visibleList = Array.from(snapshotSelectedTasks);
-
-    // Update Local
     const updated = { ...currentProject, client_visible_tasks: visibleList, last_updated: new Date().toISOString() };
     setCurrentProject(updated);
     saveProjectsLocal(projects.map(p => p.id === currentProject.id ? updated : p));
-
-    // Update DB
     if (isSupabaseReady && supabase) {
       await supabase.from('projects').update({
         client_visible_tasks: visibleList,
         last_updated: updated.last_updated
       }).eq('id', updated.id);
     }
-
     setIsSnapshotMode(false);
     showToast("클라이언트 뷰 설정이 저장되었습니다.");
   };
@@ -865,7 +810,11 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-20 bg-[#e3e7ed] selection:bg-black selection:text-white">
-      {/* Snapshot Mode Header Message */}
+      {/* DEBUG OVERLAY (Remove in production) */}
+      <div className="fixed bottom-2 left-2 z-[9999] bg-black/80 text-white text-[10px] p-2 pointer-events-none rounded opacity-50">
+        View: {currentView} | User: {user.userId} | Init: {isInitializing ? 'T' : 'F'} | Auth: {isAuthLoading ? 'T' : 'F'}
+      </div>
+
       {isSnapshotMode && (
         <div className="sticky top-[73px] md:top-[88px] z-30 bg-black text-white px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-3 shadow-md animate-in slide-in-from-top-2">
           <div className="flex items-center gap-3">
@@ -905,6 +854,7 @@ const App: React.FC = () => {
             onDeleteProject={handleDeleteProject}
             onLogout={handleLogout}
             onLogin={handleGoogleLogin}
+            user={user}
           />
           {showCreateModal && <CreateProjectModal teamMembers={teamMembers} onClose={() => setShowCreateModal(false)} onCreate={handleCreateProject} />}
           {showTeamModal && <TeamManagementModal members={teamMembers} onClose={() => setShowTeamModal(false)} onUpdate={(t) => { setTeamMembers(t); localStorage.setItem('grafy_team', JSON.stringify(t)); showToast("팀 명단 저장"); }} />}
@@ -972,7 +922,6 @@ const App: React.FC = () => {
                         onReorder={handleReorderTasks}
                         onDeleteTask={handleDeleteTask}
                         onContextMenu={(e, id, url, label) => {
-                          // Client Visibility Logic to be implemented in popover or context menu
                           setPopover({ isOpen: true, taskId: id, currentUrl: url || '', currentLabel: label || '', x: e.pageX, y: e.pageY });
                           setTaskEditPopover(p => ({ ...p, isOpen: false }));
                         }}
@@ -1015,7 +964,6 @@ const App: React.FC = () => {
               </div>
             </div>
           </main>
-          {/* Popovers positioned absolutely to stay fixed relative to document content on scroll */}
           <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-[110]">
             <div className="pointer-events-auto">
               <UrlPopover popoverState={popover} onClose={() => setPopover(p => ({ ...p, isOpen: false }))} onSave={handleSaveUrl} isAbsolute={true} />
