@@ -15,7 +15,12 @@ const SharedProjectView: React.FC<SharedProjectViewProps> = ({ projectId }) => {
 
     useEffect(() => {
         const fetchProject = async () => {
-            if (!supabase) return;
+            if (!supabase) {
+                console.error("Supabase client not initialized");
+                setError("시스템 설정 오류: 데이터베이스 연결 불가");
+                setLoading(false);
+                return;
+            }
 
             try {
                 // Fetch project by ID. Note: RLS must allow this for anon/public or use a secure edge function.

@@ -67,25 +67,27 @@ const App: React.FC = () => {
   useEffect(() => {
     let active = true; // cleanup guard
 
-    // 0. Check for Shared Link first
+    // 0. Check for Shared Link first - PRIORITY 1
     const path = window.location.pathname;
     if (path.startsWith('/share/')) {
+      console.log("Shared link detecting:", path);
       const pid = path.split('/share/')[1];
       if (pid) {
         setSharedProjectId(pid);
         setCurrentView('share');
         setIsInitializing(false);
+        // DO NOT run auth checks if we are in shared view mode.
         return;
       }
     }
 
-    // Supabase Auth State Subscription
+    // Supabase Auth State Subscription - PRIORITY 2
     if (isSupabaseReady && supabase) {
       console.log("Supabase is ready, initializing auth check...");
 
       const performSessionCheck = async (retryCount = 0) => {
         try {
-          // 1. Manually check URL hash
+          // 1. Manually check URL hash for tokens (Super robust for clock skew)
           const hash = window.location.hash.substring(1);
           if (hash.includes('access_token=')) {
             console.log("Found access_token in hash, attempting manual session recovery...");
@@ -98,10 +100,14 @@ const App: React.FC = () => {
                 access_token: accessToken,
                 refresh_token: refreshToken || '',
               });
+
               if (error) console.error("setSession error:", error.message);
+              // If successful, the onAuthStateChange will fire 'SIGNED_IN'
               if (data?.user) {
-                console.log("Manual session recovery successful!");
+                console.log("Manual setSession successful -> waiting for onAuthStateChange");
                 window.history.replaceState(null, '', window.location.pathname);
+                // We don't need to do anything else, the listener will handle it.
+                return;
               }
             }
           }
@@ -121,7 +127,6 @@ const App: React.FC = () => {
             };
             setUser(u);
             setCurrentView('list');
-            // Async fetches - don't await blocking UI
             fetchTeamMembers();
             fetchProjects();
           } else if (window.location.hash.includes('access_token') && retryCount < 3) {
@@ -129,12 +134,12 @@ const App: React.FC = () => {
             setTimeout(() => performSessionCheck(retryCount + 1), 1000);
             return; // Don't turn off init yet
           } else {
+            console.log("No session found, modifying view to Welcome.");
             setCurrentView('welcome');
           }
         } catch (e) {
           console.error("Session check failed:", e);
           if (active) setCurrentView('welcome');
-          showToast("로그인 세션 확인 중 오류가 발생했습니다.");
         } finally {
           if (active) setIsInitializing(false);
         }
@@ -144,6 +149,10 @@ const App: React.FC = () => {
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         console.log("Auth state change event:", event);
+        if (!active) return;
+
+        // Critical: Do NOT change view if we are already in SHARE mode
+        if (window.location.pathname.startsWith('/share/')) return;
 
         if (session?.user) {
           setUser({
@@ -157,10 +166,14 @@ const App: React.FC = () => {
           fetchProjects();
           setIsAuthLoading(false);
         } else if (event === 'SIGNED_OUT') {
-          // Explicitly clear query params on Sign Out if needed
+          console.log("User Signed Out -> Switch to Welcome");
           setUser({ id: 'guest', userId: 'guest', name: '게스트', avatarUrl: '' });
           setCurrentView('welcome');
           setIsAuthLoading(false);
+          setIsInitializing(false);
+        } else if (event === 'INITIAL_SESSION') {
+          // Just handled by performSessionCheck usually, but safe to ignore or set loading false
+          setIsInitializing(false);
         }
       });
 
