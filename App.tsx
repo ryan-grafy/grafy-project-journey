@@ -15,6 +15,7 @@ import { Role, Task, PopoverState, Project, User, TaskEditPopoverState, TeamMemb
 const App: React.FC = () => {
   const [user, setUser] = useState<User>({ id: 'guest', userId: 'guest', name: '게스트', avatarUrl: '' });
   const [currentView, setCurrentView] = useState<'welcome' | 'list' | 'detail'>('welcome');
+  const [isInitializing, setIsInitializing] = useState(true); // New state for initial load
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
@@ -80,7 +81,7 @@ const App: React.FC = () => {
         }
 
         // 2. Standard session check
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         console.log(`Session check #${retryCount + 1}:`, session ? "Session exists" : "No session");
 
         if (session?.user) {
@@ -94,16 +95,20 @@ const App: React.FC = () => {
           setCurrentView('list');
           fetchTeamMembers();
           fetchProjects();
-          setIsAuthLoading(false); // Make sure to turn off loading
-        } else if (window.location.hash.includes('access_token') && retryCount < 10) {
-          // Increase retry count and keep loading state
-          setIsAuthLoading(true);
-          console.log("Token detected but session not ready, retrying in 1s...");
+        } else if (window.location.hash.includes('access_token') && retryCount < 3) {
+          // Token exists but session retrieval failed or racing. Retry a few times.
+          console.log("Token in hash but no session yet, retrying...", sessionError);
           setTimeout(() => performSessionCheck(retryCount + 1), 1000);
+          return;
         } else {
-          setIsAuthLoading(false);
           setCurrentView('welcome');
+          if (window.location.hash.includes('access_token')) {
+            showToast("로그인 세션 복구에 실패했습니다. 다시 로그인해주세요.");
+            // Clear hash to avoid confusion
+            window.history.replaceState(null, '', window.location.pathname);
+          }
         }
+        setIsInitializing(false);
       };
 
       performSessionCheck();
@@ -133,6 +138,7 @@ const App: React.FC = () => {
     } else {
       console.warn("Supabase not ready or missing. Using welcome screen as default.");
       setCurrentView('welcome');
+      setIsInitializing(false);
     }
   }, []);
 
@@ -859,7 +865,16 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {currentView === 'welcome' && <WelcomeScreen onLogin={handleGoogleLogin} isLoading={isAuthLoading} />}
+      {currentView === 'welcome' && !isInitializing && <WelcomeScreen onLogin={handleGoogleLogin} isLoading={isAuthLoading} />}
+
+      {isInitializing && (
+        <div className="min-h-screen flex items-center justify-center bg-[#e3e7ed]">
+          <div className="flex flex-col items-center gap-4">
+            <i className="fa-solid fa-plane text-4xl text-black animate-airplane-pulse"></i>
+            <p className="text-black font-bold">탑승 수속 중...</p>
+          </div>
+        </div>
+      )}
 
       {currentView === 'list' && (
         <>
