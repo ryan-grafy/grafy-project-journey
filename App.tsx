@@ -9,13 +9,15 @@ import CreateProjectModal from './components/CreateProjectModal.tsx';
 import TeamManagementModal from './components/TeamManagementModal.tsx';
 import WelcomeScreen from './components/WelcomeScreen.tsx';
 import { supabase, isSupabaseReady, signInWithGoogle, signOut } from './supabaseClient.ts';
+import SharedProjectView from './components/SharedProjectView.tsx';
 import { STEPS_STATIC, TEAM_MEMBERS as INITIAL_TEAM_MEMBERS } from './constants.ts';
 import { Role, Task, PopoverState, Project, User, TaskEditPopoverState, TeamMember } from './types.ts';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User>({ id: 'guest', userId: 'guest', name: '게스트', avatarUrl: '' });
-  const [currentView, setCurrentView] = useState<'welcome' | 'list' | 'detail'>('welcome');
-  const [isInitializing, setIsInitializing] = useState(true); // New state for initial load
+  const [currentView, setCurrentView] = useState<'welcome' | 'list' | 'detail' | 'share'>('welcome');
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [sharedProjectId, setSharedProjectId] = useState<string | null>(null);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
@@ -876,9 +878,12 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {currentView === 'share' && sharedProjectId && (
+        <SharedProjectView projectId={sharedProjectId} />
+      )}
+
       {currentView === 'list' && (
         <>
-
           <ProjectList
             projects={projects}
             onSelectProject={selectProject}
