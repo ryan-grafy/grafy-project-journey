@@ -119,6 +119,15 @@ const App: React.FC = () => {
           if (!active) return; // Unmounted
 
           if (session?.user) {
+            // AUTHORIZATION CHECK
+            const isAuthorized = await checkEmailAuthorization(session.user.email);
+            if (!isAuthorized) {
+              console.warn("Unauthorized user found during session check:", session.user.email);
+              await handleLogout();
+              showToast("허가되지 않은 계정입니다. 접근이 거부되었습니다.");
+              return;
+            }
+
             const u = {
               id: session.user.id,
               userId: session.user.id,
@@ -155,6 +164,15 @@ const App: React.FC = () => {
         if (window.location.pathname.startsWith('/share/')) return;
 
         if (session?.user) {
+          // AUTHORIZATION CHECK
+          const isAuthorized = await checkEmailAuthorization(session.user.email);
+          if (!isAuthorized) {
+            console.warn("Unauthorized user login attempt:", session.user.email);
+            await handleLogout();
+            showToast("허가되지 않은 계정입니다. 접근이 거부되었습니다.");
+            return;
+          }
+
           setUser({
             id: session.user.id,
             userId: session.user.id,
@@ -169,6 +187,7 @@ const App: React.FC = () => {
           console.log("User Signed Out -> Switch to Welcome");
           setUser({ id: 'guest', userId: 'guest', name: '게스트', avatarUrl: '' });
           setCurrentView('welcome');
+          window.history.pushState(null, '', '/'); // Ensure URL is clean
           setIsAuthLoading(false);
           setIsInitializing(false);
         } else if (event === 'INITIAL_SESSION') {
@@ -188,6 +207,34 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Helper to check if email is allowed
+  const checkEmailAuthorization = async (email: string | undefined): Promise<boolean> => {
+    if (!email) return false;
+
+    // 1. Check Constants (Fastest)
+    const constantEmails = INITIAL_TEAM_MEMBERS.map(m => m.email);
+    if (constantEmails.includes(email)) return true;
+
+    // 2. Check LocalStorage (Sync Fallback)
+    const local = localStorage.getItem('grafy_team');
+    if (local) {
+      try {
+        const parsed = JSON.parse(local);
+        if (Array.isArray(parsed) && parsed.some((m: TeamMember) => m.email === email)) return true;
+      } catch (e) { console.error("Error parsing local team data", e); }
+    }
+
+    // 3. Check Supabase (Most Accurate)
+    if (isSupabaseReady && supabase) {
+      try {
+        const { data, error } = await supabase.from('team_members').select('email').eq('email', email).limit(1);
+        if (data && data.length > 0) return true;
+      } catch (e) { console.error("Error checking supabase authorization", e); }
+    }
+
+    return false;
+  };
+
   const handleGoogleLogin = async () => {
     setIsAuthLoading(true);
     console.log("Initiating Google OAuth Login...");
@@ -198,6 +245,15 @@ const App: React.FC = () => {
       const sessionUser = result?.data?.session?.user;
 
       if (sessionUser) {
+        // AUTHORIZATION CHECK
+        const isAuthorized = await checkEmailAuthorization(sessionUser.email);
+        if (!isAuthorized) {
+          console.warn("Unauthorized user login:", sessionUser.email);
+          await handleLogout();
+          showToast("허가되지 않은 계정입니다. 접근이 거부되었습니다.");
+          return;
+        }
+
         setUser({
           id: sessionUser.id,
           userId: sessionUser.id,
@@ -215,6 +271,7 @@ const App: React.FC = () => {
       console.error("Login component error:", error);
       showToast("로그인 중 오류가 발생했습니다.");
     } finally {
+      // If we didn't return early due to auth check, stop loading
       setTimeout(() => setIsAuthLoading(false), 3000);
     }
   };
@@ -223,8 +280,12 @@ const App: React.FC = () => {
     try {
       await signOut();
       showToast("로그아웃 되었습니다.");
+      // Force a hard reload to root to ensure clean state and show login screen
+      window.location.href = '/';
     } catch (error) {
       showToast("로그아웃 중 오류가 발생했습니다.");
+      // Even if error, try to redirect
+      window.location.href = '/';
     }
   };
 
@@ -829,7 +890,7 @@ const App: React.FC = () => {
       </div>
 
       {isSnapshotMode && (
-        <div className="sticky top-[73px] md:top-[88px] z-30 bg-black text-white px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-3 shadow-md animate-in slide-in-from-top-2">
+        <div className="fixed top-[72px] left-0 w-full z-30 bg-black text-white px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-3 shadow-md animate-in slide-in-from-top-2">
           <div className="flex items-center gap-3">
             <i className="fa-solid fa-camera text-red-500 animate-pulse"></i>
             <span className="font-bold text-sm md:text-base">클라이언트에게 보여질 목록을 선택 후 결정 버튼을 눌러 주세요</span>

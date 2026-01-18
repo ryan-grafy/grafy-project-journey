@@ -121,6 +121,19 @@ const SharedProjectView: React.FC<SharedProjectViewProps> = ({ projectId }) => {
     // Calculate generic progress for display only
     const status = project.status || 0;
 
+    const completedTasks = new Set(project.task_states?.completed || []);
+
+    // Logic to determine if a step is "visually" locked (grayscale)
+    const isLockedStep = (stepId: number): boolean => {
+        if (stepId === 1) return false;
+        const prevStepId = stepId - 1;
+        // We must check if *all visible tasks* of the previous step are completed.
+        // Re-using getVisibleTasks logic here might be expensive if not careful, 
+        // but given the size it's fine.
+        const prevVisibleTasks = getVisibleTasks(prevStepId, project);
+        return !prevVisibleTasks.every(t => completedTasks.has(t.id));
+    };
+
     return (
         <div className="min-h-screen pb-20 bg-[#e3e7ed] selection:bg-black selection:text-white">
             {/* Read-Only Navbar */}
@@ -158,20 +171,18 @@ const SharedProjectView: React.FC<SharedProjectViewProps> = ({ projectId }) => {
                         </div>
                     </div>
 
-                    {/* Steps Layout */}
-                    <div className="overflow-x-auto pb-8 no-scrollbar scroll-smooth">
-                        <div className="flex gap-4 md:gap-8 min-w-max px-0">
+                    {/* Steps Layout - Changed to Grid for fit-to-screen */}
+                    <div className="w-full pb-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 w-full">
                             {STEPS_STATIC.map((step) => {
                                 const tasks = getVisibleTasks(step.id, project);
-                                // If no tasks are visible in this step, we can consider hiding the column or showing empty state.
-                                // For now, we show the column to maintain structure.
-
+                                const locked = isLockedStep(step.id);
                                 return (
                                     <StepColumn
                                         key={step.id}
                                         step={step}
                                         tasks={tasks}
-                                        isLocked={true} // Always locked for client view
+                                        isLocked={locked} // Dynamic locking for visuals
                                         filter={Role.ALL}
                                         completedTasks={new Set(project.task_states?.completed || [])}
                                         taskLinks={new Map(Object.entries(project.task_states?.links || {}))}

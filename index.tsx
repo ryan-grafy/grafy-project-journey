@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
-import ClientShareView from './components/ClientShareView.tsx';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: React.ReactNode }) {
@@ -36,12 +35,11 @@ if (!rootElement) {
   console.error('Failed to find the root element');
 } else {
   const root = ReactDOM.createRoot(rootElement);
-  const isShareView = window.location.pathname.startsWith('/share/');
 
   root.render(
     <React.StrictMode>
       <ErrorBoundary>
-        {isShareView ? <ClientShareView /> : <App />}
+        <App />
       </ErrorBoundary>
     </React.StrictMode>
   );

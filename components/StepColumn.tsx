@@ -260,7 +260,7 @@ const StepColumn: React.FC<StepColumnProps> = ({
 
   return (
     <div
-      className={`relative h-fit flex flex-col flex-1 w-[85vw] md:w-auto md:min-w-[410px] p-5 md:p-8 rounded-[1.25rem] md:rounded-[1.5rem] border transition-all duration-700 ${bgColor} ${borderColor} ${isLocked && !isSnapshotMode ? 'opacity-40 grayscale blur-[0.5px]' : 'opacity-100 shadow-2xl shadow-black/5'}`}
+      className={`relative h-fit flex flex-col flex-1 w-full min-w-[280px] md:min-w-0 p-5 md:p-8 rounded-[1.25rem] md:rounded-[1.5rem] border transition-all duration-700 ${bgColor} ${borderColor} ${isLocked && !isSnapshotMode ? 'opacity-40 grayscale blur-[0.5px]' : 'opacity-100 shadow-2xl shadow-black/5'}`}
       onDragOver={(e) => {
         e.preventDefault();
         if (draggedIndex !== null && dragOverIndex === null) setDragOverIndex(visibleTasks.length);
