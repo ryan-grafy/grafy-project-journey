@@ -44,6 +44,18 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
+    // 0. Check for Shared Link first
+    const path = window.location.pathname;
+    if (path.startsWith('/share/')) {
+      const pid = path.split('/share/')[1];
+      if (pid) {
+        setSharedProjectId(pid);
+        setCurrentView('share');
+        setIsInitializing(false);
+        return; // Skip auth check for share view
+      }
+    }
+
     // Supabase Auth State Subscription
     if (isSupabaseReady && supabase) {
       console.log("Supabase is ready, initializing auth check...");
