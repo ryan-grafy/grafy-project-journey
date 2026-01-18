@@ -173,150 +173,155 @@ const Navbar: React.FC<NavbarProps> = ({
             <span className="text-[14px] font-bold text-black whitespace-nowrap">{project.designer_3_name || '-'}</span>
           </div>
         </div>
-      </div>
 
-      {/* Right Side: Roles & Actions */}
-      <div className="flex flex-col md:flex-row md:items-center gap-4 lg:gap-6 shrink-0 h-auto md:h-[42px]">
-        <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200 overflow-x-auto no-scrollbar max-w-full md:max-w-none h-full">
-          {roles.map((r) => (
-            <button key={r.value} onClick={(e) => { e.stopPropagation(); onRoleChange(r.value); }} className={`px-2.5 py-1 md:px-3 md:py-1.5 h-full flex items-center rounded-lg text-[10.5px] md:text-[12.5px] font-bold transition-all whitespace-nowrap ${activeRole === r.value ? 'bg-black text-white shadow-md' : 'text-slate-500 hover:text-black'}`}>
-              {r.label}
-            </button>
-          ))}
-        </div>
 
-        <div className="flex items-center justify-between md:justify-end gap-3 md:gap-4 h-full">
-          {project.status === 100 && (
-            <button onClick={(e) => { e.stopPropagation(); onToggleLock?.(!project.is_locked); }} className={`flex items-center gap-2 px-3 py-1.5 md:px-5 md:py-2 rounded-xl text-[10px] md:text-[12px] font-bold transition-all shadow-md h-full ${project.is_locked ? 'bg-red-500 text-white' : 'bg-black text-white'}`}>
-              <i className={`fa-solid ${project.is_locked ? 'fa-unlock' : 'fa-lock'}`}></i>
-              <span className="hidden sm:inline">{project.is_locked ? '잠금 해제' : '최종 완료 잠금'}</span>
-              <span className="sm:hidden">{project.is_locked ? '해제' : '잠금'}</span>
-            </button>
-          )}
-          <div className="flex items-center gap-2 md:gap-3 ml-auto h-full">
-            {/* Share Button (Moved First) */}
-            <button
-              onClick={async () => {
-                try {
-                  const token = crypto.randomUUID();
-                  const shareUrl = `${window.location.origin}/share/${project.id}`; // Changed to Project ID for persistent link mostly (needs token though)
-                  await navigator.clipboard.writeText(shareUrl);
-                  onToast("클라이언트 공유 링크가 복사되었습니다!");
-                } catch (e) {
-                  onToast("링크 복사 실패");
-                }
-              }}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 border border-slate-200 hover:bg-black hover:text-white hover:border-black transition-all"
-              title="공유 링크 복사"
-            >
-              <i className="fa-solid fa-share-nodes text-sm"></i>
-            </button>
+        {/* Right Side: Roles & Actions */}
+        <div className="flex flex-col md:flex-row md:items-center gap-4 lg:gap-6 shrink-0 h-auto md:h-[42px]">
+          <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200 overflow-x-auto no-scrollbar max-w-full md:max-w-none h-full">
+            {roles.map((r) => (
+              <button key={r.value} onClick={(e) => { e.stopPropagation(); onRoleChange(r.value); }} className={`px-2.5 py-1 md:px-3 md:py-1.5 h-full flex items-center rounded-lg text-[10.5px] md:text-[12.5px] font-bold transition-all whitespace-nowrap ${activeRole === r.value ? 'bg-black text-white shadow-md' : 'text-slate-500 hover:text-black'}`}>
+                {r.label}
+              </button>
+            ))}
+          </div>
 
-            {/* Snapshot Button (New) */}
-            <button
-              onClick={onSnapshotToggle}
-              className={`w-10 h-10 flex items-center justify-center rounded-xl border transition-all ${isSnapshotMode ? 'bg-red-500 text-white border-red-500 animate-pulse' : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-black hover:text-white hover:border-black'}`}
-              title="클라이언트 스냅샷 모드"
-            >
-              <i className="fa-solid fa-camera text-sm"></i>
-            </button>
+          <div className="flex items-center justify-between md:justify-end gap-3 md:gap-4 h-full">
+            {project.status === 100 && (
+              <button onClick={(e) => { e.stopPropagation(); onToggleLock?.(!project.is_locked); }} className={`flex items-center gap-2 px-3 py-1.5 md:px-5 md:py-2 rounded-xl text-[10px] md:text-[12px] font-bold transition-all shadow-md h-full ${project.is_locked ? 'bg-red-500 text-white' : 'bg-black text-white'}`}>
+                <i className={`fa-solid ${project.is_locked ? 'fa-unlock' : 'fa-lock'}`}></i>
+                <span className="hidden sm:inline">{project.is_locked ? '잠금 해제' : '최종 완료 잠금'}</span>
+                <span className="sm:hidden">{project.is_locked ? '해제' : '잠금'}</span>
+              </button>
+            )}
+            <div className="flex items-center gap-2 md:gap-3 ml-auto h-full">
+              {/* Share Button (Moved First) */}
+              <button
+                onClick={async () => {
+                  try {
+                    const token = crypto.randomUUID();
+                    const shareUrl = `${window.location.origin}/share/${project.id}`; // Changed to Project ID for persistent link mostly (needs token though)
+                    await navigator.clipboard.writeText(shareUrl);
+                    onToast("클라이언트 공유 링크가 복사되었습니다!");
+                  } catch (e) {
+                    onToast("링크 복사 실패");
+                  }
+                }}
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 border border-slate-200 hover:bg-black hover:text-white hover:border-black transition-all"
+                title="공유 링크 복사"
+              >
+                <i className="fa-solid fa-share-nodes text-sm"></i>
+              </button>
 
-            {/* Project List Button (Moved & Styled like others) */}
-            <button
-              onClick={(e) => { e.stopPropagation(); onBack(); }}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 border border-slate-200 hover:bg-black hover:text-white hover:border-black transition-all shrink-0 shadow-sm group"
-              title="프로젝트 목록으로 돌아가기"
-            >
-              <i className="fa-solid fa-list-ul text-sm"></i>
-            </button>
+              {/* Snapshot Button (New) */}
+              <button
+                onClick={onSnapshotToggle}
+                className={`w-10 h-10 flex items-center justify-center rounded-xl border transition-all ${isSnapshotMode ? 'bg-red-500 text-white border-red-500 animate-pulse' : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-black hover:text-white hover:border-black'}`}
+                title="클라이언트 스냅샷 모드"
+              >
+                <i className="fa-solid fa-camera text-sm"></i>
+              </button>
 
-            <div className="relative h-full flex items-center">
-              {user.userId === 'guest' ? (
-                <button
-                  onClick={onLogin}
-                  className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all shadow-sm group"
-                >
-                  <img src="https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png" alt="Google" className="w-4 h-4" />
-                  <span className="text-[12px] font-bold text-slate-700">Google 로그인</span>
-                </button>
-              ) : (
-                <div className="relative">
+              {/* Project List Button (Moved & Styled like others) */}
+              <button
+                onClick={(e) => { e.stopPropagation(); onBack(); }}
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 border border-slate-200 hover:bg-black hover:text-white hover:border-black transition-all shrink-0 shadow-sm group"
+                title="프로젝트 목록으로 돌아가기"
+              >
+                <i className="fa-solid fa-list-ul text-sm"></i>
+              </button>
+
+              <div className="relative h-full flex items-center">
+                {user.userId === 'guest' ? (
                   <button
-                    onClick={(e) => { e.stopPropagation(); setProfileMenuOpen(!profileMenuOpen); }}
-                    className="w-10 h-10 rounded-full border-2 border-white shadow-md overflow-hidden bg-slate-200 hover:scale-105 transition-all flex-shrink-0"
+                    onClick={onLogin}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all shadow-sm group"
                   >
-                    <img
-                      src={user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}
-                      alt={user.name}
-                      className="w-full h-full object-cover"
-                    />
+                    <img src="https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png" alt="Google" className="w-4 h-4" />
+                    <span className="text-[12px] font-bold text-slate-700">Google 로그인</span>
                   </button>
+                ) : (
+                  <div className="relative">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setProfileMenuOpen(!profileMenuOpen); }}
+                      className="w-10 h-10 rounded-full border-2 border-white shadow-md overflow-hidden bg-slate-200 hover:scale-105 transition-all flex-shrink-0"
+                    >
+                      <img
+                        src={user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}
+                        alt={user.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
 
-                  {profileMenuOpen && (
-                    <div className="absolute right-0 top-12 w-[220px] bg-white border border-slate-200 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100" onClick={(e) => e.stopPropagation()}>
-                      <div className="px-4 py-3 border-b border-slate-100">
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">내 정보</p>
-                        <p className="text-[14px] font-bold text-black">{user.name}</p>
+                    {profileMenuOpen && (
+                      <div className="absolute right-0 top-12 w-[220px] bg-white border border-slate-200 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100" onClick={(e) => e.stopPropagation()}>
+                        <div className="px-4 py-3 border-b border-slate-100">
+                          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">내 정보</p>
+                          <p className="text-[14px] font-bold text-black">{user.name}</p>
+                        </div>
+                        <div className="py-1">
+                          <button className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors flex items-center gap-3 text-slate-700">
+                            <i className="fa-regular fa-user text-sm"></i>
+                            <span className="text-[13px] font-medium">프로필 설정</span>
+                          </button>
+                          <button className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors flex items-center gap-3 text-slate-700">
+                            <i className="fa-regular fa-bell text-sm"></i>
+                            <span className="text-[13px] font-medium">알림 메일</span>
+                          </button>
+                        </div>
+                        <div className="border-t border-slate-100 mt-1 pt-1">
+                          <button
+                            onClick={onLogout}
+                            className="w-full text-left px-4 py-2 hover:bg-red-50 transition-colors flex items-center gap-3 text-red-500"
+                          >
+                            <i className="fa-solid fa-arrow-right-from-bracket text-sm"></i>
+                            <span className="text-[13px] font-bold">로그아웃</span>
+                          </button>
+                        </div>
                       </div>
-                      <div className="py-1">
-                        <button className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors flex items-center gap-3 text-slate-700">
-                          <i className="fa-regular fa-user text-sm"></i>
-                          <span className="text-[13px] font-medium">프로필 설정</span>
-                        </button>
-                        <button className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors flex items-center gap-3 text-slate-700">
-                          <i className="fa-regular fa-bell text-sm"></i>
-                          <span className="text-[13px] font-medium">알림 메일</span>
-                        </button>
-                      </div>
-                      <div className="border-t border-slate-100 mt-1 pt-1">
-                        <button
-                          onClick={onLogout}
-                          className="w-full text-left px-4 py-2 hover:bg-red-50 transition-colors flex items-center gap-3 text-red-500"
-                        >
-                          <i className="fa-solid fa-arrow-right-from-bracket text-sm"></i>
-                          <span className="text-[13px] font-bold">로그아웃</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Popovers */}
-      {editMenu.isOpen && (
-        <div className="fixed z-[110] bg-white border border-slate-200 rounded-xl shadow-2xl p-1.5 w-[200px]" style={{ top: editMenu.y, left: editMenu.x }} onClick={(e) => e.stopPropagation()}>
-          <div className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 mb-1">담당자 교체 선택</div>
-          <div className="max-h-60 overflow-y-auto custom-scrollbar">
-            {teamMembers.map(m => (
-              <button key={m.id} onClick={() => handleMemberSelect(m)} className="w-full text-left px-4 py-2 rounded-lg hover:bg-slate-50 text-[13px] font-bold text-black border-b border-slate-50 last:border-0">{m.name} {m.title}</button>
-            ))}
+      {
+        editMenu.isOpen && (
+          <div className="fixed z-[110] bg-white border border-slate-200 rounded-xl shadow-2xl p-1.5 w-[200px]" style={{ top: editMenu.y, left: editMenu.x }} onClick={(e) => e.stopPropagation()}>
+            <div className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 mb-1">담당자 교체 선택</div>
+            <div className="max-h-60 overflow-y-auto custom-scrollbar">
+              {teamMembers.map(m => (
+                <button key={m.id} onClick={() => handleMemberSelect(m)} className="w-full text-left px-4 py-2 rounded-lg hover:bg-slate-50 text-[13px] font-bold text-black border-b border-slate-50 last:border-0">{m.name} {m.title}</button>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
-      {contactPopover.isOpen && (
-        <div className="fixed z-[110] bg-white text-black border border-slate-200 rounded-2xl shadow-2xl p-6 w-[240px] animate-in fade-in zoom-in-95 duration-100" style={{ top: contactPopover.y, left: contactPopover.x }} onClick={(e) => e.stopPropagation()}>
-          <div className="flex justify-between items-start mb-4">
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{contactPopover.memberName} INFO</div>
-            <button onClick={() => setContactPopover({ ...contactPopover, isOpen: false })} className="text-slate-300 hover:text-black transition-colors"><i className="fa-solid fa-times"></i></button>
-          </div>
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-3">
-              <i className="fa-solid fa-phone text-blue-600 text-[12px]"></i>
-              <span className="text-[14px] font-bold text-black">{contactPopover.phone || '정보 없음'}</span>
+      {
+        contactPopover.isOpen && (
+          <div className="fixed z-[110] bg-white text-black border border-slate-200 rounded-2xl shadow-2xl p-6 w-[240px] animate-in fade-in zoom-in-95 duration-100" style={{ top: contactPopover.y, left: contactPopover.x }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-start mb-4">
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{contactPopover.memberName} INFO</div>
+              <button onClick={() => setContactPopover({ ...contactPopover, isOpen: false })} className="text-slate-300 hover:text-black transition-colors"><i className="fa-solid fa-times"></i></button>
             </div>
-            <div className="flex items-center gap-3">
-              <i className="fa-solid fa-envelope text-blue-600 text-[12px]"></i>
-              <span className="text-[14px] font-bold text-black truncate">{contactPopover.email || '정보 없음'}</span>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <i className="fa-solid fa-phone text-blue-600 text-[12px]"></i>
+                <span className="text-[14px] font-bold text-black">{contactPopover.phone || '정보 없음'}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <i className="fa-solid fa-envelope text-blue-600 text-[12px]"></i>
+                <span className="text-[14px] font-bold text-black truncate">{contactPopover.email || '정보 없음'}</span>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </nav>
+        )
+      }
+    </nav >
   );
 };
 

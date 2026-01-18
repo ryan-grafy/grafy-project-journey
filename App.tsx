@@ -863,19 +863,7 @@ const App: React.FC = () => {
 
       {currentView === 'list' && (
         <>
-          <Navbar
-            project={{ name: 'GRAFY PROJECT JOURNEY', start_date: '', status: 0, pm_name: '', designer_name: '', id: 'temp', created_at: '', last_updated: '', rounds_count: 2 }}
-            user={user}
-            teamMembers={teamMembers}
-            activeRole={activeRole}
-            onRoleChange={setActiveRole}
-            onBack={() => { }}
-            onUpdateInfo={() => { }}
-            onLogout={handleLogout}
-            onLogin={handleGoogleLogin}
-            onToast={showToast}
-            isSnapshotMode={false} // List view no snapshot
-          />
+
           <ProjectList
             projects={projects}
             onSelectProject={selectProject}
