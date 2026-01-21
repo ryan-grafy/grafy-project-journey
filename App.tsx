@@ -1195,7 +1195,8 @@ const App: React.FC = () => {
             rounds_count: 2,
             rounds2_count: 2,
             rounds_navigation_count: 2, // 기본값 2로 변경
-            client_visible_tasks: []
+            client_visible_tasks: [],
+            template_name: templateName
         }
       },
       client_visible_tasks: [],
@@ -1217,6 +1218,7 @@ const App: React.FC = () => {
             rounds2_count, 
             rounds_navigation_count, 
             client_visible_tasks, 
+            template_name,
             ...baseProject 
         } = newProject;
 
@@ -1257,6 +1259,7 @@ const App: React.FC = () => {
             rounds_navigation_count, 
             client_visible_tasks, 
             deleted_at, // Omit
+            template_name,
             ...projectData 
         } = currentProject;
         
@@ -1276,7 +1279,8 @@ const App: React.FC = () => {
                     rounds2_count: rounds2,
                     rounds_navigation_count: roundsNavigation, // Ensure this is captured
                     client_visible_tasks: currentProject.client_visible_tasks,
-                    is_expedition2_hidden: currentProject.task_states?.meta?.is_expedition2_hidden
+                    is_expedition2_hidden: currentProject.task_states?.meta?.is_expedition2_hidden,
+                    template_name: template_name
                 }
             }
         };
