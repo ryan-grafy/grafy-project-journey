@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Project, User, Role, Task } from '../types';
 import { STEPS_STATIC } from '../constants';
+import DeletedDataModal from './DeletedDataModal';
 
 interface ProjectListProps {
   projects: Project[];
@@ -160,7 +161,7 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
     <>
       {/* Desktop Row View */}
       <div
-        className={`hidden md:grid grid-cols-12 border-b border-slate-100 hover:bg-slate-50/50 transition-all items-stretch group relative ${isLast ? 'rounded-b-[1rem] md:rounded-b-[1.25rem] border-b-0' : ''}`}
+        className={`hidden md:grid grid-cols-12 border-b border-slate-100 hover:bg-slate-50/50 transition-all items-center group relative h-[33px] ${isLast ? 'rounded-b-[1rem] md:rounded-b-[1.25rem] border-b-0' : ''}`}
       >
         <a 
           href={`?project=${project.id}`}
@@ -168,15 +169,18 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
           className="absolute inset-0 z-0 block"
         ></a>
 
-        <div className="col-span-1 px-4 py-2.5 flex items-center justify-center text-slate-300 font-black text-xl group-hover:text-black transition-colors border-r border-slate-100 relative z-10 pointer-events-none">
+        <div className="col-span-1 px-4 py-0.5 flex items-center justify-center text-slate-300 font-black text-xl group-hover:text-black transition-colors border-r border-slate-100 relative z-10 pointer-events-none">
           {String(index + 1).padStart(2, '0')}
         </div>
-        <div className="col-span-1 px-4 py-2.5 flex items-center justify-center text-[16px] font-bold text-slate-500 whitespace-nowrap border-r border-slate-100 relative z-10 pointer-events-none">
+        <div className="col-span-1 px-2 py-0.5 flex items-center justify-center text-[13px] font-bold text-slate-400 border-r border-slate-100 overflow-hidden relative z-10 pointer-events-none">
+          <span className="truncate" title={project.template_name || '-'}>{project.template_name || '-'}</span>
+        </div>
+        <div className="col-span-1 px-4 py-0.5 flex items-center justify-center text-[15px] font-bold text-slate-500 whitespace-nowrap border-r border-slate-100 relative z-10 pointer-events-none">
           {project.start_date || '-'}
         </div>
-        <div className="col-span-1 px-2 py-2.5 flex flex-col items-center justify-center border-r border-slate-100 overflow-hidden relative z-10 pointer-events-none">
+        <div className="col-span-1 px-2 py-0.5 flex flex-col items-center justify-center border-r border-slate-100 overflow-hidden relative z-10 pointer-events-none">
             {isProjectEnded ? (
-               <span className="text-xs font-bold text-black bg-slate-100 px-2 py-1 rounded-full whitespace-nowrap">프로젝트 종료</span>
+               <span className="text-[13px] font-bold text-white bg-emerald-500 px-3 py-1.5 rounded-full whitespace-nowrap shadow-sm">프로젝트 종료</span>
             ) : nextSchedule ? (
                 <>
                     <span className={`font-mono text-[15px] font-bold ${nextSchedule.isOverdue ? 'text-red-500 animate-pulse' : 'text-emerald-500'}`}>
@@ -190,10 +194,10 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
                 <span className="text-xs text-slate-300">-</span>
             )}
         </div>
-        <div className={`col-span-1 px-4 py-2.5 flex items-center justify-center text-[16px] font-bold ${isCompleted ? 'text-emerald-500' : 'text-slate-400'} whitespace-nowrap transition-colors duration-500 border-r border-slate-100 relative z-10 pointer-events-none`}>
+        <div className={`col-span-1 px-4 py-0.5 flex items-center justify-center text-[15px] font-bold ${isCompleted ? 'text-emerald-500' : 'text-slate-400'} whitespace-nowrap transition-colors duration-500 border-r border-slate-100 relative z-10 pointer-events-none`}>
           {project.end_date || '-'}
         </div>
-        <div className="col-span-4 px-6 py-2.5 flex items-center font-black text-black text-[16px] group-hover:translate-x-1 transition-transform border-r border-slate-100 overflow-hidden relative z-10 pointer-events-none">
+        <div className="col-span-3 px-6 py-0.5 flex items-center font-black text-black text-[16px] group-hover:translate-x-1 transition-transform border-r border-slate-100 overflow-hidden relative z-10 pointer-events-none">
           <span className="truncate">{project.name}</span>
           {project.is_locked && (
             <div className="w-5 h-5 ml-2 rounded-full bg-red-500 flex items-center justify-center text-white shadow-sm shrink-0">
@@ -201,10 +205,10 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
             </div>
           )}
         </div>
-        <div className="col-span-2 px-6 py-2.5 flex items-center text-[14px] font-bold text-slate-600 border-r border-slate-100 overflow-hidden relative z-10 pointer-events-none">
+        <div className="col-span-2 px-6 py-0.5 flex items-center text-[14px] font-bold text-slate-600 border-r border-slate-100 overflow-hidden relative z-10 pointer-events-none">
           <span className="truncate">{getTeamString(project)}</span>
         </div>
-        <div className="col-span-2 px-6 py-2.5 flex items-center justify-end gap-3 ml-auto w-full relative z-10 pointer-events-none">
+        <div className="col-span-2 px-6 py-0.5 flex items-center justify-end gap-3 ml-auto w-full relative z-10 pointer-events-none">
           <div className="flex items-center justify-end gap-3 w-full">
             <div className="w-5 flex-shrink-0 flex items-center justify-center">
               {isCompleted && (
@@ -297,6 +301,7 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('recent_created');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [showDeletedDataModal, setShowDeletedDataModal] = useState(false);
 
   useEffect(() => {
     const closeMenu = () => setProfileMenuOpen(false);
@@ -330,9 +335,10 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest
   }, [projects, searchTerm, sortBy]);
 
   const exportToCSV = () => {
-    const headers = ["No", "시작일", "종료일", "클라이언트 / 프로젝트명", "진행 인원", "Status", "Last Updated"];
+    const headers = ["No", "카테고리", "시작일", "종료일", "클라이언트 / 프로젝트명", "진행 인원", "Status", "Last Updated"];
     const rows = sortedAndFilteredProjects.map((p, i) => [
       i + 1,
+      p.template_name || '-',
       p.start_date || '-',
       p.end_date || '-',
       p.name,
@@ -412,9 +418,26 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest
                   <div className="absolute right-0 top-12 w-[220px] bg-white border border-slate-200 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100" onClick={(e) => e.stopPropagation()}>
                     <div className="px-4 py-3 border-b border-slate-100">
                       <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">내 정보</p>
-                      <p className="text-[14px] font-bold text-black">{user.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[14px] font-bold text-black">{user.name}</p>
+                        {['mondo.kim@gmail.com', 'wjatnsdl527@gmail.com'].includes(user.email || '') && (
+                          <span className="text-[9px] font-black px-1.5 py-0.5 bg-black text-white rounded uppercase tracking-wider">ADMIN</span>
+                        )}
+                      </div>
                     </div>
                     <div className="py-1">
+                      {['mondo.kim@gmail.com', 'wjatnsdl527@gmail.com'].includes(user.email || '') && (
+                        <button
+                          onClick={() => {
+                            setProfileMenuOpen(false);
+                            setShowDeletedDataModal(true);
+                          }}
+                          className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors flex items-center gap-3 text-slate-700"
+                        >
+                          <i className="fa-solid fa-trash-arrow-up text-sm text-amber-600"></i>
+                          <span className="text-[13px] font-bold">삭제 데이터 관리</span>
+                        </button>
+                      )}
                       <button
                         onClick={onLogout}
                         className="w-full text-left px-4 py-2 hover:bg-red-50 transition-colors flex items-center gap-3 text-red-500"
@@ -487,13 +510,14 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest
         <div className="bg-white rounded-[1rem] md:rounded-[1.25rem] shadow-xl shadow-black/5 border border-slate-100">
           {/* Desktop Header */}
           <div className="hidden md:grid grid-cols-12 bg-black text-[13px] md:text-[14px] font-black text-white uppercase tracking-widest text-center rounded-t-[1rem] md:rounded-t-[1.25rem]">
-            <div className="col-span-1 py-3 border-r border-white/20">No.</div>
-            <div className="col-span-1 py-3 border-r border-white/20">시작일</div>
-            <div className="col-span-1 py-3 border-r border-white/20 text-emerald-300">다음 일정</div>
-            <div className="col-span-1 py-3 border-r border-white/20">종료일</div>
-            <div className="col-span-4 py-3 border-r border-white/20 px-6 text-left">클라이언트 / 프로젝트명</div>
-            <div className="col-span-2 py-3 border-r border-white/20 px-6 text-left">진행 인원</div>
-            <div className="col-span-2 py-3">진행율</div>
+            <div className="col-span-1 py-1.5 border-r border-white/20">No.</div>
+            <div className="col-span-1 py-1.5 border-r border-white/20">카테고리</div>
+            <div className="col-span-1 py-1.5 border-r border-white/20">시작일</div>
+            <div className="col-span-1 py-1.5 border-r border-white/20 text-emerald-300">다음 일정</div>
+            <div className="col-span-1 py-1.5 border-r border-white/20">종료일</div>
+            <div className="col-span-3 py-1.5 border-r border-white/20 px-6 text-left">클라이언트 / 프로젝트명</div>
+            <div className="col-span-2 py-1.5 border-r border-white/20 px-6 text-left">진행 인원</div>
+            <div className="col-span-2 py-1.5">진행율</div>
           </div>
 
           {sortedAndFilteredProjects.length === 0 ? (
@@ -518,6 +542,17 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest
             </div>
           )}
         </div>
+      )}
+
+      {showDeletedDataModal && (
+        <DeletedDataModal
+          onClose={() => setShowDeletedDataModal(false)}
+          onRestore={(projectId) => {
+            console.log('Restore project:', projectId);
+            setShowDeletedDataModal(false);
+          }}
+          deletedProjects={[]}
+        />
       )}
     </div>
   );

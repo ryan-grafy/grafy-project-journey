@@ -234,8 +234,8 @@ const SharedProjectView: React.FC<SharedProjectViewProps> = ({ projectId }) => {
                                         onToast={() => { }}
                                         isLockedProject={true}
                                         projectId={project.id}
-                                        isSnapshotMode={false} // Always false
-                                        snapshotSelectedTasks={new Set()}
+                                        isSnapshotMode={true} // Show snapshot selection
+                                        snapshotSelectedTasks={new Set(project.client_visible_tasks || [])}
                                         onSnapshotTaskSelect={() => { }}
                                         onAddTask={() => { }}
                                     />

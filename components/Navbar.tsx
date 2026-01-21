@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Role, Project, User, TeamMember } from '../types';
+import { ADMIN_EMAILS } from '../constants';
 
 interface NavbarProps {
   project: Project;
@@ -15,11 +16,12 @@ interface NavbarProps {
   onToggleLock?: (locked: boolean) => void;
   isSnapshotMode?: boolean;
   onSnapshotToggle?: () => void;
+  onSaveTemplate?: (name: string) => void;
 }
 
 const Navbar: React.FC<NavbarProps> = ({
   project, user = { id: 'guest', userId: 'guest', name: 'Guest', avatarUrl: '' } as User, teamMembers, activeRole, onRoleChange, onBack, onUpdateInfo, onLogout, onLogin, onToast, onToggleLock,
-  isSnapshotMode, onSnapshotToggle
+  isSnapshotMode, onSnapshotToggle, onSaveTemplate
 }) => {
   const [localProjectName, setLocalProjectName] = useState(project.name);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -194,6 +196,19 @@ const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
             <div className="flex items-center gap-2 md:gap-3 ml-auto h-full">
+              {/* Admin Template Save Button */}
+              {user.email && ADMIN_EMAILS.includes(user.email) && onSaveTemplate && (
+                <button
+                  onClick={() => {
+                    const name = prompt("템플릿 이름을 입력하세요 (예: 기본 브랜딩 템플릿)");
+                    if (name) onSaveTemplate(name);
+                  }}
+                  className="bg-white border border-slate-300 text-slate-600 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-[11px] md:text-[13px] font-bold shadow-sm hover:border-black hover:text-black transition-all h-full"
+                >
+                  <i className="fa-solid fa-save mr-1.5"></i> 템플릿 저장
+                </button>
+              )}
+
               {/* Share Button (Moved First) */}
               <button
                 onClick={async () => {

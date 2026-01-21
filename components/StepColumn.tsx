@@ -22,6 +22,8 @@ interface StepColumnProps {
   isSnapshotMode?: boolean;
   snapshotSelectedTasks?: Set<string>;
   onSnapshotTaskSelect?: (taskId: string) => void;
+  displayIndex?: number;
+  headerLeftButtons?: React.ReactNode;
 }
 
 const StepColumn: React.FC<StepColumnProps> = ({
@@ -43,7 +45,9 @@ const StepColumn: React.FC<StepColumnProps> = ({
   children,
   isSnapshotMode,
   snapshotSelectedTasks,
-  onSnapshotTaskSelect
+  onSnapshotTaskSelect,
+  displayIndex,
+  headerLeftButtons
 }) => {
   /* Migration Safe Access: task.roles might be undefined during transition if data not migrated yet. 
      We treat missing roles as [Role.PM] or empty based on context, but let's safely access. */
@@ -282,10 +286,15 @@ const StepColumn: React.FC<StepColumnProps> = ({
     >
       <div className="flex items-center mb-6 md:mb-8 relative z-10">
         <span className="bg-black text-[10px] md:text-[12px] font-bold px-3 py-2 rounded-xl border border-black mr-4 text-white uppercase tracking-tighter shadow-sm">
-          STEP {String(step.id).padStart(2, '0')}
+          STEP {String(displayIndex || step.id).padStart(2, '0')}
         </span>
         <h3 className="font-bold text-xl md:text-2xl text-black uppercase tracking-tight truncate">{step.title}</h3>
         <div className="ml-auto flex items-center gap-2">
+          {headerLeftButtons && (
+            <div className="flex items-center gap-2 mr-2">
+              {headerLeftButtons}
+            </div>
+          )}
           {!isLocked && !isLockedProject && onAddTask && (
             <button
               onClick={(e) => { e.stopPropagation(); onAddTask(); }}

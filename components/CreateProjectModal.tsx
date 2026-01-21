@@ -4,26 +4,29 @@ import { TeamMember, Project } from '../types';
 
 interface CreateProjectModalProps {
   teamMembers: TeamMember[];
+  templates: Project[]; // Templates passed from App
   onClose: () => void;
-  onCreate: (name: string, pm: TeamMember | null, designers: (TeamMember | null)[], startDate: string) => Promise<void>;
+  onCreate: (name: string, pm: TeamMember | null, designers: (TeamMember | null)[], startDate: string, customTasks?: any, templateName?: string) => Promise<void>;
 }
 
-const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ teamMembers, onClose, onCreate }) => {
+const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ teamMembers, templates, onClose, onCreate }) => {
   const [name, setName] = useState('');
   const [pm, setPm] = useState<TeamMember | null>(null);
   const [designerLead, setDesignerLead] = useState<TeamMember | null>(null);
   const [designer1, setDesigner1] = useState<TeamMember | null>(null);
   const [designer2, setDesigner2] = useState<TeamMember | null>(null);
   const [startDate, setStartDate] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState<Project | null>(null); // Selected Template
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const [dropdownOpen, setDropdownOpen] = useState<'pm' | 'lead' | 'd1' | 'd2' | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState<'pm' | 'lead' | 'd1' | 'd2' | 'template' | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
     setIsSubmitting(true);
-    await onCreate(name, pm, [designerLead, designer1, designer2], startDate);
+    // Pass custom_tasks from selected template if exists
+    await onCreate(name, pm, [designerLead, designer1, designer2], startDate, selectedTemplate?.custom_tasks, selectedTemplate?.name);
     setIsSubmitting(false);
   };
 
@@ -80,6 +83,27 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ teamMembers, on
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          {/* Template Selection */}
+          <div className="relative">
+            <label className="block text-[12px] font-black text-black mb-2 uppercase tracking-widest">TEMPLATE (선택)</label>
+            <div onClick={() => setDropdownOpen(dropdownOpen === 'template' ? null : 'template')} className="w-full bg-white border border-slate-200 rounded-xl p-4 text-base font-bold cursor-pointer hover:border-black transition-all text-black flex justify-between items-center">
+                <span className={selectedTemplate ? 'text-black' : 'text-slate-400'}>{selectedTemplate ? selectedTemplate.name : '기본 (Default)'}</span>
+                <i className={`fa-solid fa-chevron-down text-[10px] transition-transform ${dropdownOpen === 'template' ? 'rotate-180' : ''}`}></i>
+            </div>
+            {dropdownOpen === 'template' && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border-2 border-black rounded-xl shadow-2xl z-[110] overflow-hidden">
+                    <div className="max-h-64 overflow-y-auto custom-scrollbar">
+                        <div onClick={() => { setSelectedTemplate(null); setDropdownOpen(null); }} className="px-5 py-2 text-base font-bold hover:bg-slate-50 cursor-pointer text-slate-400 border-b border-slate-100 italic">기본 (Default)</div>
+                        {templates.map(t => (
+                            <div key={t.id} onClick={() => { setSelectedTemplate(t); setDropdownOpen(null); }} className="px-5 py-2 text-base font-bold hover:bg-slate-50 cursor-pointer text-black border-b border-slate-100 last:border-0">
+                                {t.name}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+          </div>
+
           <div>
             <label className="block text-[12px] font-black text-black mb-2 uppercase tracking-widest">Project Name</label>
             <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl p-4 text-base font-bold outline-none focus:border-black transition-all text-black" placeholder="프로젝트명을 입력하세요" />

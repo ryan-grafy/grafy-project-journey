@@ -4,7 +4,8 @@ export enum Role {
   CLIENT = 'client',
   PM = 'pm',
   DESIGNER = 'designer',
-  MANAGER = 'manager'
+  MANAGER = 'manager',
+  DEVELOPER = 'developer'
 }
 
 export interface User {
@@ -103,6 +104,8 @@ export interface Project {
   task_states?: {
     completed: string[];
     links: Record<string, { url: string; label: string }>;
+    meta?: any;
   };
   client_visible_tasks?: string[]; // IDs of tasks visible to clients
+  template_name?: string; // Name of the template used to create the project
 }

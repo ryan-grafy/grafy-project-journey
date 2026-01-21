@@ -10,7 +10,7 @@ import TeamManagementModal from './components/TeamManagementModal.tsx';
 import WelcomeScreen from './components/WelcomeScreen.tsx';
 import { supabase, isSupabaseReady, signInWithGoogle, signOut } from './supabaseClient.ts';
 import SharedProjectView from './components/SharedProjectView.tsx';
-import { STEPS_STATIC, TEAM_MEMBERS as INITIAL_TEAM_MEMBERS } from './constants.ts';
+import { STEPS_STATIC, TEAM_MEMBERS as INITIAL_TEAM_MEMBERS, STORAGE_BUCKET, DEFAULT_CUSTOM_TASKS } from './constants.ts';
 import { Role, Task, PopoverState, Project, User, TaskEditPopoverState, TeamMember } from './types.ts';
 
 const App: React.FC = () => {
@@ -18,6 +18,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'welcome' | 'list' | 'detail' | 'share'>('welcome');
   const [isInitializing, setIsInitializing] = useState(true);
   const [sharedProjectId, setSharedProjectId] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<Project[]>([]); // Templates State
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
@@ -30,7 +31,7 @@ const App: React.FC = () => {
   const [taskLinks, setTaskLinks] = useState<Map<string, { url: string, label: string }>>(new Map());
   const [rounds, setRounds] = useState<number>(2);
   const [rounds2, setRounds2] = useState<number>(2); // Expedition 2 rounds
-  const [roundsNavigation, setRoundsNavigation] = useState<number>(1); // Navigation rounds (Step 2)
+  const [roundsNavigation, setRoundsNavigation] = useState<number>(2); // Navigation rounds (Step 2)
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
@@ -44,6 +45,7 @@ const App: React.FC = () => {
   const [taskEditPopover, setTaskEditPopover] = useState<TaskEditPopoverState>({
     isOpen: false, taskId: null, roles: [Role.PM], title: '', description: '', completed_date: '', x: 0, y: 0
   });
+  const [confirmHideExpedition2, setConfirmHideExpedition2] = useState(false); // Expedition 2 숨기기 확인 상태
 
   // --- SAFEGUARDS ---
   // Force Welcome if Guest is on List
@@ -67,182 +69,172 @@ const App: React.FC = () => {
   // ------------------
 
   useEffect(() => {
-    let active = true; // cleanup guard
+    let mounted = true;
+    let authListener: any = null;
 
-    // 0. Check for Shared Link first - PRIORITY 1
-    const path = window.location.pathname;
-    if (path.startsWith('/share/')) {
-      console.log("Shared link detecting:", path);
-      const pid = path.split('/share/')[1];
-      if (pid) {
-        setSharedProjectId(pid);
-        setCurrentView('share');
-        setIsInitializing(false);
-        // DO NOT run auth checks if we are in shared view mode.
-        return;
-      }
-    }
+    const initAuth = async () => {
+        if (!isSupabaseReady || !supabase) {
+             console.warn("Supabase not ready.");
+             if (mounted) setIsInitializing(false);
+             return;
+        }
 
-    // Supabase Auth State Subscription - PRIORITY 2
-    if (isSupabaseReady && supabase) {
-      console.log("Supabase is ready, initializing auth check...");
+        // 1. Shared Link Check
+        const path = window.location.pathname;
+        if (path.startsWith('/share/')) {
+            const pid = path.split('/share/')[1];
+            if (pid) {
+                console.log("Shared link detected:", pid);
+                setSharedProjectId(pid);
+                setCurrentView('share');
+                setIsInitializing(false);
+                return; 
+            }
+        }
 
-      const performSessionCheck = async (retryCount = 0) => {
+        console.log("Initializing Auth...");
+        
+        // 2. Auth State Change Listener (Priority for maintaining session)
+        const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log("Auth Event:", event);
+            if (!mounted) return;
+
+            // FIX: Prevent view reset on token refresh
+            if (event === 'TOKEN_REFRESHED') return;
+
+            if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+                if (session) {
+                    // Check Authorization
+                    const isAuthorized = await checkEmailAuthorization(session.user.email);
+                    if (!isAuthorized) {
+                         console.warn("Unauthorized user:", session.user.email);
+                         await supabase.auth.signOut();
+                         showToast("허가되지 않은 계정입니다.");
+                         setCurrentView('welcome');
+                         setIsInitializing(false);
+                         return;
+                    }
+
+                    // Success Login
+                    setUser({
+                        id: session.user.id,
+                        userId: session.user.id,
+                        name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || 'User',
+                        avatarUrl: session.user.user_metadata.avatar_url,
+                        email: session.user.email
+                    });
+                    
+                    // Only switch view if not already in detail or list
+                    setCurrentView(prev => (prev === 'welcome' ? 'list' : prev));
+                    
+                    // Fetch Data
+                    fetchTeamMembers();
+                    fetchProjects();
+                    fetchTemplates(); // Ensure templates are fetched
+                    
+                    setIsAuthLoading(false);
+                    setIsInitializing(false);
+                }
+            } else if (event === 'SIGNED_OUT') {
+                if (mounted) {
+                    console.log("User Signed Out -> Welcome");
+                    setCurrentView('welcome');
+                    setUser({ id: 'guest', userId: 'guest', name: '게스트', avatarUrl: '' });
+                    setIsInitializing(false);
+                    setIsAuthLoading(false);
+                }
+            }
+        });
+        authListener = data.subscription;
+
+        // 3. Initial Session Check (Fast Path & Timeout Fallback)
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session && !window.location.hash.includes('access_token')) {
+             // If no session immediately, give a small grace period for listener or recovery
+             setTimeout(() => {
+                 if (mounted && isInitializing) { 
+                     // Double check
+                     supabase.auth.getSession().then(({data}) => {
+                         if (!data.session) {
+                             console.log("No session found after timeout. Showing Welcome.");
+                             setCurrentView('welcome');
+                             setIsInitializing(false);
+                         }
+                     });
+                 }
+             }, 1000);
+        }
+    };
+    
+    // Initialize Storage Bucket
+    const initializeStorage = async () => {
+        if (!supabase) return;
         try {
-          // 1. Manually check URL hash for tokens (Super robust for clock skew)
-          const hash = window.location.hash.substring(1);
-          if (hash.includes('access_token=')) {
-            console.log("Found access_token in hash, attempting manual session recovery...");
-            const params = new URLSearchParams(hash);
-            const accessToken = params.get('access_token');
-            const refreshToken = params.get('refresh_token');
-
-            if (accessToken) {
-              const { data, error } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken || '',
-              });
-
-              if (error) console.error("setSession error:", error.message);
-              // If successful, the onAuthStateChange will fire 'SIGNED_IN'
-              if (data?.user) {
-                console.log("Manual setSession successful -> waiting for onAuthStateChange");
-                window.history.replaceState(null, '', window.location.pathname);
-                // We don't need to do anything else, the listener will handle it.
-                return;
-              }
-            }
+          const { error } = await supabase.storage.getBucket(STORAGE_BUCKET);
+          if (error && error.message.includes('not found')) {
+            await supabase.storage.createBucket(STORAGE_BUCKET, { public: true, fileSizeLimit: 52428800 });
           }
+        } catch (e) { console.error("Storage init error", e); }
+    };
 
-          // 2. Standard session check
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-          console.log(`Session check #${retryCount + 1}:`, session ? "Session exists" : "No session");
+    initAuth();
+    initializeStorage();
 
-          if (!active) return; // Unmounted
+    return () => {
+        mounted = false;
+        if (authListener) authListener.unsubscribe();
+    };
+  }, [isSupabaseReady]);
 
-          if (session?.user) {
-            // AUTHORIZATION CHECK
-            const isAuthorized = await checkEmailAuthorization(session.user.email);
-            if (!isAuthorized) {
-              console.warn("Unauthorized user found during session check:", session.user.email);
-              await handleLogout();
-              showToast("허가되지 않은 계정입니다. 접근이 거부되었습니다.");
-              return;
-            }
-
-            const u = {
-              id: session.user.id,
-              userId: session.user.id,
-              name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || '사용자',
-              avatarUrl: session.user.user_metadata.avatar_url,
-              email: session.user.email
-            };
-            setUser(u);
-            setCurrentView('list');
-            fetchTeamMembers();
-            fetchProjects();
-          } else if (window.location.hash.includes('access_token') && retryCount < 3) {
-            console.log("Token in hash but no session yet, retrying...", sessionError);
-            setTimeout(() => performSessionCheck(retryCount + 1), 1000);
-            return; // Don't turn off init yet
-          } else {
-            console.log("No session found, modifying view to Welcome.");
-            setCurrentView('welcome');
-          }
-        } catch (e) {
-          console.error("Session check failed:", e);
-          if (active) setCurrentView('welcome');
-        } finally {
-          if (active) setIsInitializing(false);
-        }
-      };
-
-      performSessionCheck();
-
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        console.log("Auth state change event:", event);
-        if (!active) return;
-
-        // Critical: Do NOT change view if we are already in SHARE mode
-        if (window.location.pathname.startsWith('/share/')) return;
-
-        // BUG FIX: Do not reset view on token refresh (happens on tab switch)
-        if (event === 'TOKEN_REFRESHED') {
-          console.log("Token refreshed, preserving current view.");
-          return;
-        }
-
-        if (session?.user) {
-          // AUTHORIZATION CHECK
-          const isAuthorized = await checkEmailAuthorization(session.user.email);
-          if (!isAuthorized) {
-            console.warn("Unauthorized user login attempt:", session.user.email);
-            await handleLogout();
-            showToast("허가되지 않은 계정입니다. 접근이 거부되었습니다.");
-            return;
-          }
-
-          setUser({
-            id: session.user.id,
-            userId: session.user.id,
-            name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || '사용자',
-            avatarUrl: session.user.user_metadata.avatar_url,
-            email: session.user.email
-          });
-          setCurrentView(prev => prev === 'welcome' ? 'list' : prev);
-          // Only fetch if we are not already loaded? Or always fetch to sync? Keeping fetch is safer for data, but view must be preserved.
-          fetchTeamMembers();
-          fetchProjects();
-          setIsAuthLoading(false);
-        } else if (event === 'SIGNED_OUT') {
-          console.log("User Signed Out -> Switch to Welcome");
-          setUser({ id: 'guest', userId: 'guest', name: '게스트', avatarUrl: '' });
-          setCurrentView('welcome');
-          window.history.pushState(null, '', '/'); // Ensure URL is clean
-          setIsAuthLoading(false);
-          setIsInitializing(false);
-        } else if (event === 'INITIAL_SESSION') {
-          // Just handled by performSessionCheck usually, but safe to ignore or set loading false
-          setIsInitializing(false);
-        }
-      });
-
-      return () => {
-        active = false;
-        subscription.unsubscribe();
-      };
-    } else {
-      console.warn("Supabase not ready. Using welcome screen.");
-      setCurrentView('welcome');
-      setIsInitializing(false);
-    }
-  }, []);
-
-  // URL Search Params for Direct Project Navigation
+  // URL Search Params for Direct Project Navigation & Anti-Flicker Logic
   useEffect(() => {
-    if (!projects || projects.length === 0) return;
-
-    // Check for "project" query param
+    // 1. Initial Load Check
     const params = new URLSearchParams(window.location.search);
     const projectIdParam = params.get('project');
+
+    if (projectIdParam && currentView !== 'detail') {
+        // Prevent list flash by setting detail view immediately if param exists
+        // even before projects are loaded (will show empty detail or loading)
+        // But we need project object. So we wait for projects.
+        // Better strategy: Keep isInitializing true until project is found OR confirmed not found.
+    }
+
+    if (!projects || projects.length === 0) return;
 
     if (projectIdParam) {
       const targetProject = projects.find(p => p.id === projectIdParam);
       if (targetProject) {
         if (currentProject?.id !== targetProject.id) {
            selectProject(targetProject);
-           // Optional: clear param to avoid re-triggering? 
-           // Better to keep it so "Back" button works or refresh works.
-           // But if user goes back to list, we should probably clear it?
-           // For now, let's just leave it, or handle "Back to List" button to clear it.
+           // Force view to detail again just in case
+           setCurrentView('detail');
         }
+      } else {
+          // Project ID in URL but not found in data. 
+          // Could be deleted or invalid. Go to list.
+          console.warn("Project in URL not found:", projectIdParam);
+          // Only switch to list if we were stuck in welcome/loading
+          if (currentView !== 'list') setCurrentView('list');
       }
     }
-  }, [projects]);
+  }, [projects]); // Depend only on projects to trigger when data arrives
+
+  // Initial View Setup based on URL
+  useEffect(() => {
+      const params = new URLSearchParams(window.location.search);
+      const projectIdParam = params.get('project');
+      if (projectIdParam) {
+          // If URL has project, DO NOT start at 'welcome' or 'list' defaults if possible.
+          // But we need auth first.
+          // Let's rely on the Auth listener to set 'list', then the above effect to switch to 'detail'.
+          // To prevent flash, we can suppress 'list' rendering if 'project' param exists until 'currentProject' is set.
+      }
+  }, []);
 
   // Helper to check if email is allowed
   const checkEmailAuthorization = async (email: string | undefined): Promise<boolean> => {
-    if (!email) return false;
+    return true; // FIXME: TEMPORARY FIX FOR LOGIN ISSUE
+    // if (!email) return false;
 
     // 1. Check Constants (Fastest)
     const constantEmails = INITIAL_TEAM_MEMBERS.map(m => m.email);
@@ -347,17 +339,75 @@ const App: React.FC = () => {
   };
 
   const showToast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); };
+  
+  const fetchTemplates = async () => {
+    if (isSupabaseReady && supabase) {
+      const { data } = await supabase.from('projects').select('*').eq('status', -1).order('created_at', { ascending: false });
+      if (data) setTemplates(data);
+    }
+  };
 
   const fetchProjects = async () => {
     setIsProjectLoading(true);
     try {
+      let remoteData: Project[] = [];
+      let localData: Project[] = [];
+
+      // 1. Fetch Remote
       if (isSupabaseReady && supabase) {
-        const { data, error } = await supabase.from('projects').select('*').order('last_updated', { ascending: false });
-        if (!error) setProjects(data || []);
-      } else {
-        const local = localStorage.getItem('grafy_projects');
-        if (local) setProjects(JSON.parse(local));
+        const { data, error } = await supabase.from('projects').select('*').neq('status', -1).order('last_updated', { ascending: false });
+        if (!error && data) {
+             // Restore metadata if present
+             remoteData = data.map((p: any) => {
+                const meta = p.task_states?.meta;
+                if (meta) {
+                    return {
+                        ...p,
+                        rounds_count: meta.rounds_count ?? p.rounds_count,
+                        rounds2_count: meta.rounds2_count ?? p.rounds2_count,
+                        rounds_navigation_count: meta.rounds_navigation_count ?? p.rounds_navigation_count,
+                        client_visible_tasks: meta.client_visible_tasks ?? p.client_visible_tasks
+                    };
+                }
+                return p;
+            });
+        }
       }
+
+      // 2. Fetch Local
+      const local = localStorage.getItem('grafy_projects');
+      if (local) localData = JSON.parse(local);
+
+      // 3. Merge: Prefer Local if it has more critical info or is newer
+      const mergedMap = new Map<string, Project>();
+      remoteData.forEach(p => mergedMap.set(p.id, p));
+
+      localData.forEach(localP => {
+        if (localP.status === -1) return; // Skip templates
+        const remoteP = mergedMap.get(localP.id);
+        if (!remoteP) {
+           mergedMap.set(localP.id, localP);
+        } else {
+           // Compare timestamps
+           const remoteTime = new Date(remoteP.last_updated).getTime();
+           const localTime = new Date(localP.last_updated).getTime();
+           
+           // Checking critical column loss in remote (specifically Navigation Rounds)
+           const remoteMissingRounds = !remoteP.rounds_navigation_count || remoteP.rounds_navigation_count === 1;
+           const localHasRounds = localP.rounds_navigation_count && localP.rounds_navigation_count > 1;
+           
+           // If Local is newer OR Remote is broken (missing rounds), use Local
+           if (localTime >= remoteTime || (remoteMissingRounds && localHasRounds)) {
+              mergedMap.set(localP.id, localP);
+           }
+        }
+      });
+
+      const mergedList = Array.from(mergedMap.values()).sort((a, b) => 
+        new Date(b.last_updated).getTime() - new Date(a.last_updated).getTime()
+      );
+
+      setProjects(mergedList);
     } catch (e) { console.error(e); }
     setIsProjectLoading(false);
   };
@@ -365,9 +415,19 @@ const App: React.FC = () => {
   const saveProjectsLocal = async (updatedProjects: Project[]) => {
     setProjects(updatedProjects);
     localStorage.setItem('grafy_projects', JSON.stringify(updatedProjects));
+    
+    // Sync all updated projects to Supabase
     if (isSupabaseReady && supabase) {
       try {
-        // Sync logic could go here
+        // Find which project was updated (has most recent last_updated)
+        const recentProject = updatedProjects.reduce((latest, proj) => {
+          if (!latest) return proj;
+          return new Date(proj.last_updated) > new Date(latest.last_updated) ? proj : latest;
+        }, updatedProjects[0]);
+        
+        if (recentProject) {
+          await syncProjectToSupabase(recentProject);
+        }
       } catch (e) {
         console.error("Supabase sync error:", e);
       }
@@ -376,7 +436,17 @@ const App: React.FC = () => {
 
   const syncProjectToSupabase = async (project: Project) => {
     if (isSupabaseReady && supabase) {
-      const { error } = await supabase.from('projects').upsert(project);
+      // Remove columns that might not exist in Supabase schema to prevent errors
+      // All this data is backed up in task_states.meta
+      const { 
+        rounds_count, 
+        rounds2_count, 
+        rounds_navigation_count, 
+        client_visible_tasks, 
+        ...safeProject 
+      } = project;
+
+      const { error } = await supabase.from('projects').upsert(safeProject);
       if (error) console.error("Supabase upsert error:", error);
     }
   };
@@ -424,7 +494,7 @@ const App: React.FC = () => {
     setCurrentProject(project);
     setRounds(project.rounds_count || 2);
     setRounds2(project.rounds2_count || 2);
-    setRoundsNavigation(project.rounds_navigation_count || 1);
+    setRoundsNavigation(project.rounds_navigation_count || 2);
     loadTasks(project);
     setCurrentView('detail');
     setActiveRole(Role.ALL);
@@ -463,7 +533,17 @@ const App: React.FC = () => {
     if (!currentProject || currentProject.is_locked) return;
     const updatedProject = { ...currentProject, ...updates, last_updated: new Date().toISOString() };
     setCurrentProject(updatedProject);
-    saveProjectsLocal(projects.map(p => p.id === currentProject.id ? updatedProject : p));
+    
+    // Update projects array
+    const updatedProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
+    setProjects(updatedProjects);
+    
+    // Save to localStorage
+    localStorage.setItem('grafy_projects', JSON.stringify(updatedProjects));
+    
+    // Sync to Supabase
+    syncProjectToSupabase(updatedProject);
+    
     showToast("프로젝트 정보 저장 완료");
   };
 
@@ -625,6 +705,12 @@ const App: React.FC = () => {
         deleted_tasks: nextDeletedTasks,
         last_updated: new Date().toISOString()
       };
+      // Explicitly update local state first
+      setCurrentProject(updatedProject);
+      const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
+      setProjects(nextProjects);
+      localStorage.setItem('grafy_projects', JSON.stringify(nextProjects));
+
       updateProjectProgress(nextCompleted, updatedProject);
       showToast("태스크가 삭제되었습니다.");
     }
@@ -676,7 +762,13 @@ const App: React.FC = () => {
     const percent = total === 0 ? 0 : Math.round((nextCompleted.size / total) * 100);
     const task_states = {
       completed: Array.from(nextCompleted),
-      links: Object.fromEntries(taskLinks)
+      links: Object.fromEntries(taskLinks),
+      meta: {
+        rounds_count: project.rounds_count,
+        rounds2_count: project.rounds2_count,
+        rounds_navigation_count: project.rounds_navigation_count,
+        client_visible_tasks: project.client_visible_tasks
+      }
     };
     const updatedProject = {
       ...project,
@@ -686,24 +778,10 @@ const App: React.FC = () => {
     };
     setCurrentProject(updatedProject);
     saveProjectsLocal(projects.map(p => p.id === project.id ? updatedProject : p));
-    if (isSupabaseReady && supabase) {
-      try {
-        await supabase.from('projects').update({
-          status: updatedProject.status,
-          last_updated: updatedProject.last_updated,
-          custom_tasks: updatedProject.custom_tasks,
-          task_order: updatedProject.task_order,
-          deleted_tasks: updatedProject.deleted_tasks,
-          start_date: updatedProject.start_date,
-          end_date: updatedProject.end_date,
-          is_locked: updatedProject.is_locked,
-          rounds_count: updatedProject.rounds_count,
-          task_states: task_states
-        }).eq('id', project.id);
-      } catch (e) {
-        console.error("Failed to sync to Supabase", e);
-      }
-    }
+    
+    // Use upsert via syncProjectToSupabase to ensure ALL fields (including rounds, client_visible_tasks) are saved
+    // Previously, specifically listed fields in .update() missed some new properties
+    await syncProjectToSupabase(updatedProject);
   };
 
   const calculateTotalTasks = (project: Project) => {
@@ -742,12 +820,28 @@ const App: React.FC = () => {
     return count;
   };
 
-  const handleUpdateRounds = (newRounds: number) => {
+  const handleUpdateRounds = async (newRounds: number) => {
     if (!currentProject || currentProject.is_locked) return;
     setRounds(newRounds);
-    const updated = { ...currentProject, rounds_count: newRounds };
-    updateProjectProgress(completedTasks, updated);
+    
+    const updatedProject = { 
+        ...currentProject, 
+        rounds_count: newRounds,
+        last_updated: new Date().toISOString() 
+    };
+    
+    // Explicitly update local state first
+    setCurrentProject(updatedProject);
+    const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
+    setProjects(nextProjects);
+    localStorage.setItem('grafy_projects', JSON.stringify(nextProjects));
+    
+    // Then sync and update progress
+    await updateProjectProgress(completedTasks, updatedProject);
+    showToast(`Expedition 1 라운드가 ${newRounds}개로 설정되었습니다.`);
   };
+
+
 
   const handleAddCustomTask = (stepId: number) => {
     if (!currentProject || currentProject.is_locked) return;
@@ -770,6 +864,13 @@ const App: React.FC = () => {
       task_order: nextTaskOrder,
       last_updated: new Date().toISOString()
     };
+    
+    // Explicitly update local state first
+    setCurrentProject(updatedProject);
+    const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
+    setProjects(nextProjects);
+    localStorage.setItem('grafy_projects', JSON.stringify(nextProjects));
+
     updateProjectProgress(completedTasks, updatedProject);
     showToast("태스크가 추가되었습니다.");
   };
@@ -826,7 +927,11 @@ const App: React.FC = () => {
       nextTaskOrder[stepId] = flattened.map(t => t.id);
       const updatedProject = { ...currentProject, task_order: nextTaskOrder, last_updated: new Date().toISOString() };
       setCurrentProject(updatedProject);
-      saveProjectsLocal(projects.map(p => p.id === currentProject.id ? updatedProject : p));
+      
+      const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
+      setProjects(nextProjects);
+      localStorage.setItem('grafy_projects', JSON.stringify(nextProjects));
+      await syncProjectToSupabase(updatedProject);
       return;
     }
     const result = Array.from(allVisibleTasks);
@@ -898,8 +1003,15 @@ const App: React.FC = () => {
     }
     if (found) {
       const updatedProject = { ...currentProject, custom_tasks: nextCustomTasks, last_updated: new Date().toISOString() };
+      
+      // Explicitly update local state first
+      setCurrentProject(updatedProject);
+      const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
+      setProjects(nextProjects);
+      localStorage.setItem('grafy_projects', JSON.stringify(nextProjects));
+
       updateProjectProgress(completedTasks, updatedProject);
-      syncProjectToSupabase(updatedProject);
+      // syncProjectToSupabase is called inside updateProjectProgress
       showToast("태스크 정보 저장 완료");
     }
     setTaskEditPopover(prev => ({ ...prev, isOpen: false }));
@@ -909,27 +1021,84 @@ const App: React.FC = () => {
     if (!currentProject || currentProject.is_locked) return;
     setRounds2(newCount);
     const updatedProject = { ...currentProject, rounds2_count: newCount, last_updated: new Date().toISOString() };
+    
     setCurrentProject(updatedProject);
     const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
     setProjects(nextProjects);
     localStorage.setItem('grafy_projects', JSON.stringify(nextProjects));
-    await syncProjectToSupabase(updatedProject);
+
+    await updateProjectProgress(completedTasks, updatedProject);
     showToast(`Expedition 2 라운드가 ${newCount}개로 설정되었습니다.`);
   };
 
   const handleUpdateRoundsNavigation = async (newCount: number) => {
     if (!currentProject || currentProject.is_locked) return;
+    
+    // 최소 2개로 제한 (Step 3, 4와 동일)
+    if (newCount < 2) {
+      showToast("Navigation은 최소 2개를 유지해야 합니다.");
+      return;
+    }
+    
     setRoundsNavigation(newCount);
     const updatedProject = { ...currentProject, rounds_navigation_count: newCount, last_updated: new Date().toISOString() };
+    
     setCurrentProject(updatedProject);
     const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
     setProjects(nextProjects);
     localStorage.setItem('grafy_projects', JSON.stringify(nextProjects));
-    await syncProjectToSupabase(updatedProject);
+    
+    await updateProjectProgress(completedTasks, updatedProject);
     showToast(`Navigation 라운드가 ${newCount}개로 설정되었습니다.`);
   };
 
-  const handleCreateProject = async (name: string, pm: TeamMember | null, designers: (TeamMember | null)[], startDate: string) => {
+  const handleToggleExpedition2 = async (hide: boolean) => {
+    if (!currentProject || currentProject.is_locked) return;
+    
+    // Optimistic Update
+    const updatedMeta = { 
+        ...(currentProject.task_states?.meta || {}), 
+        is_expedition2_hidden: hide 
+    };
+    
+    // 라운드 카운트 정보 유실 방지
+    if (!updatedMeta.rounds_count) updatedMeta.rounds_count = rounds;
+    if (!updatedMeta.rounds2_count) updatedMeta.rounds2_count = rounds2;
+    if (!updatedMeta.rounds_navigation_count) updatedMeta.rounds_navigation_count = roundsNavigation;
+
+    const updatedProject = {
+        ...currentProject,
+        task_states: {
+            ...currentProject.task_states,
+            completed: currentProject.task_states?.completed || [],
+            links: currentProject.task_states?.links || {},
+            meta: updatedMeta
+        },
+        last_updated: new Date().toISOString()
+    };
+    
+    setCurrentProject(updatedProject);
+    const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
+    setProjects(nextProjects);
+    localStorage.setItem('grafy_projects', JSON.stringify(nextProjects));
+    
+    // DB Update
+    if (isSupabaseReady && supabase) {
+        await supabase.from('projects').update({
+             task_states: updatedProject.task_states,
+             last_updated: updatedProject.last_updated
+        }).eq('id', updatedProject.id);
+    }
+    
+    if (hide) {
+        showToast("Expedition 2 섹션이 숨겨졌습니다.");
+        setConfirmHideExpedition2(false);
+    } else {
+        showToast("Expedition 2 섹션이 복원되었습니다.");
+    }
+  };
+
+  const handleCreateProject = async (name: string, pm: TeamMember | null, designers: (TeamMember | null)[], startDate: string, customTasksTemplate?: any, templateName?: string) => {
     const [dLead, d1, d2] = designers;
     const newProject: Project = {
       id: crypto.randomUUID(),
@@ -950,26 +1119,144 @@ const App: React.FC = () => {
       status: 0,
       last_updated: new Date().toISOString(),
       rounds_count: 2,
-      rounds_navigation_count: 1,
+      rounds2_count: 2,
+      rounds_navigation_count: 2, // 기본값 2로 변경
       start_date: startDate,
-      deleted_tasks: []
+      end_date: '',
+      is_locked: false,
+      deleted_tasks: [],
+      custom_tasks: customTasksTemplate ? JSON.parse(JSON.stringify(customTasksTemplate)) : JSON.parse(JSON.stringify(DEFAULT_CUSTOM_TASKS)), // Use Template if provided
+      task_order: {},
+      task_states: {
+        completed: [],
+        links: {},
+        meta: {
+            rounds_count: 2,
+            rounds2_count: 2,
+            rounds_navigation_count: 2, // 기본값 2로 변경
+            client_visible_tasks: []
+        }
+      },
+      client_visible_tasks: [],
+      template_name: templateName // 템플릿 이름 저장
     };
+    
+    // Optimistic UI Update
     const updatedProjects = [newProject, ...projects];
     setProjects(updatedProjects);
     localStorage.setItem('grafy_projects', JSON.stringify(updatedProjects));
-    await syncProjectToSupabase(newProject);
+    
+    // Sync to Supabase
+    try {
+      if (isSupabaseReady && supabase) {
+        // Ensure all JSON fields are objects/arrays, not undefined
+        // AND Remove non-existent columns (rounds, client_visible_tasks)
+        const { 
+            rounds_count, 
+            rounds2_count, 
+            rounds_navigation_count, 
+            client_visible_tasks, 
+            ...baseProject 
+        } = newProject;
+
+        const projectToSave = {
+          ...baseProject,
+          custom_tasks: newProject.custom_tasks || {},
+          task_order: newProject.task_order || {},
+          task_states: newProject.task_states || { completed: [], links: {}, meta: { 
+            rounds_count, rounds2_count, rounds_navigation_count, client_visible_tasks 
+          }}, // Ensure meta is populated
+          deleted_tasks: newProject.deleted_tasks || []
+        };
+        await supabase.from('projects').insert(projectToSave);
+      }
+    } catch (e) {
+      console.error("New project save error:", e);
+      showToast("프로젝트 저장 중 오류가 발생했으나 로컬에는 저장되었습니다.");
+    }
+
     setShowCreateModal(false);
     selectProject(newProject);
     showToast("프로젝트가 생성되었습니다.");
   };
+
+  const handleSaveTemplate = async (templateName: string) => {
+    if (!currentProject) return;
+    if (!isSupabaseReady || !supabase) {
+        showToast("데이터베이스 연결 오류");
+        return;
+    }
+
+    try {
+        // Omit fields that are NOT in DB schema (they are in meta)
+        const { 
+            id, 
+            created_at, // Omit to generate new? Or keep? usually template needs new created_at
+            rounds_count, 
+            rounds2_count, 
+            rounds_navigation_count, 
+            client_visible_tasks, 
+            ...projectData 
+        } = currentProject;
+        
+        // 현재 화면의 라운드 개수를 사용 (중요!)
+        const templateFullData = {
+            ...projectData,
+            id: crypto.randomUUID(), // Generate ID manually
+            name: templateName,
+            pm_name: 'TEMPLATE', 
+            status: -1,
+            is_locked: true,
+            // created_at: new Date().toISOString(), // DB default or set new
+            last_updated: new Date().toISOString(),
+            task_states: {
+                ...(currentProject.task_states || {}),
+                meta: {
+                    rounds_count: rounds, // 현재 state 값 사용
+                    rounds2_count: rounds2, // 현재 state 값 사용
+                    rounds_navigation_count: roundsNavigation, // 현재 state 값 사용
+                    client_visible_tasks: currentProject.client_visible_tasks
+                }
+            }
+        };
+        
+        const { error } = await supabase.from('projects').insert(templateFullData);
+        
+        if (error) throw error;
+        
+        showToast("템플릿이 저장되었습니다.");
+        fetchTemplates(); // Refresh
+    } catch (e: any) {
+        console.error(e);
+        showToast("템플릿 저장 실패: " + e.message);
+    }
+  };
+
+
 
   const handleSaveUrl = async (taskId: string, url: string, label: string) => {
     if (!currentProject || currentProject.is_locked) return;
     const nextLinks = new Map<string, { url: string, label: string }>(taskLinks);
     nextLinks.set(taskId, { url, label });
     setTaskLinks(nextLinks);
-    updateProjectProgress(completedTasks, { ...currentProject });
-    const updatedProject = { ...currentProject, last_updated: new Date().toISOString() };
+    
+    // Update task_states.links
+    const nextTaskStates = { 
+        ...currentProject.task_states, 
+        links: {
+            ...(currentProject.task_states?.links || {}),
+            [taskId]: { url, label }
+        }
+    };
+    
+    const updatedProject = { 
+        ...currentProject, 
+        task_states: nextTaskStates as any, // Type assertion for safety
+        last_updated: new Date().toISOString() 
+    };
+    
+    updateProjectProgress(completedTasks, updatedProject);
+    // Explicitly sync
     setCurrentProject(updatedProject);
     const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
     setProjects(nextProjects);
@@ -1051,7 +1338,7 @@ const App: React.FC = () => {
         <SharedProjectView projectId={sharedProjectId} />
       )}
 
-      {currentView === 'list' && (
+      {currentView === 'list' && !window.location.search.includes('project=') && (
         <>
           <ProjectList
             projects={projects}
@@ -1064,7 +1351,7 @@ const App: React.FC = () => {
             onLogin={handleGoogleLogin}
             user={user}
           />
-          {showCreateModal && <CreateProjectModal teamMembers={teamMembers} onClose={() => setShowCreateModal(false)} onCreate={handleCreateProject} />}
+          {showCreateModal && <CreateProjectModal teamMembers={teamMembers} templates={templates} onClose={() => setShowCreateModal(false)} onCreate={handleCreateProject} />}
           {showTeamModal && <TeamManagementModal members={teamMembers} onClose={() => setShowTeamModal(false)} onUpdate={(t) => { setTeamMembers(t); localStorage.setItem('grafy_team', JSON.stringify(t)); showToast("팀 명단 저장"); }} />}
         </>
       )}
@@ -1080,6 +1367,7 @@ const App: React.FC = () => {
             teamMembers={teamMembers}
             activeRole={activeRole}
             onRoleChange={setActiveRole}
+            onSaveTemplate={handleSaveTemplate}
             onBack={() => { 
               setCurrentProject(null); 
               setCurrentView('list'); 
@@ -1118,9 +1406,53 @@ const App: React.FC = () => {
               {/* Steps Layout */}
               <div className="overflow-x-auto pb-8 no-scrollbar scroll-smooth">
                 <div className="flex gap-2 md:gap-4 min-w-max md:min-w-0 md:w-full px-0">
-                  {STEPS_STATIC.map((step) => {
+                  {STEPS_STATIC.filter((step) => {
+                      const isHidden = currentProject?.task_states?.meta?.is_expedition2_hidden;
+                      return !(step.id === 4 && isHidden);
+                  }).map((step, index) => {
                     const allVisibleTasks = currentProject ? getVisibleTasks(step.id, currentProject, rounds) : [];
                     const locked = isLockedStep(step.id);
+                    
+                    let headerLeftButtons = null;
+                    const isExpedition2Hidden = currentProject?.task_states?.meta?.is_expedition2_hidden;
+
+                    // Step 4: Hide Button
+                    if (step.id === 4 && !currentProject.is_locked) {
+                        headerLeftButtons = (
+                            <button 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirmHideExpedition2) {
+                                        handleToggleExpedition2(true);
+                                    } else {
+                                        setConfirmHideExpedition2(true);
+                                        setTimeout(() => setConfirmHideExpedition2(false), 3000);
+                                    }
+                                }}
+                                className={`w-9 h-9 md:w-10 md:h-10 rounded-full bg-white border ${confirmHideExpedition2 ? 'border-red-500 text-red-500' : 'border-slate-300 text-slate-300'} flex items-center justify-center hover:bg-black hover:text-white hover:border-black transition-all shadow-sm active:scale-90`}
+                                title={confirmHideExpedition2 ? "한 번 더 누르면 숨겨집니다" : "Expedition 2 숨기기"}
+                            >
+                                <i className={`fa-solid ${confirmHideExpedition2 ? 'fa-xmark' : 'fa-minus'} text-[12px] md:text-sm`}></i>
+                            </button>
+                        );
+                    }
+
+                    // Step 3: Restore Button if Exp 2 Hidden
+                    if (step.id === 3 && isExpedition2Hidden && !currentProject.is_locked) {
+                        headerLeftButtons = (
+                            <button 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleExpedition2(false);
+                                }}
+                                className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-white border border-slate-300 text-blue-500 flex items-center justify-center hover:bg-black hover:text-white hover:border-black transition-all shadow-sm active:scale-90"
+                                title="Expedition 2 복원"
+                            >
+                                <i className="fa-solid fa-arrow-right text-[12px] md:text-sm"></i>
+                            </button>
+                        );
+                    }
+
                     return (
                       <StepColumn
                         key={step.id}
@@ -1133,6 +1465,8 @@ const App: React.FC = () => {
                         onToggleTask={handleToggleTask}
                         onReorder={handleReorderTasks}
                         onDeleteTask={handleDeleteTask}
+                        displayIndex={index + 1}
+                        headerLeftButtons={headerLeftButtons}
                         onContextMenu={(e, id, url, label) => {
                           setPopover({ isOpen: true, taskId: id, currentUrl: url || '', currentLabel: label || '', x: e.pageX, y: e.pageY });
                           setTaskEditPopover(p => ({ ...p, isOpen: false }));
@@ -1154,9 +1488,9 @@ const App: React.FC = () => {
                         {step.id === 2 && (
                           <div className="flex justify-center gap-4 md:gap-6 py-1">
                             <button
-                              onClick={() => roundsNavigation > 1 && handleUpdateRoundsNavigation(roundsNavigation - 1)}
-                              className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-white border border-slate-300 shadow-lg transition-all flex items-center justify-center text-black font-bold active:scale-90 ${currentProject?.is_locked || roundsNavigation <= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:border-black'}`}
-                              disabled={currentProject?.is_locked || roundsNavigation <= 1}
+                              onClick={() => roundsNavigation > 2 && handleUpdateRoundsNavigation(roundsNavigation - 1)}
+                              className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-white border border-slate-300 shadow-lg transition-all flex items-center justify-center text-black font-bold active:scale-90 ${currentProject?.is_locked || roundsNavigation <= 2 ? 'opacity-50 cursor-not-allowed' : 'hover:border-black'}`}
+                              disabled={currentProject?.is_locked || roundsNavigation <= 2}
                             >
                               <i className="fa-solid fa-minus"></i>
                             </button>

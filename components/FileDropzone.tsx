@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { STORAGE_BUCKET } from '../constants';
 
 interface FileDropzoneProps {
   projectId: string;
@@ -45,7 +46,7 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     if (isLockedProject) return;
-    if (!fileMeta && !isCompleted && !isUploading) setIsDragActive(true);
+    if (!fileMeta && !isUploading) setIsDragActive(true);
   };
 
   const handleDragLeave = () => {
@@ -59,7 +60,7 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
       onToast("이전 스텝 완료가 필요합니다.");
       return;
     }
-    if (fileMeta || isCompleted || isUploading) return;
+    if (fileMeta || isUploading) return;
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       uploadFile(e.dataTransfer.files[0]);
@@ -72,7 +73,7 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
       onToast("이전 스텝 완료가 필요합니다.");
       return;
     }
-    if (!fileMeta && !isCompleted && !isUploading) {
+    if (!fileMeta && !isUploading) {
       fileInputRef.current?.click();
     }
   };
@@ -89,9 +90,9 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
       return;
     }
 
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    const maxSize = 30 * 1024 * 1024; // 30MB
     if (file.size > maxSize) {
-      onToast("50MB 이하의 파일만 업로드 가능합니다.");
+      onToast("30MB 이하의 파일만 업로드 가능합니다.");
       return;
     }
 
@@ -103,7 +104,7 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
       const filePath = `${projectId}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('project-files')
+        .from(STORAGE_BUCKET)
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
@@ -123,7 +124,20 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
       onToast("파일 업로드 완료");
     } catch (e: any) {
       console.error(e);
-      onToast("업로드 실패: " + (e.message || "알 수 없는 오류"));
+      let msg = "업로드 실패: " + (e.message || "알 수 없는 오류");
+       if (e.message?.includes('Bucket not found') || e.message?.includes('not found')) {
+          console.log("Bucket not found. Attempting to create...");
+          const { error: createError } = await supabase.storage.createBucket(STORAGE_BUCKET, {
+              public: true,
+              fileSizeLimit: 52428800
+          });
+          if (!createError) {
+              msg = "파일 저장소를 생성했습니다. 다시 업로드해주세요.";
+          } else {
+              msg = `업로드 실패: 저장소 생성 권한 오류. 대시보드에서 '${STORAGE_BUCKET}' 버킷을 만들어주세요.`;
+          }
+       }
+      onToast(msg);
     } finally {
       setIsUploading(false);
     }
@@ -136,7 +150,7 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
     onToast("다운로드 준비 중...");
     try {
       const { data, error } = await supabase.storage
-        .from('project-files')
+        .from(STORAGE_BUCKET)
         .download(fileMeta.file_path);
 
       if (error) throw error;
@@ -162,10 +176,10 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
       onToast("이전 스텝 완료가 필요합니다.");
       return;
     }
-    if (isCompleted) {
-      onToast("수정할 수 없는 상태입니다.");
-      return;
-    }
+    // if (isCompleted) { // Removed upon user request
+    //   onToast("수정할 수 없는 상태입니다.");
+    //   return;
+    // }
     if (!fileMeta || !supabase) return;
 
     if (!confirm("정말 파일을 삭제하시겠습니까?")) return;
@@ -213,7 +227,7 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
         transition-all duration-200 min-h-[44px] flex flex-col justify-center items-center
         ${isDragActive ? 'bg-blue-50 text-blue-500' : 'bg-slate-100 text-slate-500 font-black'}
         ${fileMeta ? '!bg-white border-2 border-slate-300' : ''}
-        ${(isCompleted || isLockedProject) && !fileMeta ? 'opacity-40 grayscale cursor-not-allowed' : ''}
+        ${isLockedProject && !fileMeta ? 'opacity-40 grayscale cursor-not-allowed' : ''}
       `}
     >
       <input
@@ -231,7 +245,7 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
       ) : !fileMeta ? (
         <div className="pointer-events-none flex items-center gap-2">
           <i className="fa-solid fa-cloud-arrow-up text-base opacity-70"></i>
-          <span>파일 드래그 앤 드롭</span>
+          <span>파일 드래그 앤 드롭 ( 30MB 제한 )</span>
         </div>
       ) : (
         <div className="w-full">
@@ -241,7 +255,17 @@ const FileDropzone: React.FC<FileDropzoneProps> = ({
             </span>
             <button
               onClick={handleDownload}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (isLockedProject) {
+                  onToast("이전 스텝 완료가 필요합니다.");
+                  return;
+                }
+                fileInputRef.current?.click();
+              }}
               className={`flex-1 min-w-[50%] shrink-0 ${accentColor} text-white py-2 rounded-xl border border-transparent hover:brightness-90 transition-all text-[13px] font-black uppercase flex items-center justify-center gap-1.5 shadow-sm`}
+              title="우클릭으로 파일 재업로드"
             >
               <i className="fa-solid fa-download text-[12px]"></i> 다운로드
             </button>
