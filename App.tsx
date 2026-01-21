@@ -417,6 +417,10 @@ const App: React.FC = () => {
   };
 
   const selectProject = (project: Project) => {
+    // Update URL to support persistence and sharing
+    const newUrl = `${window.location.pathname}?project=${project.id}`;
+    window.history.pushState({ projectId: project.id }, '', newUrl);
+
     setCurrentProject(project);
     setRounds(project.rounds_count || 2);
     setRounds2(project.rounds2_count || 2);
@@ -1076,7 +1080,11 @@ const App: React.FC = () => {
             teamMembers={teamMembers}
             activeRole={activeRole}
             onRoleChange={setActiveRole}
-            onBack={() => { setCurrentProject(null); setCurrentView('list'); }}
+            onBack={() => { 
+              setCurrentProject(null); 
+              setCurrentView('list'); 
+              window.history.pushState({}, '', '/');
+            }}
             onUpdateInfo={updateProjectInfo}
             onToast={showToast}
             onToggleLock={handleToggleLock}

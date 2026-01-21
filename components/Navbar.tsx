@@ -222,13 +222,20 @@ const Navbar: React.FC<NavbarProps> = ({
               </button>
 
               {/* Project List Button (Moved & Styled like others) */}
-              <button
-                onClick={(e) => { e.stopPropagation(); onBack(); }}
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 border border-slate-200 hover:bg-black hover:text-white hover:border-black transition-all shrink-0 shadow-sm group"
-                title="프로젝트 목록으로 돌아가기"
+              {/* Project List Button (Link for New Tab Support) */}
+              <a
+                href="/"
+                onClick={(e) => {
+                   // Allow default behavior for modifier keys (New Tab)
+                   if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return;
+                   e.preventDefault();
+                   onBack(); 
+                }}
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 border border-slate-200 hover:bg-black hover:text-white hover:border-black transition-all shrink-0 shadow-sm group flex"
+                title="프로젝트 목록으로 돌아가기 (휠 클릭시 새 탭)"
               >
                 <i className="fa-solid fa-list-ul text-sm"></i>
-              </button>
+              </a>
 
               <div className="relative h-full flex items-center">
                 {user.userId === 'guest' ? (
@@ -259,16 +266,6 @@ const Navbar: React.FC<NavbarProps> = ({
                           <p className="text-[14px] font-bold text-black">{user.name}</p>
                         </div>
                         <div className="py-1">
-                          <button className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors flex items-center gap-3 text-slate-700">
-                            <i className="fa-regular fa-user text-sm"></i>
-                            <span className="text-[13px] font-medium">프로필 설정</span>
-                          </button>
-                          <button className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors flex items-center gap-3 text-slate-700">
-                            <i className="fa-regular fa-bell text-sm"></i>
-                            <span className="text-[13px] font-medium">알림 메일</span>
-                          </button>
-                        </div>
-                        <div className="border-t border-slate-100 mt-1 pt-1">
                           <button
                             onClick={onLogout}
                             className="w-full text-left px-4 py-2 hover:bg-red-50 transition-colors flex items-center gap-3 text-red-500"

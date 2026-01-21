@@ -159,18 +159,22 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
   return (
     <>
       {/* Desktop Row View */}
-      <a
-        href={`?project=${project.id}`}
-        onClick={handleRowClick}
-        className={`hidden md:grid grid-cols-12 border-b border-slate-100 hover:bg-slate-50/50 cursor-pointer transition-all items-stretch group relative block no-underline ${isLast ? 'rounded-b-[1rem] md:rounded-b-[1.25rem] border-b-0' : ''}`}
+      <div
+        className={`hidden md:grid grid-cols-12 border-b border-slate-100 hover:bg-slate-50/50 transition-all items-stretch group relative ${isLast ? 'rounded-b-[1rem] md:rounded-b-[1.25rem] border-b-0' : ''}`}
       >
-        <div className="col-span-1 px-4 py-2.5 flex items-center justify-center text-slate-300 font-black text-xl group-hover:text-black transition-colors border-r border-slate-100">
+        <a 
+          href={`?project=${project.id}`}
+          onClick={handleRowClick}
+          className="absolute inset-0 z-0 block"
+        ></a>
+
+        <div className="col-span-1 px-4 py-2.5 flex items-center justify-center text-slate-300 font-black text-xl group-hover:text-black transition-colors border-r border-slate-100 relative z-10 pointer-events-none">
           {String(index + 1).padStart(2, '0')}
         </div>
-        <div className="col-span-1 px-4 py-2.5 flex items-center justify-center text-[16px] font-bold text-slate-500 whitespace-nowrap border-r border-slate-100">
+        <div className="col-span-1 px-4 py-2.5 flex items-center justify-center text-[16px] font-bold text-slate-500 whitespace-nowrap border-r border-slate-100 relative z-10 pointer-events-none">
           {project.start_date || '-'}
         </div>
-        <div className="col-span-1 px-2 py-2.5 flex flex-col items-center justify-center border-r border-slate-100 overflow-hidden">
+        <div className="col-span-1 px-2 py-2.5 flex flex-col items-center justify-center border-r border-slate-100 overflow-hidden relative z-10 pointer-events-none">
             {isProjectEnded ? (
                <span className="text-xs font-bold text-black bg-slate-100 px-2 py-1 rounded-full whitespace-nowrap">프로젝트 종료</span>
             ) : nextSchedule ? (
@@ -186,10 +190,10 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
                 <span className="text-xs text-slate-300">-</span>
             )}
         </div>
-        <div className={`col-span-1 px-4 py-2.5 flex items-center justify-center text-[16px] font-bold ${isCompleted ? 'text-emerald-500' : 'text-slate-400'} whitespace-nowrap transition-colors duration-500 border-r border-slate-100`}>
+        <div className={`col-span-1 px-4 py-2.5 flex items-center justify-center text-[16px] font-bold ${isCompleted ? 'text-emerald-500' : 'text-slate-400'} whitespace-nowrap transition-colors duration-500 border-r border-slate-100 relative z-10 pointer-events-none`}>
           {project.end_date || '-'}
         </div>
-        <div className="col-span-4 px-6 py-2.5 flex items-center font-black text-black text-[16px] group-hover:translate-x-1 transition-transform border-r border-slate-100 overflow-hidden">
+        <div className="col-span-4 px-6 py-2.5 flex items-center font-black text-black text-[16px] group-hover:translate-x-1 transition-transform border-r border-slate-100 overflow-hidden relative z-10 pointer-events-none">
           <span className="truncate">{project.name}</span>
           {project.is_locked && (
             <div className="w-5 h-5 ml-2 rounded-full bg-red-500 flex items-center justify-center text-white shadow-sm shrink-0">
@@ -197,10 +201,10 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
             </div>
           )}
         </div>
-        <div className="col-span-2 px-6 py-2.5 flex items-center text-[14px] font-bold text-slate-600 border-r border-slate-100 overflow-hidden">
+        <div className="col-span-2 px-6 py-2.5 flex items-center text-[14px] font-bold text-slate-600 border-r border-slate-100 overflow-hidden relative z-10 pointer-events-none">
           <span className="truncate">{getTeamString(project)}</span>
         </div>
-        <div className="col-span-2 px-6 py-2.5 flex items-center justify-end gap-3 ml-auto w-full">
+        <div className="col-span-2 px-6 py-2.5 flex items-center justify-end gap-3 ml-auto w-full relative z-10 pointer-events-none">
           <div className="flex items-center justify-end gap-3 w-full">
             <div className="w-5 flex-shrink-0 flex items-center justify-center">
               {isCompleted && (
@@ -220,7 +224,7 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
 
         {/* Desktop Delete Button: Positioned outside the frame to the right */}
         {(['mondo.kim@gmail.com', 'wjatnsdl527@gmail.com'].includes(currentEmail || '')) && (
-          <div className="absolute left-full top-1/2 -translate-y-1/2 ml-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+          <div className="absolute left-full top-1/2 -translate-y-1/2 ml-4 opacity-0 group-hover:opacity-100 transition-opacity z-20">
             <button
               onClick={handleDeleteClick}
               className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-lg border-2 ${isConfirmingDelete
@@ -233,15 +237,17 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
             </button>
           </div>
         )}
-      </a>
+      </div>
 
       {/* Mobile Card View */}
-      <a
-        href={`?project=${project.id}`}
-        onClick={handleRowClick}
-        className="md:hidden flex flex-col p-4 border-b border-slate-100 bg-white hover:bg-slate-50 transition-colors cursor-pointer relative block no-underline"
-      >
-        <div className="flex justify-between items-start mb-1.5">
+      <div className="md:hidden flex flex-col p-4 border-b border-slate-100 bg-white hover:bg-slate-50 transition-colors relative block">
+        <a 
+          href={`?project=${project.id}`}
+          onClick={handleRowClick}
+          className="absolute inset-0 z-0 block"
+        ></a>
+
+        <div className="flex justify-between items-start mb-1.5 relative z-10 pointer-events-none">
           <span className="text-[11px] font-black text-slate-300">NO. {String(index + 1).padStart(2, '0')}</span>
           <div className="flex flex-col items-end">
             <span className="text-[12px] font-bold text-slate-400">S: {project.start_date || '-'}</span>
@@ -249,7 +255,7 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
             {project.end_date && <span className={`text-[11px] font-bold ${isCompleted ? 'text-emerald-500' : 'text-slate-300'} transition-colors duration-500`}>E: {project.end_date}</span>}
           </div>
         </div>
-        <h3 className="text-lg font-black text-black mb-1 flex items-center gap-2">
+        <h3 className="text-lg font-black text-black mb-1 flex items-center gap-2 relative z-10 pointer-events-none">
           <span className="truncate">{project.name}</span>
           {project.is_locked && (
             <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-white shrink-0">
@@ -262,9 +268,9 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
             </div>
           )}
         </h3>
-        <p className="text-sm font-bold text-slate-500 mb-3 line-clamp-1 text-[13px]">{getTeamString(project)}</p>
+        <p className="text-sm font-bold text-slate-500 mb-3 line-clamp-1 text-[13px] relative z-10 pointer-events-none">{getTeamString(project)}</p>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 relative z-10 pointer-events-none">
           <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-50 relative flex items-center">
             <div className={`h-full ${isCompleted ? 'bg-emerald-500' : 'bg-black'} rounded-full transition-colors duration-500`} style={{ width: `${project.status}%` }}></div>
           </div>
@@ -275,14 +281,14 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
           <button
             onClick={handleDeleteClick}
             className={`absolute top-4 right-4 w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-sm border ${isConfirmingDelete
-              ? 'bg-red-500 border-red-600 text-white animate-pulse z-10'
+              ? 'bg-red-500 border-red-600 text-white animate-pulse z-20'
               : 'bg-white border-slate-200 text-slate-400'
               }`}
           >
             <i className={`fa-solid ${isConfirmingDelete ? 'fa-xmark' : 'fa-minus'} text-[10px]`}></i>
           </button>
         )}
-      </a>
+      </div>
     </>
   );
 };
@@ -360,13 +366,15 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest
         </div>
         <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto py-1 pr-1 overflow-visible">
           <div className="flex items-center gap-2 md:gap-4 overflow-x-auto no-scrollbar scroll-smooth flex-1 md:flex-initial">
-            <button
-              onClick={onManageTeam}
-              className="shrink-0 bg-white border-2 border-slate-100 text-slate-700 px-4 py-2 md:px-5 md:py-2.5 rounded-xl text-xs md:text-sm font-bold hover:border-black transition-all flex items-center gap-2"
-            >
-              <i className="fa-solid fa-users text-blue-600"></i>
-              <span className="whitespace-nowrap">팀 멤버 관리</span>
-            </button>
+            {['mondo.kim@gmail.com', 'wjatnsdl527@gmail.com'].includes(user.email || '') && (
+              <button
+                onClick={onManageTeam}
+                className="shrink-0 bg-white border-2 border-slate-100 text-slate-700 px-4 py-2 md:px-5 md:py-2.5 rounded-xl text-xs md:text-sm font-bold hover:border-black transition-all flex items-center gap-2"
+              >
+                <i className="fa-solid fa-users text-blue-600"></i>
+                <span className="whitespace-nowrap">팀 멤버 관리</span>
+              </button>
+            )}
             <button
               onClick={exportToCSV}
               className="shrink-0 bg-white border-2 border-slate-100 text-slate-700 px-4 py-2 md:px-5 md:py-2.5 rounded-xl text-xs md:text-sm font-bold hover:border-black transition-all flex items-center gap-2"
@@ -407,12 +415,6 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest
                       <p className="text-[14px] font-bold text-black">{user.name}</p>
                     </div>
                     <div className="py-1">
-                      <button className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors flex items-center gap-3 text-slate-700">
-                        <i className="fa-regular fa-user text-sm"></i>
-                        <span className="text-[13px] font-medium">프로필 설정</span>
-                      </button>
-                    </div>
-                    <div className="border-t border-slate-100 mt-1 pt-1">
                       <button
                         onClick={onLogout}
                         className="w-full text-left px-4 py-2 hover:bg-red-50 transition-colors flex items-center gap-3 text-red-500"
