@@ -16,7 +16,7 @@ interface NavbarProps {
   onToggleLock?: (locked: boolean) => void;
   isSnapshotMode?: boolean;
   onSnapshotToggle?: () => void;
-  onSaveTemplate?: (name: string) => void;
+  onSaveTemplate?: () => void;
 }
 
 const Navbar: React.FC<NavbarProps> = ({
@@ -199,10 +199,7 @@ const Navbar: React.FC<NavbarProps> = ({
               {/* Admin Template Save Button */}
               {user.email && ADMIN_EMAILS.includes(user.email) && onSaveTemplate && (
                 <button
-                  onClick={() => {
-                    const name = prompt("템플릿 이름을 입력하세요 (예: 기본 브랜딩 템플릿)");
-                    if (name) onSaveTemplate(name);
-                  }}
+                  onClick={() => onSaveTemplate()}
                   className="bg-white border border-slate-300 text-slate-600 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-[11px] md:text-[13px] font-bold shadow-sm hover:border-black hover:text-black transition-all h-full"
                 >
                   <i className="fa-solid fa-save mr-1.5"></i> 템플릿 저장

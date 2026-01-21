@@ -10,6 +10,7 @@ import TeamManagementModal from './components/TeamManagementModal.tsx';
 import WelcomeScreen from './components/WelcomeScreen.tsx';
 import { supabase, isSupabaseReady, signInWithGoogle, signOut } from './supabaseClient.ts';
 import SharedProjectView from './components/SharedProjectView.tsx';
+import TemplateSaveModal from './components/TemplateSaveModal.tsx';
 import { STEPS_STATIC, TEAM_MEMBERS as INITIAL_TEAM_MEMBERS, STORAGE_BUCKET, DEFAULT_CUSTOM_TASKS } from './constants.ts';
 import { Role, Task, PopoverState, Project, User, TaskEditPopoverState, TeamMember } from './types.ts';
 
@@ -26,6 +27,7 @@ const App: React.FC = () => {
   const [isProjectLoading, setIsProjectLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
+  const [showTemplateSaveModal, setShowTemplateSaveModal] = useState(false);
   const [activeRole, setActiveRole] = useState<Role>(Role.ALL);
 
   const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
@@ -1418,6 +1420,15 @@ const App: React.FC = () => {
             onRestoreProject={handleRestoreProject}
           />
           {showCreateModal && <CreateProjectModal teamMembers={teamMembers} templates={templates} onClose={() => setShowCreateModal(false)} onCreate={handleCreateProject} />}
+          {showTemplateSaveModal && (
+            <TemplateSaveModal 
+                onClose={() => setShowTemplateSaveModal(false)} 
+                onSave={(name) => {
+                    handleSaveTemplate(name);
+                    setShowTemplateSaveModal(false);
+                }} 
+            />
+          )}
           {showTeamModal && (
             <TeamManagementModal 
                 members={teamMembers} 
@@ -1443,7 +1454,7 @@ const App: React.FC = () => {
             teamMembers={teamMembers}
             activeRole={activeRole}
             onRoleChange={setActiveRole}
-            onSaveTemplate={handleSaveTemplate}
+            onSaveTemplate={() => setShowTemplateSaveModal(true)}
             onBack={() => { 
               setCurrentProject(null); 
               setCurrentView('list'); 
