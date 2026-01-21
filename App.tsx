@@ -1159,7 +1159,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleCreateProject = async (name: string, pm: TeamMember | null, designers: (TeamMember | null)[], startDate: string, customTasksTemplate?: any, templateName?: string) => {
+  const handleCreateProject = async (name: string, pm: TeamMember | null, designers: (TeamMember | null)[], startDate: string, customTasksTemplate?: any, templateName?: string, taskOrderTemplate?: any) => {
     const [dLead, d1, d2] = designers;
     const newProject: Project = {
       id: crypto.randomUUID(),
@@ -1187,7 +1187,7 @@ const App: React.FC = () => {
       is_locked: false,
       deleted_tasks: [],
       custom_tasks: customTasksTemplate ? JSON.parse(JSON.stringify(customTasksTemplate)) : JSON.parse(JSON.stringify(DEFAULT_CUSTOM_TASKS)), // Use Template if provided
-      task_order: {},
+      task_order: taskOrderTemplate ? JSON.parse(JSON.stringify(taskOrderTemplate)) : {},
       task_states: {
         completed: [],
         links: {},
