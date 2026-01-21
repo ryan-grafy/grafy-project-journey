@@ -701,10 +701,6 @@ const App: React.FC = () => {
     else if (taskId.startsWith('custom')) taskStepId = parseInt(taskId.split('-')[1]);
 
     if (isNowChecking) {
-      if (isLockedStep(taskStepId)) {
-        showToast("이전 스텝 완료가 필요합니다.");
-        return;
-      }
       const nextCompleted = new Set<string>(completedTasks);
       nextCompleted.add(taskId);
       setCompletedTasks(nextCompleted);
@@ -721,16 +717,6 @@ const App: React.FC = () => {
         updateProjectProgress(nextCompleted, currentProject);
       }
     } else {
-      const hasLaterChecked = Array.from(completedTasks).some((id: string) => {
-        let idStep = 0;
-        if (id.startsWith('t')) idStep = parseInt(id[1]);
-        else if (id.startsWith('custom')) idStep = parseInt(id.split('-')[1]);
-        return idStep > taskStepId;
-      });
-      if (hasLaterChecked) {
-        showToast("다음 스텝의 체크를 모두 없애야 이전 단계를 해제할 수 있습니다.");
-        return;
-      }
       const nextCompleted = new Set<string>(completedTasks);
       nextCompleted.delete(taskId);
       setCompletedTasks(nextCompleted);

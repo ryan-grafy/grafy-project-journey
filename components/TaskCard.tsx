@@ -27,6 +27,7 @@ const roleStyles: Record<Role, { style: string; icon: string }> = {
   [Role.PM]: { style: 'bg-orange-100 text-orange-800', icon: 'fa-briefcase' },
   [Role.DESIGNER]: { style: 'bg-pink-100 text-pink-800', icon: 'fa-palette' },
   [Role.MANAGER]: { style: 'bg-green-100 text-green-800', icon: 'fa-user-tie' },
+  [Role.DEVELOPER]: { style: 'bg-purple-100 text-purple-800', icon: 'fa-code' },
 };
 
 const roleLabels: Record<Role, string> = {
@@ -35,6 +36,7 @@ const roleLabels: Record<Role, string> = {
   [Role.PM]: 'PM',
   [Role.DESIGNER]: 'Designer',
   [Role.MANAGER]: 'Manager',
+  [Role.DEVELOPER]: 'Developer',
 };
 
 const accentColors: Record<number, string> = {
@@ -80,10 +82,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
       onSnapshotSelect?.();
       return;
     }
-    if (isLockedStep && !isCompleted) {
-      onToast("이전 스텝 완료가 필요합니다.");
-      return;
-    }
+
     if (isLockedProject) {
       onToast("잠긴 프로젝트는 수정할 수 없습니다.");
       return;
@@ -120,7 +119,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
     <div
       onClick={handleToggleClick}
       onContextMenu={handleRightClickInfo}
-      className={`relative flex flex-col p-4 mb-2 bg-white border rounded-2xl cursor-pointer transition-all duration-300 min-h-[100px] group overflow-hidden ${isCompleted ? 'bg-white border-black/10 opacity-80 shadow-inner' : 'border-black/25 hover:border-black/50 hover:-translate-y-1 hover:shadow-xl shadow-sm'} ${isLockedStep && !isSnapshotMode ? 'cursor-not-allowed grayscale-[0.5]' : ''} ${isSelectedForSnapshot ? '!border-emerald-500 !border-4 !ring-2 !ring-emerald-200 z-50' : ''}`}
+      className={`relative flex flex-col p-4 mb-2 bg-white border rounded-2xl cursor-pointer transition-all duration-300 min-h-[100px] group overflow-hidden ${isCompleted ? 'bg-white border-black/10 opacity-80 shadow-inner' : 'border-black/25 hover:border-black/50 hover:-translate-y-1 hover:shadow-xl shadow-sm'} ${isLockedStep && !isSnapshotMode ? 'grayscale-[0.5]' : ''} ${isSelectedForSnapshot ? '!border-emerald-500 !border-4 !ring-2 !ring-emerald-200 z-50' : ''}`}
     >
       <div className="absolute top-3 right-3 flex items-center gap-2 z-20">
         {isCompleted ? (
@@ -174,7 +173,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
 
       <div className="flex flex-col gap-[5px] mt-2">
         <div onClick={(e) => e.stopPropagation()}>
-          <FileDropzone onToast={onToast} isCompleted={isCompleted} accentColor={pointColor} isLockedProject={isLockedProject || isLockedStep} projectId={projectId} taskId={task.id} />
+          <FileDropzone onToast={onToast} isCompleted={isCompleted} accentColor={pointColor} isLockedProject={isLockedProject} projectId={projectId} taskId={task.id} />
         </div>
         <button
           type="button"
