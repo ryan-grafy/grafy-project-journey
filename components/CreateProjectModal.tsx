@@ -6,7 +6,7 @@ interface CreateProjectModalProps {
   teamMembers: TeamMember[];
   templates: Project[]; // Templates passed from App
   onClose: () => void;
-  onCreate: (name: string, pm: TeamMember | null, designers: (TeamMember | null)[], startDate: string, customTasks?: any, templateName?: string, taskOrder?: any) => Promise<void>;
+  onCreate: (name: string, pm: TeamMember | null, designers: (TeamMember | null)[], startDate: string, customTasks?: any, templateName?: string, taskOrder?: any, templateProject?: Project | null) => Promise<void>;
 }
 
 const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ teamMembers, templates, onClose, onCreate }) => {
@@ -26,7 +26,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ teamMembers, te
     if (!name.trim()) return;
     setIsSubmitting(true);
     // Pass custom_tasks from selected template if exists
-    await onCreate(name, pm, [designerLead, designer1, designer2], startDate, selectedTemplate?.custom_tasks, selectedTemplate?.name, selectedTemplate?.task_order);
+    await onCreate(name, pm, [designerLead, designer1, designer2], startDate, selectedTemplate?.custom_tasks, selectedTemplate?.name, selectedTemplate?.task_order, selectedTemplate);
     setIsSubmitting(false);
   };
 

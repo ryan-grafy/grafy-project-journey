@@ -361,7 +361,7 @@ const App: React.FC = () => {
         const { data, error } = await supabase.from('projects').select('*').neq('status', -1).order('last_updated', { ascending: false });
         if (!error && data) {
              // Restore metadata if present
-             remoteData = data.map((p: any) => {
+            remoteData = data.map((p: any) => {
                 const meta = p.task_states?.meta;
                 if (meta) {
                     return {
@@ -369,7 +369,11 @@ const App: React.FC = () => {
                         rounds_count: meta.rounds_count ?? p.rounds_count,
                         rounds2_count: meta.rounds2_count ?? p.rounds2_count,
                         rounds_navigation_count: meta.rounds_navigation_count ?? p.rounds_navigation_count,
-                        client_visible_tasks: meta.client_visible_tasks ?? p.client_visible_tasks
+                        client_visible_tasks: meta.client_visible_tasks ?? p.client_visible_tasks,
+                        // Restore complex objects from meta backup
+                        custom_tasks: meta.custom_tasks ?? p.custom_tasks,
+                        task_order: meta.task_order ?? p.task_order,
+                        deleted_tasks: meta.deleted_tasks ?? p.deleted_tasks
                     };
                 }
                 return p;
@@ -449,9 +453,12 @@ const App: React.FC = () => {
       // All this data is backed up in task_states.meta
       const { 
         rounds_count, 
-        rounds2_count, 
+        rounds2_count,
         rounds_navigation_count, 
-        client_visible_tasks, 
+        client_visible_tasks,
+        custom_tasks,
+        task_order,
+        deleted_tasks,
         ...safeProject 
       } = project;
 
@@ -814,7 +821,11 @@ const App: React.FC = () => {
         rounds_count: project.rounds_count,
         rounds2_count: project.rounds2_count,
         rounds_navigation_count: project.rounds_navigation_count,
-        client_visible_tasks: project.client_visible_tasks
+        client_visible_tasks: project.client_visible_tasks,
+        // Backup complex objects in meta
+        custom_tasks: project.custom_tasks,
+        task_order: project.task_order,
+        deleted_tasks: project.deleted_tasks
       }
     };
     const updatedProject = {
@@ -1112,6 +1123,10 @@ const App: React.FC = () => {
     if (!updatedMeta.rounds_count) updatedMeta.rounds_count = rounds;
     if (!updatedMeta.rounds2_count) updatedMeta.rounds2_count = rounds2;
     if (!updatedMeta.rounds_navigation_count) updatedMeta.rounds_navigation_count = roundsNavigation;
+    // Ensure complex objects are preserved
+    if (!updatedMeta.custom_tasks) updatedMeta.custom_tasks = currentProject.custom_tasks;
+    if (!updatedMeta.task_order) updatedMeta.task_order = currentProject.task_order;
+    if (!updatedMeta.deleted_tasks) updatedMeta.deleted_tasks = currentProject.deleted_tasks;
 
     const updatedProject = {
         ...currentProject,
@@ -1145,8 +1160,14 @@ const App: React.FC = () => {
     }
   };
 
-  const handleCreateProject = async (name: string, pm: TeamMember | null, designers: (TeamMember | null)[], startDate: string, customTasksTemplate?: any, templateName?: string, taskOrderTemplate?: any) => {
+  const handleCreateProject = async (name: string, pm: TeamMember | null, designers: (TeamMember | null)[], startDate: string, customTasksTemplate?: any, templateName?: string, taskOrderTemplate?: any, templateProject?: Project | null) => {
     const [dLead, d1, d2] = designers;
+    
+    // Prepare complex objects first to avoid self-reference issues
+    const finalCustomTasks = customTasksTemplate ? JSON.parse(JSON.stringify(customTasksTemplate)) : JSON.parse(JSON.stringify(DEFAULT_CUSTOM_TASKS));
+    const finalTaskOrder = taskOrderTemplate ? JSON.parse(JSON.stringify(taskOrderTemplate)) : {};
+    const finalDeletedTasks: string[] = [];
+
     const newProject: Project = {
       id: crypto.randomUUID(),
       created_at: new Date().toISOString(),
@@ -1165,28 +1186,31 @@ const App: React.FC = () => {
       designer_3_email: d2?.email,
       status: 0,
       last_updated: new Date().toISOString(),
-      rounds_count: 2,
-      rounds2_count: 2,
-      rounds_navigation_count: 2, // 기본값 2로 변경
+      rounds_count: templateProject?.rounds_count ?? 2,
+      rounds2_count: templateProject?.rounds2_count ?? 2,
+      rounds_navigation_count: templateProject?.rounds_navigation_count ?? 2, 
       start_date: startDate,
       end_date: '',
       is_locked: false,
-      deleted_tasks: [],
-      custom_tasks: customTasksTemplate ? JSON.parse(JSON.stringify(customTasksTemplate)) : JSON.parse(JSON.stringify(DEFAULT_CUSTOM_TASKS)), // Use Template if provided
-      task_order: taskOrderTemplate ? JSON.parse(JSON.stringify(taskOrderTemplate)) : {},
+      deleted_tasks: templateProject?.deleted_tasks ? [...templateProject.deleted_tasks] : finalDeletedTasks,
+      custom_tasks: finalCustomTasks,
+      task_order: finalTaskOrder,
       task_states: {
         completed: [],
         links: {},
         meta: {
-            rounds_count: 2,
-            rounds2_count: 2,
-            rounds_navigation_count: 2, // 기본값 2로 변경
+            rounds_count: templateProject?.rounds_count ?? 2,
+            rounds2_count: templateProject?.rounds2_count ?? 2,
+            rounds_navigation_count: templateProject?.rounds_navigation_count ?? 2,
             client_visible_tasks: [],
-            template_name: templateName
+            template_name: templateName,
+            custom_tasks: finalCustomTasks,
+            task_order: finalTaskOrder,
+            deleted_tasks: templateProject?.deleted_tasks ? [...templateProject.deleted_tasks] : finalDeletedTasks
         }
       },
       client_visible_tasks: [],
-      template_name: templateName // 템플릿 이름 저장
+      template_name: templateName
     };
     
     // Optimistic UI Update
@@ -1213,7 +1237,8 @@ const App: React.FC = () => {
           custom_tasks: newProject.custom_tasks || {},
           task_order: newProject.task_order || {},
           task_states: newProject.task_states || { completed: [], links: {}, meta: { 
-            rounds_count, rounds2_count, rounds_navigation_count, client_visible_tasks 
+            rounds_count, rounds2_count, rounds_navigation_count, client_visible_tasks,
+            custom_tasks: newProject.custom_tasks, task_order: newProject.task_order, deleted_tasks: newProject.deleted_tasks
           }}, // Ensure meta is populated
           deleted_tasks: newProject.deleted_tasks || []
         };
@@ -1266,7 +1291,10 @@ const App: React.FC = () => {
                     rounds_navigation_count: roundsNavigation, // Ensure this is captured
                     client_visible_tasks: currentProject.client_visible_tasks,
                     is_expedition2_hidden: currentProject.task_states?.meta?.is_expedition2_hidden,
-                    template_name: template_name
+                    template_name: template_name,
+                    custom_tasks: currentProject.custom_tasks,
+                    task_order: currentProject.task_order,
+                    deleted_tasks: currentProject.deleted_tasks
                 }
             }
         };
