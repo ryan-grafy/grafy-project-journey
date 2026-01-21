@@ -29,6 +29,8 @@ const App: React.FC = () => {
   const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
   const [taskLinks, setTaskLinks] = useState<Map<string, { url: string, label: string }>>(new Map());
   const [rounds, setRounds] = useState<number>(2);
+  const [rounds2, setRounds2] = useState<number>(2); // Expedition 2 rounds
+  const [roundsNavigation, setRoundsNavigation] = useState<number>(1); // Navigation rounds (Step 2)
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
@@ -40,7 +42,7 @@ const App: React.FC = () => {
   const [snapshotSelectedTasks, setSnapshotSelectedTasks] = useState<Set<string>>(new Set());
 
   const [taskEditPopover, setTaskEditPopover] = useState<TaskEditPopoverState>({
-    isOpen: false, taskId: null, role: Role.PM, title: '', description: '', completed_date: '', x: 0, y: 0
+    isOpen: false, taskId: null, roles: [Role.PM], title: '', description: '', completed_date: '', x: 0, y: 0
   });
 
   // --- SAFEGUARDS ---
@@ -132,7 +134,8 @@ const App: React.FC = () => {
               id: session.user.id,
               userId: session.user.id,
               name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || '사용자',
-              avatarUrl: session.user.user_metadata.avatar_url
+              avatarUrl: session.user.user_metadata.avatar_url,
+              email: session.user.email
             };
             setUser(u);
             setCurrentView('list');
@@ -183,9 +186,11 @@ const App: React.FC = () => {
             id: session.user.id,
             userId: session.user.id,
             name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || '사용자',
-            avatarUrl: session.user.user_metadata.avatar_url
+            avatarUrl: session.user.user_metadata.avatar_url,
+            email: session.user.email
           });
-          setCurrentView('list');
+          setCurrentView(prev => prev === 'welcome' ? 'list' : prev);
+          // Only fetch if we are not already loaded? Or always fetch to sync? Keeping fetch is safer for data, but view must be preserved.
           fetchTeamMembers();
           fetchProjects();
           setIsAuthLoading(false);
@@ -212,6 +217,28 @@ const App: React.FC = () => {
       setIsInitializing(false);
     }
   }, []);
+
+  // URL Search Params for Direct Project Navigation
+  useEffect(() => {
+    if (!projects || projects.length === 0) return;
+
+    // Check for "project" query param
+    const params = new URLSearchParams(window.location.search);
+    const projectIdParam = params.get('project');
+
+    if (projectIdParam) {
+      const targetProject = projects.find(p => p.id === projectIdParam);
+      if (targetProject) {
+        if (currentProject?.id !== targetProject.id) {
+           selectProject(targetProject);
+           // Optional: clear param to avoid re-triggering? 
+           // Better to keep it so "Back" button works or refresh works.
+           // But if user goes back to list, we should probably clear it?
+           // For now, let's just leave it, or handle "Back to List" button to clear it.
+        }
+      }
+    }
+  }, [projects]);
 
   // Helper to check if email is allowed
   const checkEmailAuthorization = async (email: string | undefined): Promise<boolean> => {
@@ -264,7 +291,8 @@ const App: React.FC = () => {
           id: sessionUser.id,
           userId: sessionUser.id,
           name: sessionUser.user_metadata.full_name || sessionUser.email?.split('@')[0] || '사용자',
-          avatarUrl: sessionUser.user_metadata.avatar_url
+          avatarUrl: sessionUser.user_metadata.avatar_url,
+          email: sessionUser.email
         });
         setCurrentView('list');
         fetchTeamMembers();
@@ -391,6 +419,8 @@ const App: React.FC = () => {
   const selectProject = (project: Project) => {
     setCurrentProject(project);
     setRounds(project.rounds_count || 2);
+    setRounds2(project.rounds2_count || 2);
+    setRoundsNavigation(project.rounds_navigation_count || 1);
     loadTasks(project);
     setCurrentView('detail');
     setActiveRole(Role.ALL);
@@ -430,6 +460,7 @@ const App: React.FC = () => {
     const updatedProject = { ...currentProject, ...updates, last_updated: new Date().toISOString() };
     setCurrentProject(updatedProject);
     saveProjectsLocal(projects.map(p => p.id === currentProject.id ? updatedProject : p));
+    showToast("프로젝트 정보 저장 완료");
   };
 
   const getVisibleTasks = (stepId: number, project: Project, roundCount: number) => {
@@ -437,7 +468,28 @@ const App: React.FC = () => {
     const deletedSet = new Set(project.deleted_tasks || []);
     let allVisibleTasks: Task[] = [];
 
-    if (stepId === 3) {
+    if (stepId === 2) {
+      const roundCount = project.rounds_navigation_count || 1;
+      const roundTasks = Array.from({ length: roundCount }).flatMap((_, rIdx) => {
+        const propId = `t2-round-${rIdx + 1}-prop`;
+        const feedId = `t2-round-${rIdx + 1}-feed`;
+        const rTs = [];
+        if (!deletedSet.has(propId)) {
+          rTs.push(stepCustomTasks.find(ct => ct.id === propId) || 
+            { id: propId, roles: [Role.PM, Role.DESIGNER], title: `${rIdx + 1}차 제안_버벌 아이덴티티 / 브랜드네임, 슬로건 등 도출_Ver${rIdx + 1}.0`, description: '시장 조사, 기획, 디자인 원칙, 전체적인 비주얼아이덴티티 도출을 위한 맥락 등의 디자인 소스를 제작', completed_date: '00-00-00' }
+          );
+        }
+        if (!deletedSet.has(feedId)) {
+          rTs.push(stepCustomTasks.find(ct => ct.id === feedId) || 
+            { id: feedId, roles: [Role.CLIENT, Role.PM], title: `${rIdx + 1}차 제안에 대한 피드백`, description: '( 초기 스냅샷 금지 ) 1차 피드백을 확인할 수 있습니다', completed_date: '00-00-00' }
+          );
+        }
+        return rTs;
+      });
+      const onlyCustoms = stepCustomTasks.filter(ct => !ct.id.includes('-round-'));
+      allVisibleTasks = [...roundTasks, ...onlyCustoms];
+
+    } else if (stepId === 3) {
       const baseTask = STEPS_STATIC[2].tasks[0];
       const finalTask = STEPS_STATIC[2].tasks[1];
       const roundTasks = Array.from({ length: roundCount }).flatMap((_, rIdx) => {
@@ -454,6 +506,18 @@ const App: React.FC = () => {
       if (!deletedSet.has('t3-base-1')) allVisibleTasks.push(stepCustomTasks.find(t => t.id === 't3-base-1') || baseTask);
       allVisibleTasks = [...allVisibleTasks, ...roundTasks, ...onlyCustoms];
       if (!deletedSet.has('t3-final')) allVisibleTasks.push(stepCustomTasks.find(t => t.id === 't3-final') || finalTask);
+    } else if (stepId === 4) {
+      const roundCount2 = project.rounds2_count || 2;
+      const roundTasks = Array.from({ length: roundCount2 }).flatMap((_, rIdx) => {
+        const pmId = `t4-round-${rIdx + 1}-pm`;
+        const desId = `t4-round-${rIdx + 1}-des`;
+        const rTs = [];
+        if (!deletedSet.has(pmId)) rTs.push(stepCustomTasks.find(ct => ct.id === pmId) || { id: pmId, roles: [Role.PM], title: `${rIdx + 1}차 피드백 수급`, completed_date: '00-00-00' });
+        if (!deletedSet.has(desId)) rTs.push(stepCustomTasks.find(ct => ct.id === desId) || { id: desId, roles: [Role.DESIGNER], title: `${rIdx + 1}차 수정 및 업데이트`, completed_date: '00-00-00' });
+        return rTs;
+      });
+      const onlyCustoms = stepCustomTasks.filter(ct => !ct.id.includes('-round-'));
+      allVisibleTasks = [...roundTasks, ...onlyCustoms];
     } else {
       const stepStaticTasks = STEPS_STATIC.find(s => s.id === stepId)?.tasks || [];
       allVisibleTasks = stepStaticTasks
@@ -642,13 +706,25 @@ const App: React.FC = () => {
     let count = 0;
     const deletedSet = new Set(project.deleted_tasks || []);
     STEPS_STATIC.forEach(step => {
-      if (step.id === 3) {
+      if (step.id === 2) {
+        const roundCount = (project.rounds_navigation_count || 1);
+        for (let r = 1; r <= roundCount; r++) {
+          if (!deletedSet.has(`t2-round-${r}-prop`)) count += 1;
+          if (!deletedSet.has(`t2-round-${r}-feed`)) count += 1;
+        }
+      } else if (step.id === 3) {
         if (!deletedSet.has('t3-base-1')) count += 1;
         if (!deletedSet.has('t3-final')) count += 1;
         const roundCount = (project.rounds_count || 2);
         for (let r = 1; r <= roundCount; r++) {
           if (!deletedSet.has(`t3-round-${r}-pm`)) count += 1;
           if (!deletedSet.has(`t3-round-${r}-des`)) count += 1;
+        }
+      } else if (step.id === 4) {
+        const roundCount2 = (project.rounds2_count || 2);
+        for (let r = 1; r <= roundCount2; r++) {
+          if (!deletedSet.has(`t4-round-${r}-pm`)) count += 1;
+          if (!deletedSet.has(`t4-round-${r}-des`)) count += 1;
         }
       } else {
         step.tasks.forEach(t => {
@@ -678,7 +754,7 @@ const App: React.FC = () => {
     const nextCustomTasks = { ...(currentProject.custom_tasks || {}) };
     const newTask: Task = {
       id: `custom-${stepId}-${Date.now()}`,
-      role: Role.PM, title: '새로운 태스크', description: '', hasFile: true, completed_date: '00-00-00'
+      roles: [Role.PM], title: '새로운 태스크', description: '', hasFile: true, completed_date: '00-00-00'
     };
     nextCustomTasks[stepId] = [...(nextCustomTasks[stepId] || []), newTask];
     const nextTaskOrder = { ...(currentProject.task_order || {}) };
@@ -701,14 +777,21 @@ const App: React.FC = () => {
       return;
     }
     const allVisibleTasks = getVisibleTasks(stepId, currentProject, rounds);
-    if (stepId === 3) {
+    if (stepId === 3 || stepId === 2) {
       const grouped: (Task | Task[])[] = [];
       let i = 0;
       while (i < allVisibleTasks.length) {
         const task = allVisibleTasks[i];
-        if (task.id.match(/t3-round-\d+-pm/)) {
+        // Regex to match t3-round-X-pm OR t2-round-X-prop
+        const isRoundStart = task.id.match(/t[23]-round-\d+-(pm|prop)/);
+        
+        if (isRoundStart) {
           const next = allVisibleTasks[i + 1];
-          if (next && next.id === task.id.replace('-pm', '-des')) {
+          // Check if next is the partner: pm->des OR prop->feed
+          const partnerSuffix = task.id.includes('-pm') ? '-des' : '-feed';
+          const currentSuffix = task.id.includes('-pm') ? '-pm' : '-prop';
+          
+          if (next && next.id === task.id.replace(currentSuffix, partnerSuffix)) {
             grouped.push([task, next]);
             i += 2;
           } else {
@@ -755,14 +838,14 @@ const App: React.FC = () => {
     await syncProjectToSupabase(updatedProject);
   };
 
-  const handleSaveTaskInfo = (taskId: string, role: Role, title: string, description: string, completed_date: string) => {
+  const handleSaveTaskInfo = (taskId: string, roles: Role[], title: string, description: string, completed_date: string) => {
     if (!currentProject || currentProject.is_locked) return;
     const nextCustomTasks = { ...(currentProject.custom_tasks || {}) };
     let found = false;
     for (const stepId in nextCustomTasks) {
       const idx = nextCustomTasks[stepId].findIndex(t => t.id === taskId);
       if (idx > -1) {
-        nextCustomTasks[stepId][idx] = { ...nextCustomTasks[stepId][idx], role, title, description, completed_date };
+        nextCustomTasks[stepId][idx] = { ...nextCustomTasks[stepId][idx], roles, title, description, completed_date };
         found = true; break;
       }
     }
@@ -772,21 +855,37 @@ const App: React.FC = () => {
         if (sTask) {
           const sid = step.id;
           if (!nextCustomTasks[sid]) nextCustomTasks[sid] = [];
-          nextCustomTasks[sid].push({ ...sTask, role, title, description, completed_date });
+          nextCustomTasks[sid].push({ ...sTask, roles, title, description, completed_date });
           found = true; break;
         }
       }
     }
-    if (!found && taskId.startsWith('t3-round-')) {
-      const sid = 3;
+    if (!found && (taskId.startsWith('t3-round-') || taskId.startsWith('t4-round-') || taskId.startsWith('t2-round-'))) {
+      const isNav = taskId.startsWith('t2');
+      const sid = isNav ? 2 : (taskId.startsWith('t3') ? 3 : 4);
+      
       if (!nextCustomTasks[sid]) nextCustomTasks[sid] = [];
-      const isPm = taskId.endsWith('-pm');
-      const roundNum = taskId.split('-')[2];
-      const defaultTitle = isPm ? `${roundNum}차 피드백 수급` : `${roundNum}차 수정 및 업데이트`;
-      const defaultRole = isPm ? Role.PM : Role.DESIGNER;
+      
+      let defaultTitle = '';
+      let defaultRoles: Role[] = [];
+      
+      if (isNav) {
+         const isProp = taskId.endsWith('-prop');
+         const roundNum = taskId.split('-')[2];
+         defaultTitle = isProp 
+           ? `${roundNum}차 제안_버벌 아이덴티티 / 브랜드네임, 슬로건 등 도출_Ver${roundNum}.0` 
+           : `${roundNum}차 제안에 대한 피드백`;
+         defaultRoles = isProp ? [Role.PM, Role.DESIGNER] : [Role.CLIENT, Role.PM];
+      } else {
+        const isPm = taskId.endsWith('-pm');
+        const roundNum = taskId.split('-')[2];
+        defaultTitle = isPm ? `${roundNum}차 피드백 수급` : `${roundNum}차 수정 및 업데이트`;
+        defaultRoles = isPm ? [Role.PM] : [Role.DESIGNER];
+      }
+
       nextCustomTasks[sid].push({
         id: taskId,
-        role: role || defaultRole,
+        roles: roles && roles.length > 0 ? roles : defaultRoles,
         title: title || defaultTitle,
         description: description || '',
         completed_date: completed_date || '00-00-00'
@@ -800,6 +899,30 @@ const App: React.FC = () => {
       showToast("태스크 정보 저장 완료");
     }
     setTaskEditPopover(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const handleUpdateRounds2 = async (newCount: number) => {
+    if (!currentProject || currentProject.is_locked) return;
+    setRounds2(newCount);
+    const updatedProject = { ...currentProject, rounds2_count: newCount, last_updated: new Date().toISOString() };
+    setCurrentProject(updatedProject);
+    const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
+    setProjects(nextProjects);
+    localStorage.setItem('grafy_projects', JSON.stringify(nextProjects));
+    await syncProjectToSupabase(updatedProject);
+    showToast(`Expedition 2 라운드가 ${newCount}개로 설정되었습니다.`);
+  };
+
+  const handleUpdateRoundsNavigation = async (newCount: number) => {
+    if (!currentProject || currentProject.is_locked) return;
+    setRoundsNavigation(newCount);
+    const updatedProject = { ...currentProject, rounds_navigation_count: newCount, last_updated: new Date().toISOString() };
+    setCurrentProject(updatedProject);
+    const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
+    setProjects(nextProjects);
+    localStorage.setItem('grafy_projects', JSON.stringify(nextProjects));
+    await syncProjectToSupabase(updatedProject);
+    showToast(`Navigation 라운드가 ${newCount}개로 설정되었습니다.`);
   };
 
   const handleCreateProject = async (name: string, pm: TeamMember | null, designers: (TeamMember | null)[], startDate: string) => {
@@ -823,6 +946,7 @@ const App: React.FC = () => {
       status: 0,
       last_updated: new Date().toISOString(),
       rounds_count: 2,
+      rounds_navigation_count: 1,
       start_date: startDate,
       deleted_tasks: []
     };
@@ -961,8 +1085,8 @@ const App: React.FC = () => {
             isSnapshotMode={isSnapshotMode}
             onSnapshotToggle={handleSnapshotToggle}
           />
-          <main className="w-full px-4 md:px-6 py-10 max-w-[1800px] mx-auto">
-            <div className="max-w-[1800px] mx-auto">
+          <main className="w-full px-4 md:px-6 py-10 max-w-[2100px] mx-auto">
+            <div className="max-w-[2100px] mx-auto">
               {/* Progress Section */}
               <div className="bg-white p-6 md:p-8 rounded-[1.25rem] md:rounded-[1.5rem] mb-6 md:mb-10 flex flex-col md:flex-row items-center gap-6 md:gap-10 border border-slate-200 shadow-sm relative overflow-visible">
                 <div className="shrink-0 relative z-10 w-full md:w-auto text-center md:text-left">
@@ -985,7 +1109,7 @@ const App: React.FC = () => {
 
               {/* Steps Layout */}
               <div className="overflow-x-auto pb-8 no-scrollbar scroll-smooth">
-                <div className="flex gap-4 md:gap-8 min-w-max px-0">
+                <div className="flex gap-2 md:gap-4 min-w-max md:min-w-0 md:w-full px-0">
                   {STEPS_STATIC.map((step) => {
                     const allVisibleTasks = currentProject ? getVisibleTasks(step.id, currentProject, rounds) : [];
                     const locked = isLockedStep(step.id);
@@ -1008,7 +1132,7 @@ const App: React.FC = () => {
                         onEditContextMenu={(e, task) => {
                           if (isSnapshotMode) return;
                           setTaskEditPopover({
-                            isOpen: true, taskId: task.id, role: task.role, title: task.title, description: task.description || '', completed_date: task.completed_date || '00-00-00', x: e.clientX, y: e.clientY
+                            isOpen: true, taskId: task.id, roles: task.roles || [Role.PM], title: task.title, description: task.description || '', completed_date: task.completed_date || '00-00-00', x: e.pageX, y: e.pageY
                           });
                         }}
                         onToast={showToast}
@@ -1019,6 +1143,24 @@ const App: React.FC = () => {
                         onSnapshotTaskSelect={handleSnapshotTaskSelect}
                         onAddTask={() => handleAddCustomTask(step.id)}
                       >
+                        {step.id === 2 && (
+                          <div className="flex justify-center gap-4 md:gap-6 py-1">
+                            <button
+                              onClick={() => roundsNavigation > 1 && handleUpdateRoundsNavigation(roundsNavigation - 1)}
+                              className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-white border border-slate-300 shadow-lg transition-all flex items-center justify-center text-black font-bold active:scale-90 ${currentProject?.is_locked || roundsNavigation <= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:border-black'}`}
+                              disabled={currentProject?.is_locked || roundsNavigation <= 1}
+                            >
+                              <i className="fa-solid fa-minus"></i>
+                            </button>
+                            <button
+                              onClick={() => handleUpdateRoundsNavigation(roundsNavigation + 1)}
+                              className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-black text-white shadow-lg transition-all flex items-center justify-center text-sm active:scale-90 ${currentProject?.is_locked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              disabled={currentProject?.is_locked}
+                            >
+                              <i className="fa-solid fa-plus"></i>
+                            </button>
+                          </div>
+                        )}
                         {step.id === 3 && (
                           <div className="flex justify-center gap-4 md:gap-6 py-1">
                             <button
@@ -1030,6 +1172,24 @@ const App: React.FC = () => {
                             </button>
                             <button
                               onClick={() => handleUpdateRounds(rounds + 1)}
+                              className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-black text-white shadow-lg transition-all flex items-center justify-center text-sm active:scale-90 ${currentProject?.is_locked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              disabled={currentProject?.is_locked}
+                            >
+                              <i className="fa-solid fa-plus"></i>
+                            </button>
+                          </div>
+                        )}
+                        {step.id === 4 && (
+                          <div className="flex justify-center gap-4 md:gap-6 py-1">
+                            <button
+                              onClick={() => rounds2 > 2 && handleUpdateRounds2(rounds2 - 1)}
+                              className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-white border border-slate-300 shadow-lg transition-all flex items-center justify-center text-black font-bold active:scale-90 ${currentProject?.is_locked || rounds2 <= 2 ? 'opacity-50 cursor-not-allowed' : 'hover:border-black'}`}
+                              disabled={currentProject?.is_locked || rounds2 <= 2}
+                            >
+                              <i className="fa-solid fa-minus"></i>
+                            </button>
+                            <button
+                              onClick={() => handleUpdateRounds2(rounds2 + 1)}
                               className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-black text-white shadow-lg transition-all flex items-center justify-center text-sm active:scale-90 ${currentProject?.is_locked ? 'opacity-50 cursor-not-allowed' : ''}`}
                               disabled={currentProject?.is_locked}
                             >
@@ -1054,8 +1214,13 @@ const App: React.FC = () => {
       )}
       {
         toastMsg && (
-          <div className={`fixed bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 text-white px-8 md:px-12 py-4 md:py-6 rounded-full text-sm md:text-[18px] font-bold z-[9999] shadow-2xl animate-in fade-in slide-in-from-bottom-10 duration-500 flex items-center gap-3 md:gap-4 ${toastMsg.includes("이전 스텝") ? "bg-red-500" : "bg-black"}`}>
-            {toastMsg.includes("이전 스텝") ? <i className="fa-solid fa-circle-xmark text-white"></i> : <i className="fa-solid fa-circle-info text-white"></i>}
+          <div className={`fixed bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 text-white px-8 md:px-12 py-4 md:py-6 rounded-full text-sm md:text-[18px] font-bold z-[9999] shadow-2xl animate-in fade-in slide-in-from-bottom-10 duration-500 flex items-center gap-3 md:gap-4 ${
+            toastMsg.includes("이전 스텝") ? "bg-red-500" : 
+            toastMsg.includes("저장 완료") ? "bg-[#05D686]" : "bg-black"
+          }`}>
+            {toastMsg.includes("이전 스텝") ? <i className="fa-solid fa-circle-xmark text-white"></i> : 
+             toastMsg.includes("저장 완료") ? <i className="fa-solid fa-circle-check text-white"></i> :
+             <i className="fa-solid fa-circle-info text-white"></i>}
             {toastMsg}
           </div>
         )

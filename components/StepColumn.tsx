@@ -45,21 +45,30 @@ const StepColumn: React.FC<StepColumnProps> = ({
   snapshotSelectedTasks,
   onSnapshotTaskSelect
 }) => {
-  const visibleTasks = tasks.filter(t => filter === Role.ALL || t.role === filter);
+  /* Migration Safe Access: task.roles might be undefined during transition if data not migrated yet. 
+     We treat missing roles as [Role.PM] or empty based on context, but let's safely access. */
+  const visibleTasks = tasks.filter(t => {
+    if (filter === Role.ALL) return true;
+    const tRoles = t.roles || []; // Fallback empty array
+    return tRoles.includes(filter);
+  });
 
   const borderColors: Record<number, string> = {
     1: isLocked ? 'border-blue-100' : 'border-blue-500/30',
     2: isLocked ? 'border-violet-100' : 'border-violet-500/30',
     3: isLocked ? 'border-yellow-100' : 'border-yellow-500/30',
-    4: isLocked ? 'border-green-100' : 'border-green-500/30'
+    4: isLocked ? 'border-orange-100' : 'border-orange-500/30',
+    5: isLocked ? 'border-green-100' : 'border-green-500/30'
   };
 
   const activeBgColors: Record<number, string> = {
-    1: 'bg-blue-100/50', 2: 'bg-violet-100/50', 3: 'bg-yellow-100/50', 4: 'bg-green-100/50'
+    1: 'bg-blue-100/50', 2: 'bg-violet-100/50', 3: 'bg-yellow-100/50', 4: 'bg-orange-100/50', 5: 'bg-green-100/50'
   };
 
-  const borderColor = borderColors[step.id] || 'border-slate-300';
-  const bgColor = !isLocked ? activeBgColors[step.id] : step.colorClass;
+  const borderColor = isLocked ? 'border-slate-200' : (borderColors[step.id] || 'border-slate-300');
+  const bgColor = isLocked 
+    ? 'bg-slate-50' 
+    : (activeBgColors[step.id] || step.colorClass);
 
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -162,8 +171,8 @@ const StepColumn: React.FC<StepColumnProps> = ({
     const rendered = [];
 
     // 마지막 라운드 PM 태스크의 ID를 찾아 그 바로 밑에 조작 버튼을 넣기 위함
-    const lastRoundPmId = step.id === 3
-      ? [...visibleTasks].reverse().find(t => t.id.includes('-round-') && t.id.endsWith('-pm'))?.id
+    const lastRoundPmId = (step.id === 3 || step.id === 4 || step.id === 2)
+      ? [...visibleTasks].reverse().find(t => t.id.includes('-round-') && (t.id.endsWith('-pm') || t.id.endsWith('-prop')))?.id
       : null;
 
     let i = 0;
@@ -173,11 +182,15 @@ const StepColumn: React.FC<StepColumnProps> = ({
       const canDrag = !isLocked && !isLockedProject && !isTaskCompleted;
       const currentIndex = i;
 
-      const roundMatch = task.id.match(/t3-round-(\d+)-pm/);
-      if (step.id === 3 && roundMatch) {
-        const roundNum = roundMatch[1];
+      const roundMatch = task.id.match(/t([234])-round-(\d+)-(pm|prop)/);
+      if ((step.id === 3 || step.id === 4 || step.id === 2) && roundMatch) {
+        const stepNum = roundMatch[1];
+        const roundNum = roundMatch[2];
         const nextTask = visibleTasks[i + 1];
-        const isNextDesigner = nextTask?.id === `t3-round-${roundNum}-des`;
+        
+        const isNextPartner = stepNum === '2' 
+          ? nextTask?.id === `t${stepNum}-round-${roundNum}-feed` 
+          : nextTask?.id === `t${stepNum}-round-${roundNum}-des`;
 
         rendered.push(
           <div
@@ -195,15 +208,15 @@ const StepColumn: React.FC<StepColumnProps> = ({
 
             <div className="mb-1 pl-2">
               <span className="text-[12px] md:text-[14px] font-bold bg-white/95 border border-black/10 px-4 py-1.5 rounded-full uppercase tracking-widest text-slate-700 shadow-sm inline-block">
-                Round {roundNum} Feedback Cycle
+                {roundNum}차 제안_Ver{roundNum}.0
               </span>
             </div>
-            <div className="flex flex-col gap-2.5 p-3 md:p-4 bg-white/60 border border-white/70 rounded-[1.5rem] shadow-inner relative">
+            <div className="flex flex-col gap-2.5 p-1.5 md:p-2 bg-white/60 border border-white/70 rounded-[1.5rem] shadow-inner relative">
               <TaskCard {...getTaskProps(task)} />
-              {isNextDesigner && <TaskCard {...getTaskProps(nextTask)} />}
+              {isNextPartner && <TaskCard {...getTaskProps(nextTask)} />}
             </div>
 
-            {currentIndex === visibleTasks.length - (isNextDesigner ? 2 : 1) && dragOverIndex === visibleTasks.length && draggedIndex !== null && (
+            {currentIndex === visibleTasks.length - (isNextPartner ? 2 : 1) && dragOverIndex === visibleTasks.length && draggedIndex !== null && (
               <div className="absolute bottom-[-10px] left-0 w-full h-[6px] bg-black/60 rounded-full z-[100] animate-pulse shadow-[0_0_10px_rgba(0,0,0,0.3)]"></div>
             )}
           </div>
@@ -220,7 +233,7 @@ const StepColumn: React.FC<StepColumnProps> = ({
           );
         }
 
-        i += isNextDesigner ? 2 : 1;
+        i += isNextPartner ? 2 : 1;
       } else {
         rendered.push(
           <div
@@ -260,7 +273,7 @@ const StepColumn: React.FC<StepColumnProps> = ({
 
   return (
     <div
-      className={`relative h-fit flex flex-col flex-1 w-full min-w-[280px] md:min-w-0 p-5 md:p-8 rounded-[1.25rem] md:rounded-[1.5rem] border transition-all duration-700 ${bgColor} ${borderColor} ${isLocked && !isSnapshotMode ? 'opacity-40 grayscale blur-[0.5px]' : 'opacity-100 shadow-2xl shadow-black/5'}`}
+      className={`relative h-fit flex flex-col flex-1 w-full min-w-[280px] md:min-w-0 p-2.5 md:p-4 rounded-[1.25rem] md:rounded-[1.5rem] border transition-all duration-700 ${bgColor} ${borderColor} ${isLocked && !isSnapshotMode ? 'opacity-40 grayscale blur-[0.5px]' : 'opacity-100 shadow-2xl shadow-black/5'}`}
       onDragOver={(e) => {
         e.preventDefault();
         if (draggedIndex !== null && dragOverIndex === null) setDragOverIndex(visibleTasks.length);

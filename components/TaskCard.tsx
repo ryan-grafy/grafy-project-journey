@@ -38,7 +38,7 @@ const roleLabels: Record<Role, string> = {
 };
 
 const accentColors: Record<number, string> = {
-  1: 'bg-blue-600', 2: 'bg-violet-600', 3: 'bg-yellow-500', 4: 'bg-green-600',
+  1: 'bg-blue-600', 2: 'bg-violet-600', 3: 'bg-yellow-500', 4: 'bg-orange-600', 5: 'bg-green-600',
 };
 
 const TaskCard: React.FC<TaskCardProps> = ({
@@ -120,7 +120,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
     <div
       onClick={handleToggleClick}
       onContextMenu={handleRightClickInfo}
-      className={`relative flex flex-col p-4 mb-2 bg-white border rounded-2xl cursor-pointer transition-all duration-300 min-h-[100px] group ${isCompleted ? 'bg-white border-black/10 opacity-80 shadow-inner' : 'border-black/25 hover:border-black/50 hover:-translate-y-1 hover:shadow-xl shadow-sm'} ${isLockedStep && !isSnapshotMode ? 'cursor-not-allowed grayscale-[0.5]' : ''} ${isSelectedForSnapshot ? '!border-red-500 !border-4 !ring-2 !ring-red-200 z-50' : ''}`}
+      className={`relative flex flex-col p-4 mb-2 bg-white border rounded-2xl cursor-pointer transition-all duration-300 min-h-[100px] group overflow-hidden ${isCompleted ? 'bg-white border-black/10 opacity-80 shadow-inner' : 'border-black/25 hover:border-black/50 hover:-translate-y-1 hover:shadow-xl shadow-sm'} ${isLockedStep && !isSnapshotMode ? 'cursor-not-allowed grayscale-[0.5]' : ''} ${isSelectedForSnapshot ? '!border-emerald-500 !border-4 !ring-2 !ring-emerald-200 z-50' : ''}`}
     >
       <div className="absolute top-3 right-3 flex items-center gap-2 z-20">
         {isCompleted ? (
@@ -142,12 +142,27 @@ const TaskCard: React.FC<TaskCardProps> = ({
       </div>
 
       <div className="mb-2 pr-10">
-        <span className={`text-[10px] font-black px-2 py-1 rounded-lg w-fit mb-[16px] flex items-center gap-2 uppercase tracking-widest ${roleInfo.style}`}>
-          <i className={`fa-solid ${roleInfo.icon} text-[9px]`}></i>
-          {roleLabels[task.role]}
-        </span>
+        <div className="flex flex-wrap gap-1 mb-[16px]">
+          {task.roles && task.roles.length > 0 ? (
+            task.roles.map(r => {
+              const rInfo = roleStyles[r] || roleStyles[Role.PM];
+              return (
+                <span key={r} className={`text-[10px] font-black px-2 py-1 rounded-lg w-fit flex items-center gap-2 uppercase tracking-widest ${rInfo.style}`}>
+                  <i className={`fa-solid ${rInfo.icon} text-[10px]`}></i>
+                  {roleLabels[r]}
+                </span>
+              );
+            })
+          ) : (
+            // Fallback for migration safety or empty
+            <span className={`text-[10px] font-black px-2 py-1 rounded-lg w-fit flex items-center gap-2 uppercase tracking-widest ${roleStyles[Role.PM].style}`}>
+              <i className={`fa-solid ${roleStyles[Role.PM].icon} text-[10px]`}></i>
+              {roleLabels[Role.PM]}
+            </span>
+          )}
+        </div>
         <h4 className="font-bold text-lg mb-1 leading-tight tracking-tight text-black">{task.title}</h4>
-        {task.description && <p className="text-[12.5px] leading-snug font-bold text-slate-500 line-clamp-2">{task.description}</p>}
+        {task.description && <p className="text-[12.5px] leading-snug font-bold text-slate-500 line-clamp-3 break-all whitespace-normal">{task.description}</p>}
 
         <div className="mt-1.5 inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2 py-1 rounded-full">
           <i className="fa-solid fa-calendar-check text-slate-400 text-[9px]"></i>
@@ -168,9 +183,9 @@ const TaskCard: React.FC<TaskCardProps> = ({
             e.stopPropagation();
             linkUrl ? window.open(linkUrl, '_blank') : onToast("우클릭하여 링크를 설정해주세요.");
           }}
-          className={`w-full inline-flex justify-center items-center gap-1.5 px-3 py-2.5 rounded-xl text-[13px] font-black border transition-all ${linkUrl ? `${pointColor} text-white border-transparent hover:brightness-90 shadow-md` : 'bg-white text-slate-600 border-slate-200 hover:border-black hover:text-black'}`}
+          className={`w-full inline-flex justify-center items-center gap-1.5 px-3 py-2.5 rounded-xl text-[13px] font-black border transition-all ${linkUrl ? `${pointColor} text-white border-transparent hover:brightness-90 shadow-md` : 'bg-white text-slate-600 border-slate-200 hover:border-black hover:text-black'} overflow-hidden`}
         >
-          {linkUrl ? (linkLabel || "자료 확인") : "우클릭 링크 지정"}
+          <span className="truncate max-w-full">{linkUrl ? (linkLabel || "자료 확인") : "우클릭 링크 지정"}</span>
         </button>
       </div>
     </div>

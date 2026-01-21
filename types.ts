@@ -13,6 +13,7 @@ export interface User {
   name: string;
   avatarUrl?: string;
   password?: string;
+  email?: string;
 }
 
 export interface TeamMember {
@@ -34,7 +35,7 @@ export interface Log {
 
 export interface Task {
   id: string;
-  role: Role;
+  roles: Role[]; // Changed from role for multi-selection
   title: string;
   description?: string;
   hasFile?: boolean;
@@ -64,7 +65,7 @@ export interface PopoverState {
 export interface TaskEditPopoverState {
   isOpen: boolean;
   taskId: string | null;
-  role: Role;
+  roles: Role[]; // Changed from role
   title: string;
   description: string;
   completed_date: string;
@@ -91,6 +92,8 @@ export interface Project {
   status: number;
   last_updated: string;
   rounds_count: number;
+  rounds2_count?: number; // Expedition 2 rounds
+  rounds_navigation_count?: number; // Navigation rounds
   is_locked?: boolean;
   custom_tasks?: Record<number, Task[]>;
   task_order?: Record<number, string[]>;

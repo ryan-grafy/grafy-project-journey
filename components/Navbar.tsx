@@ -113,7 +113,7 @@ const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <nav className="w-full bg-white border-b border-slate-200 py-3 md:py-4 sticky top-0 z-40 shadow-sm" onClick={() => { setEditMenu({ ...editMenu, isOpen: false }); setContactPopover({ ...contactPopover, isOpen: false }); setProfileMenuOpen(false); }}>
-      <div className="max-w-[1800px] mx-auto px-4 md:px-6 flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-center">
+      <div className="max-w-[2100px] mx-auto px-4 md:px-6 flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-center">
 
         {/* Left Side: Title & Info */}
         <div className="flex flex-col md:flex-row md:items-center gap-4 lg:gap-8 flex-1 min-w-0">
@@ -198,8 +198,8 @@ const Navbar: React.FC<NavbarProps> = ({
               <button
                 onClick={async () => {
                   try {
-                    const token = crypto.randomUUID();
-                    const shareUrl = `${window.location.origin}/share/${project.id}`; // Changed to Project ID for persistent link mostly (needs token though)
+                    // const token = crypto.randomUUID(); // Unused
+                    const shareUrl = `${window.location.origin}/share/${project.id}`;
                     await navigator.clipboard.writeText(shareUrl);
                     onToast("클라이언트 공유 링크가 복사되었습니다!");
                   } catch (e) {

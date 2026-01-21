@@ -1,0 +1,21 @@
+// handleUpdateRounds2 함수가 필요합니다
+// handleUpdateRounds를 찾아서 복사하고 rounds2용으로 수정 필요
+
+const handleUpdateRounds2 = async (newCount: number) => {
+  if (!currentProject || currentProject.is_locked) return;
+  setRounds2(newCount);
+  
+  const updatedProject = {
+    ...currentProject,
+    rounds2_count: newCount,
+    last_updated: new Date().toISOString()
+  };
+  
+  setCurrentProject(updatedProject);
+  const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
+  setProjects(nextProjects);
+  localStorage.setItem('grafy_projects', JSON.stringify(nextProjects));
+  
+  await syncProjectToSupabase(updatedProject);
+  showToast(`Expedition 2 라운드가 ${newCount}개로 설정되었습니다.`);
+};

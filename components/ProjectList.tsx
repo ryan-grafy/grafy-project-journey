@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Project, User } from '../types';
+import { Project, User, Role, Task } from '../types';
+import { STEPS_STATIC } from '../constants';
 
 interface ProjectListProps {
   projects: Project[];
@@ -22,16 +23,104 @@ interface ProjectRowItemProps {
   onSelectProject: (p: Project) => void;
   onDeleteProject: (id: string) => void;
   getTeamString: (p: Project) => string;
+  currentEmail?: string;
 }
 
-const ProjectRowItem: React.FC<ProjectRowItemProps> = ({
-  project,
-  index,
-  total,
-  onSelectProject,
-  onDeleteProject,
-  getTeamString
-}) => {
+const getNextSchedule = (project: Project): { date: string, title: string, isOverdue: boolean } | null => {
+  const completedSet = new Set(project.task_states?.completed || []);
+  const deletedSet = new Set(project.deleted_tasks || []);
+  const customTasks = project.custom_tasks || {};
+  const taskOrder = project.task_order || {};
+
+  const stepIds = [1, 2, 3, 4];
+  
+  for (const stepId of stepIds) {
+    let tasks: Task[] = [];
+    
+    // 1. Collect Base Tasks
+    if (stepId === 2) {
+        const roundCount = project.rounds_navigation_count || 1;
+        for (let r = 1; r <= roundCount; r++) {
+            tasks.push({ id: `t2-round-${r}-prop`, title: `${r}차 제안`, completed_date: '00-00-00', roles: [Role.PM, Role.DESIGNER] });
+            tasks.push({ id: `t2-round-${r}-feed`, title: `${r}차 피드백`, completed_date: '00-00-00', roles: [Role.CLIENT, Role.PM] });
+        }
+    } else if (stepId === 3) {
+        tasks.push(STEPS_STATIC[2].tasks[0]); // Base 1
+        const roundCount = project.rounds_count || 2;
+        for (let r = 1; r <= roundCount; r++) {
+            tasks.push({ id: `t3-round-${r}-pm`, title: `${r}차 피드백 수급`, completed_date: '00-00-00', roles: [Role.PM] });
+            tasks.push({ id: `t3-round-${r}-des`, title: `${r}차 수정`, completed_date: '00-00-00', roles: [Role.DESIGNER] });
+        }
+        tasks.push(STEPS_STATIC[2].tasks[1]); // Final
+    } else if (stepId === 4) {
+        const roundCount = project.rounds2_count || 2;
+        for (let r = 1; r <= roundCount; r++) {
+            tasks.push({ id: `t4-round-${r}-pm`, title: `${r}차 피드백 수급`, completed_date: '00-00-00', roles: [Role.PM] });
+            tasks.push({ id: `t4-round-${r}-des`, title: `${r}차 수정`, completed_date: '00-00-00', roles: [Role.DESIGNER] });
+        }
+    } else {
+        tasks = [...(STEPS_STATIC.find(s => s.id === stepId)?.tasks || [])];
+    }
+
+    // 2. Merge Custom Tasks (Override info or Add new)
+    const stepCustoms = customTasks[stepId] || [];
+    // Override existing
+    tasks = tasks.map(t => {
+        const found = stepCustoms.find(ct => ct.id === t.id);
+        if (found) return { ...t, ...found };
+        return t;
+    });
+    // Add pure custom tasks
+    const pureCustoms = stepCustoms.filter(ct => !tasks.some(t => t.id === ct.id));
+    tasks = [...tasks, ...pureCustoms];
+
+    // 3. Filter Deleted
+    tasks = tasks.filter(t => !deletedSet.has(t.id));
+
+    // 4. Sort by Order
+    const order = taskOrder[stepId];
+    if (order && order.length > 0) {
+        tasks.sort((a, b) => {
+            const idxA = order.indexOf(a.id);
+            const idxB = order.indexOf(b.id);
+            const valA = idxA === -1 ? 999 : idxA;
+            const valB = idxB === -1 ? 999 : idxB;
+            return valA - valB;
+        });
+    }
+
+    // 5. Find First Incomplete
+    for (const t of tasks) {
+        if (!completedSet.has(t.id)) {
+            const dateStr = t.completed_date || '00-00-00';
+            let isOverdue = false;
+            
+            if (dateStr !== '00-00-00') {
+               try {
+                  const today = new Date();
+                  today.setHours(0,0,0,0);
+                  const parts = dateStr.split('-');
+                  if(parts.length === 3) {
+                    const fullYear = parseInt(parts[0]) + 2000;
+                    const d = new Date(fullYear, parseInt(parts[1])-1, parseInt(parts[2]));
+                    if (d < today) isOverdue = true;
+                  }
+               } catch(e) {}
+            }
+
+            return {
+                title: t.title,
+                date: dateStr,
+                isOverdue
+            };
+        }
+    }
+  }
+
+  return null;
+};
+
+const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, onSelectProject, onDeleteProject, getTeamString, currentEmail }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   useEffect(() => {
@@ -42,6 +131,7 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({
   }, [isConfirmingDelete]);
 
   const handleDeleteClick = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent link navigation
     e.stopPropagation();
     if (!isConfirmingDelete) {
       setIsConfirmingDelete(true);
@@ -54,18 +144,47 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({
   const isCompleted = project.status === 100;
   const isLast = index === total - 1;
 
+  const nextSchedule = getNextSchedule(project);
+  const isProjectEnded = project.status === 100 && project.is_locked;
+
+  const handleRowClick = (e: React.MouseEvent) => {
+    // Allow default browser behavior for modifier keys (Ctrl+Click, Cmd+Click, Shift+Click, Middle Click)
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) {
+      return;
+    }
+    e.preventDefault();
+    onSelectProject(project);
+  };
+
   return (
     <>
       {/* Desktop Row View */}
-      <div
-        onClick={() => onSelectProject(project)}
-        className={`hidden md:grid grid-cols-12 border-b border-slate-100 hover:bg-slate-50/50 cursor-pointer transition-all items-stretch group relative ${isLast ? 'rounded-b-[1rem] md:rounded-b-[1.25rem] border-b-0' : ''}`}
+      <a
+        href={`?project=${project.id}`}
+        onClick={handleRowClick}
+        className={`hidden md:grid grid-cols-12 border-b border-slate-100 hover:bg-slate-50/50 cursor-pointer transition-all items-stretch group relative block no-underline ${isLast ? 'rounded-b-[1rem] md:rounded-b-[1.25rem] border-b-0' : ''}`}
       >
         <div className="col-span-1 px-4 py-2.5 flex items-center justify-center text-slate-300 font-black text-xl group-hover:text-black transition-colors border-r border-slate-100">
           {String(index + 1).padStart(2, '0')}
         </div>
         <div className="col-span-1 px-4 py-2.5 flex items-center justify-center text-[16px] font-bold text-slate-500 whitespace-nowrap border-r border-slate-100">
           {project.start_date || '-'}
+        </div>
+        <div className="col-span-1 px-2 py-2.5 flex flex-col items-center justify-center border-r border-slate-100 overflow-hidden">
+            {isProjectEnded ? (
+               <span className="text-xs font-bold text-black bg-slate-100 px-2 py-1 rounded-full whitespace-nowrap">프로젝트 종료</span>
+            ) : nextSchedule ? (
+                <>
+                    <span className={`font-mono text-[15px] font-bold ${nextSchedule.isOverdue ? 'text-red-500 animate-pulse' : 'text-emerald-500'}`}>
+                        {nextSchedule.date}
+                    </span>
+                    <span className={`text-[11px] truncate w-full text-center px-1 ${nextSchedule.isOverdue ? 'text-red-500' : 'text-emerald-500'}`} title={nextSchedule.title}>
+                        {nextSchedule.title}
+                    </span>
+                </>
+            ) : (
+                <span className="text-xs text-slate-300">-</span>
+            )}
         </div>
         <div className={`col-span-1 px-4 py-2.5 flex items-center justify-center text-[16px] font-bold ${isCompleted ? 'text-emerald-500' : 'text-slate-400'} whitespace-nowrap transition-colors duration-500 border-r border-slate-100`}>
           {project.end_date || '-'}
@@ -78,7 +197,7 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({
             </div>
           )}
         </div>
-        <div className="col-span-3 px-6 py-2.5 flex items-center text-[14px] font-bold text-slate-600 border-r border-slate-100 overflow-hidden">
+        <div className="col-span-2 px-6 py-2.5 flex items-center text-[14px] font-bold text-slate-600 border-r border-slate-100 overflow-hidden">
           <span className="truncate">{getTeamString(project)}</span>
         </div>
         <div className="col-span-2 px-6 py-2.5 flex items-center justify-end gap-3 ml-auto w-full">
@@ -100,29 +219,33 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({
         </div>
 
         {/* Desktop Delete Button: Positioned outside the frame to the right */}
-        <div className="absolute left-full top-1/2 -translate-y-1/2 ml-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-          <button
-            onClick={handleDeleteClick}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-lg border-2 ${isConfirmingDelete
-              ? 'bg-red-500 border-red-600 text-white animate-pulse'
-              : 'bg-white border-slate-200 text-slate-400 hover:border-red-400 hover:text-red-500 hover:scale-110'
-              }`}
-            title={isConfirmingDelete ? "정말 삭제할까요?" : "프로젝트 삭제"}
-          >
-            <i className={`fa-solid ${isConfirmingDelete ? 'fa-xmark' : 'fa-minus'} text-[12px]`}></i>
-          </button>
-        </div>
-      </div>
+        {(['mondo.kim@gmail.com', 'wjatnsdl527@gmail.com'].includes(currentEmail || '')) && (
+          <div className="absolute left-full top-1/2 -translate-y-1/2 ml-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            <button
+              onClick={handleDeleteClick}
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-lg border-2 ${isConfirmingDelete
+                ? 'bg-red-500 border-red-600 text-white animate-pulse'
+                : 'bg-white border-slate-200 text-slate-400 hover:border-red-400 hover:text-red-500 hover:scale-110'
+                }`}
+              title={isConfirmingDelete ? "정말 삭제할까요?" : "프로젝트 삭제"}
+            >
+              <i className={`fa-solid ${isConfirmingDelete ? 'fa-xmark' : 'fa-minus'} text-[12px]`}></i>
+            </button>
+          </div>
+        )}
+      </a>
 
       {/* Mobile Card View */}
-      <div
-        onClick={() => onSelectProject(project)}
-        className="md:hidden flex flex-col p-4 border-b border-slate-100 bg-white hover:bg-slate-50 transition-colors cursor-pointer relative"
+      <a
+        href={`?project=${project.id}`}
+        onClick={handleRowClick}
+        className="md:hidden flex flex-col p-4 border-b border-slate-100 bg-white hover:bg-slate-50 transition-colors cursor-pointer relative block no-underline"
       >
         <div className="flex justify-between items-start mb-1.5">
           <span className="text-[11px] font-black text-slate-300">NO. {String(index + 1).padStart(2, '0')}</span>
           <div className="flex flex-col items-end">
             <span className="text-[12px] font-bold text-slate-400">S: {project.start_date || '-'}</span>
+            {nextSchedule && <span className={`text-[11px] font-bold ${nextSchedule.isOverdue ? 'text-red-500' : 'text-blue-500'} mt-0.5`}>Next: {nextSchedule.date}</span>}
             {project.end_date && <span className={`text-[11px] font-bold ${isCompleted ? 'text-emerald-500' : 'text-slate-300'} transition-colors duration-500`}>E: {project.end_date}</span>}
           </div>
         </div>
@@ -148,16 +271,18 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({
           <span className={`text-lg font-black ${isCompleted ? 'text-emerald-500' : 'text-black'} whitespace-nowrap transition-colors duration-500`}>{project.status}%</span>
         </div>
 
-        <button
-          onClick={handleDeleteClick}
-          className={`absolute top-4 right-4 w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-sm border ${isConfirmingDelete
-            ? 'bg-red-500 border-red-600 text-white animate-pulse z-10'
-            : 'bg-white border-slate-200 text-slate-400'
-            }`}
-        >
-          <i className={`fa-solid ${isConfirmingDelete ? 'fa-xmark' : 'fa-minus'} text-[10px]`}></i>
-        </button>
-      </div>
+        {(['mondo.kim@gmail.com', 'wjatnsdl527@gmail.com'].includes(currentEmail || '')) && (
+          <button
+            onClick={handleDeleteClick}
+            className={`absolute top-4 right-4 w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-sm border ${isConfirmingDelete
+              ? 'bg-red-500 border-red-600 text-white animate-pulse z-10'
+              : 'bg-white border-slate-200 text-slate-400'
+              }`}
+          >
+            <i className={`fa-solid ${isConfirmingDelete ? 'fa-xmark' : 'fa-minus'} text-[10px]`}></i>
+          </button>
+        )}
+      </a>
     </>
   );
 };
@@ -227,7 +352,7 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest
   };
 
   return (
-    <div className="max-w-[1800px] mx-auto px-4 md:px-6 py-6 md:py-8">
+    <div className="max-w-[2100px] mx-auto px-4 md:px-6 py-6 md:py-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 md:mb-8">
         <div className="flex items-baseline gap-2">
           <h1 className="text-2xl md:text-3xl font-black tracking-tighter uppercase text-black">GRAFY Project Airport</h1>
@@ -308,25 +433,25 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest
         <div className="flex bg-slate-100 p-1 rounded-xl md:rounded-2xl border border-slate-200 w-full lg:w-auto overflow-x-auto no-scrollbar h-[56px] items-stretch">
           <button
             onClick={() => setSortBy('recent_created')}
-            className={`flex-1 lg:flex-none px-4 md:px-6 py-2 rounded-lg md:rounded-l-xl md:rounded-r-none text-sm md:text-base font-black transition-all whitespace-nowrap border-r border-slate-200 last:border-r-0 h-full ${sortBy === 'recent_created' ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-black'}`}
+            className={`flex-1 px-4 md:px-6 py-2 rounded-lg md:rounded-l-xl md:rounded-r-none text-sm md:text-base font-black transition-all whitespace-nowrap border-r border-slate-200 last:border-r-0 h-full ${sortBy === 'recent_created' ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-black'}`}
           >
             최근등록순
           </button>
           <button
             onClick={() => setSortBy('name')}
-            className={`flex-1 lg:flex-none px-4 md:px-6 py-2 rounded-lg md:rounded-none text-sm md:text-base font-black transition-all whitespace-nowrap border-r border-slate-200 last:border-r-0 h-full ${sortBy === 'name' ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-black'}`}
+            className={`flex-1 px-4 md:px-6 py-2 rounded-lg md:rounded-none text-sm md:text-base font-black transition-all whitespace-nowrap border-r border-slate-200 last:border-r-0 h-full ${sortBy === 'name' ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-black'}`}
           >
             프로젝트명순
           </button>
           <button
             onClick={() => setSortBy('progress')}
-            className={`flex-1 lg:flex-none px-4 md:px-6 py-2 rounded-lg md:rounded-none text-sm md:text-base font-black transition-all whitespace-nowrap border-r border-slate-200 last:border-r-0 h-full ${sortBy === 'progress' ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-black'}`}
+            className={`flex-1 px-4 md:px-6 py-2 rounded-lg md:rounded-none text-sm md:text-base font-black transition-all whitespace-nowrap border-r border-slate-200 last:border-r-0 h-full ${sortBy === 'progress' ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-black'}`}
           >
             진행율높은순
           </button>
           <button
             onClick={() => setSortBy('recent_ended')}
-            className={`flex-1 lg:flex-none px-4 md:px-6 py-2 rounded-lg md:rounded-r-xl md:rounded-l-none text-sm md:text-base font-black transition-all whitespace-nowrap border-r border-slate-200 last:border-r-0 h-full ${sortBy === 'recent_ended' ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-black'}`}
+            className={`flex-1 px-4 md:px-6 py-2 rounded-lg md:rounded-r-xl md:rounded-l-none text-sm md:text-base font-black transition-all whitespace-nowrap border-r border-slate-200 last:border-r-0 h-full ${sortBy === 'recent_ended' ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-black'}`}
           >
             최근종료일순
           </button>
@@ -362,9 +487,10 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest
           <div className="hidden md:grid grid-cols-12 bg-black text-[13px] md:text-[14px] font-black text-white uppercase tracking-widest text-center rounded-t-[1rem] md:rounded-t-[1.25rem]">
             <div className="col-span-1 py-3 border-r border-white/20">No.</div>
             <div className="col-span-1 py-3 border-r border-white/20">시작일</div>
+            <div className="col-span-1 py-3 border-r border-white/20 text-emerald-300">다음 일정</div>
             <div className="col-span-1 py-3 border-r border-white/20">종료일</div>
             <div className="col-span-4 py-3 border-r border-white/20 px-6 text-left">클라이언트 / 프로젝트명</div>
-            <div className="col-span-3 py-3 border-r border-white/20 px-6 text-left">진행 인원</div>
+            <div className="col-span-2 py-3 border-r border-white/20 px-6 text-left">진행 인원</div>
             <div className="col-span-2 py-3">진행율</div>
           </div>
 
@@ -384,6 +510,7 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest
                   onSelectProject={onSelectProject}
                   onDeleteProject={onDeleteProject}
                   getTeamString={getTeamString}
+                  currentEmail={user.email}
                 />
               ))}
             </div>

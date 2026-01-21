@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { PopoverState } from '../types';
 
 interface UrlPopoverProps {
@@ -13,10 +13,11 @@ const UrlPopover: React.FC<UrlPopoverProps> = ({ popoverState, onClose, onSave, 
   const [label, setLabel] = useState(popoverState.currentLabel);
   const inputRef = useRef<HTMLInputElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ top: popoverState.y, left: popoverState.x });
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [isVisible, setIsVisible] = useState(false);
 
   // 팝업 외부 클릭 감지 리스너
-  useEffect(() => {
+  useLayoutEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (popoverState.isOpen && popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
         onClose();
@@ -34,44 +35,62 @@ const UrlPopover: React.FC<UrlPopoverProps> = ({ popoverState, onClose, onSave, 
     }
   }, [popoverState.isOpen, onClose]);
 
-  useEffect(() => {
-    setUrl(popoverState.currentUrl);
-    setLabel(popoverState.currentLabel);
-    
+  useLayoutEffect(() => {
     if (popoverState.isOpen) {
+        setUrl(popoverState.currentUrl);
+        setLabel(popoverState.currentLabel);
+    }
+  }, [popoverState.isOpen, popoverState.currentUrl, popoverState.currentLabel]);
+
+  useLayoutEffect(() => {
+    if (popoverState.isOpen && popoverRef.current) {
       setTimeout(() => inputRef.current?.focus(), 50);
 
-      const width = 300;
-      const height = 350;
-      let nextLeft = popoverState.x;
-      let nextTop = popoverState.y;
-
+      const { offsetWidth: width, offsetHeight: height } = popoverRef.current;
+      
       const viewWidth = window.innerWidth;
       const viewHeight = window.innerHeight;
       const scrollX = window.scrollX;
       const scrollY = window.scrollY;
 
-      if (nextLeft + width > scrollX + viewWidth) {
-        nextLeft = scrollX + viewWidth - width - 20;
+      const margin = 20;
+
+      // X: Start slightly right of cursor
+      let nextLeft = popoverState.x + 10;
+
+      // Y: Center popup vertically on the cursor position
+      let nextTop = popoverState.y - (height / 2);
+
+      // --- Horizontal Constraint ---
+      if (nextLeft + width > scrollX + viewWidth - margin) {
+          nextLeft = popoverState.x - width - 10;
       }
-      if (nextTop + height > scrollY + viewHeight) {
-        nextTop = scrollY + viewHeight - height - 20;
+      if (nextLeft < scrollX + margin) {
+          nextLeft = scrollX + margin;
+      }
+
+      // --- Vertical Constraint (Clamping) ---
+      if (nextTop < scrollY + margin) {
+          nextTop = scrollY + margin;
+      }
+      if (nextTop + height > scrollY + viewHeight - margin) {
+          nextTop = scrollY + viewHeight - height - margin;
       }
 
       setPosition({ 
-        top: Math.max(20, nextTop), 
-        left: Math.max(20, nextLeft) 
+        top: nextTop, 
+        left: nextLeft 
       });
+      setIsVisible(true);
+    } else {
+        setIsVisible(false);
     }
-  }, [popoverState, isAbsolute]);
+  }, [popoverState.isOpen, popoverState.x, popoverState.y]);
 
   if (!popoverState.isOpen || !popoverState.taskId) return null;
 
   const handleSave = () => {
     let finalUrl = url.trim();
-    if (finalUrl && !finalUrl.startsWith('http')) {
-      finalUrl = 'https://' + finalUrl;
-    }
     onSave(popoverState.taskId!, finalUrl, label.trim());
     onClose();
   };
@@ -82,12 +101,12 @@ const UrlPopover: React.FC<UrlPopoverProps> = ({ popoverState, onClose, onSave, 
   };
 
   return (
-    <div className={isAbsolute ? "absolute z-[110]" : "fixed inset-0 z-[110]"} onClick={onClose} style={isAbsolute ? { top: position.top, left: position.left } : {}}>
-      {!isAbsolute && <div className="fixed inset-0" onClick={onClose}></div>}
+    <div className="absolute z-[120]" style={{ top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+      <div className="fixed inset-0 pointer-events-auto" onClick={onClose}></div>
       <div 
         ref={popoverRef}
-        className={`${isAbsolute ? "" : "fixed"} bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] p-6 border border-slate-100 w-[300px] animate-in fade-in zoom-in-95 duration-200 pointer-events-auto`}
-        style={isAbsolute ? {} : { top: position.top, left: position.left }}
+        className={`absolute bg-white rounded-xl shadow-2xl p-6 border border-slate-200 w-[300px] pointer-events-auto transition-opacity duration-150 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+        style={{ top: position.top, left: position.left }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-5">

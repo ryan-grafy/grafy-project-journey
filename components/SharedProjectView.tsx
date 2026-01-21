@@ -66,8 +66,8 @@ const SharedProjectView: React.FC<SharedProjectViewProps> = ({ projectId }) => {
             for (let r = 1; r <= roundCount; r++) {
                 const pmId = `t3-round-${r}-pm`;
                 const desId = `t3-round-${r}-des`;
-                if (isVisible(pmId)) allTasks.push(stepCustomTasks.find(t => t.id === pmId) || { id: pmId, role: Role.PM, title: `${r}차 피드백 수급` } as Task);
-                if (isVisible(desId)) allTasks.push(stepCustomTasks.find(t => t.id === desId) || { id: desId, role: Role.DESIGNER, title: `${r}차 수정 및 업데이트` } as Task);
+                if (isVisible(pmId)) allTasks.push(stepCustomTasks.find(t => t.id === pmId) || { id: pmId, roles: [Role.PM], title: `${r}차 피드백 수급` } as Task);
+                if (isVisible(desId)) allTasks.push(stepCustomTasks.find(t => t.id === desId) || { id: desId, roles: [Role.DESIGNER], title: `${r}차 수정 및 업데이트` } as Task);
             }
 
             if (isVisible('t3-final')) allTasks.push(stepCustomTasks.find(t => t.id === 't3-final') || finalTask);
@@ -124,21 +124,61 @@ const SharedProjectView: React.FC<SharedProjectViewProps> = ({ projectId }) => {
     const completedTasks = new Set(project.task_states?.completed || []);
 
     // Logic to determine if a step is "visually" locked (grayscale)
+    // Logic to get ALL tasks for a step (ignoring client visibility) to determine real project progress
+    const getAllProjectTasks = (stepId: number) => {
+        const stepCustomTasks = project.custom_tasks?.[stepId] || [];
+        const deletedSet = new Set(project.deleted_tasks || []);
+        let allTasks: Task[] = [];
+
+        if (stepId === 3) {
+            const roundCount = project.rounds_count || 2;
+            const baseTask = STEPS_STATIC[2].tasks[0];
+            const finalTask = STEPS_STATIC[2].tasks[1];
+
+            if (!deletedSet.has('t3-base-1')) allTasks.push(stepCustomTasks.find(t => t.id === 't3-base-1') || baseTask);
+            for (let r = 1; r <= roundCount; r++) {
+                const pmId = `t3-round-${r}-pm`;
+                const desId = `t3-round-${r}-des`;
+                if (!deletedSet.has(pmId)) allTasks.push(stepCustomTasks.find(t => t.id === pmId) || { id: pmId, roles: [Role.PM], title: `${r}차 피드백 수급` } as Task);
+                if (!deletedSet.has(desId)) allTasks.push(stepCustomTasks.find(t => t.id === desId) || { id: desId, roles: [Role.DESIGNER], title: `${r}차 수정 및 업데이트` } as Task);
+            }
+            if (!deletedSet.has('t3-final')) allTasks.push(stepCustomTasks.find(t => t.id === 't3-final') || finalTask);
+            
+             // Add only-custom tasks
+             const onlyCustoms = stepCustomTasks.filter(ct => !['t3-base-1', 't3-final'].includes(ct.id) && !ct.id.includes('-round-'));
+             allTasks = [...allTasks, ...onlyCustoms];
+
+        } else {
+             const stepStaticTasks = STEPS_STATIC.find(s => s.id === stepId)?.tasks || [];
+             allTasks = stepStaticTasks.filter(st => !deletedSet.has(st.id)).map(st => stepCustomTasks.find(ct => ct.id === st.id) || st);
+             const onlyCustoms = stepCustomTasks.filter(ct => !stepStaticTasks.some(st => st.id === ct.id));
+             allTasks = [...allTasks, ...onlyCustoms];
+        }
+        return allTasks;
+    };
+
     const isLockedStep = (stepId: number): boolean => {
         if (stepId === 1) return false;
+        
+        // 1. Check Real Project Progress (Previous Step Complete?)
         const prevStepId = stepId - 1;
-        // We must check if *all visible tasks* of the previous step are completed.
-        // Re-using getVisibleTasks logic here might be expensive if not careful, 
-        // but given the size it's fine.
-        const prevVisibleTasks = getVisibleTasks(prevStepId, project);
-        return !prevVisibleTasks.every(t => completedTasks.has(t.id));
+        const prevAllTasks = getAllProjectTasks(prevStepId);
+        // If previous step has tasks and ANY is not complete, current is locked
+        if (!prevAllTasks.every(t => completedTasks.has(t.id))) return true;
+
+        // 2. Visual Lock for Empty Client Steps
+        // If the client has no tasks to see in this step, show it as gray (locked style) for better aesthetics
+        const currentClientTasks = getVisibleTasks(stepId, project);
+        if (currentClientTasks.length === 0) return true;
+
+        return false;
     };
 
     return (
         <div className="min-h-screen pb-20 bg-[#e3e7ed] selection:bg-black selection:text-white">
             {/* Read-Only Navbar */}
             <nav className="w-full bg-white border-b border-slate-200 py-4 sticky top-0 z-40 shadow-sm">
-                <div className="max-w-[1800px] mx-auto px-6 flex justify-between items-center">
+                <div className="max-w-[1900px] mx-auto px-6 flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <span className="bg-black text-white text-[10px] px-2 py-0.5 rounded uppercase font-bold tracking-widest">Client View</span>
                         <h1 className="text-2xl font-black text-black uppercase tracking-tight">{project.name}</h1>
@@ -149,8 +189,8 @@ const SharedProjectView: React.FC<SharedProjectViewProps> = ({ projectId }) => {
                 </div>
             </nav>
 
-            <main className="w-full px-4 md:px-6 py-10 max-w-[1800px] mx-auto">
-                <div className="max-w-[1800px] mx-auto">
+            <main className="w-full px-4 md:px-6 py-10 max-w-[1900px] mx-auto">
+                <div className="max-w-[1900px] mx-auto">
                     {/* Progress Section */}
                     <div className="bg-white p-6 md:p-8 rounded-[1.5rem] mb-10 flex flex-col md:flex-row items-center gap-10 border border-slate-200 shadow-sm relative overflow-visible">
                         <div className="shrink-0 relative z-10">
@@ -171,9 +211,9 @@ const SharedProjectView: React.FC<SharedProjectViewProps> = ({ projectId }) => {
                         </div>
                     </div>
 
-                    {/* Steps Layout - Changed to Grid for fit-to-screen */}
-                    <div className="w-full pb-8">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 w-full">
+                    {/* Steps Layout - Horizontal Scroll */}
+                    <div className="overflow-x-auto pb-8 no-scrollbar scroll-smooth">
+                        <div className="flex gap-2 md:gap-4 min-w-max md:min-w-0 md:w-full px-0">
                             {STEPS_STATIC.map((step) => {
                                 const tasks = getVisibleTasks(step.id, project);
                                 const locked = isLockedStep(step.id);
