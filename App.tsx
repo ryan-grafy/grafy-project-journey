@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [templates, setTemplates] = useState<Project[]>([]); // Templates State
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [deletedProjects, setDeletedProjects] = useState<Project[]>([]); // Separated state for deleted projects
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isProjectLoading, setIsProjectLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -407,23 +408,29 @@ const App: React.FC = () => {
         new Date(b.last_updated).getTime() - new Date(a.last_updated).getTime()
       );
 
-      setProjects(mergedList);
+      // Separate Active vs Deleted
+      const active = mergedList.filter(p => p.status !== -99);
+      const deleted = mergedList.filter(p => p.status === -99);
+
+      setProjects(active);
+      setDeletedProjects(deleted);
     } catch (e) { console.error(e); }
     setIsProjectLoading(false);
   };
 
-  const saveProjectsLocal = async (updatedProjects: Project[]) => {
-    setProjects(updatedProjects);
-    localStorage.setItem('grafy_projects', JSON.stringify(updatedProjects));
+  const saveProjectsLocal = async (updatedActiveProjects: Project[]) => {
+    setProjects(updatedActiveProjects);
+    // Combine with deletedProjects for storage
+    const allProjects = [...updatedActiveProjects, ...deletedProjects];
+    localStorage.setItem('grafy_projects', JSON.stringify(allProjects));
     
-    // Sync all updated projects to Supabase
+    // Sync all updated projects to Supabase (Only recent one usually needed)
     if (isSupabaseReady && supabase) {
       try {
-        // Find which project was updated (has most recent last_updated)
-        const recentProject = updatedProjects.reduce((latest, proj) => {
+        const recentProject = updatedActiveProjects.reduce((latest, proj) => {
           if (!latest) return proj;
           return new Date(proj.last_updated) > new Date(latest.last_updated) ? proj : latest;
-        }, updatedProjects[0]);
+        }, updatedActiveProjects[0]);
         
         if (recentProject) {
           await syncProjectToSupabase(recentProject);
@@ -452,15 +459,67 @@ const App: React.FC = () => {
   };
 
   const handleDeleteProject = async (projectId: string) => {
-    const next = projects.filter(p => p.id !== projectId);
-    setProjects(next);
-    localStorage.setItem('grafy_projects', JSON.stringify(next));
+    const targetProject = projects.find(p => p.id === projectId);
+    if (!targetProject) return;
 
-    if (isSupabaseReady && supabase) {
-      const { error } = await supabase.from('projects').delete().eq('id', projectId);
-      if (error) console.error("Supabase delete error:", error);
-    }
-    showToast("프로젝트가 삭제되었습니다.");
+    // Soft Delete: status -> -99
+    const originalStatus = targetProject.status;
+    const updatedProject: Project = { 
+        ...targetProject, 
+        status: -99,
+        deleted_at: new Date().toISOString(),
+        task_states: {
+            ...targetProject.task_states!,
+            meta: {
+                ...targetProject.task_states?.meta,
+                original_status: originalStatus // Backup original status
+            }
+        },
+        last_updated: new Date().toISOString()
+    };
+    
+    // Update States
+    const nextActive = projects.filter(p => p.id !== projectId);
+    const nextDeleted = [updatedProject, ...deletedProjects];
+    
+    setProjects(nextActive);
+    setDeletedProjects(nextDeleted);
+
+    // Update Storage (Active + Deleted)
+    localStorage.setItem('grafy_projects', JSON.stringify([...nextActive, ...nextDeleted]));
+
+    // Update Supabase
+    await syncProjectToSupabase(updatedProject);
+    showToast("프로젝트가 삭제되었습니다 (복구 가능).");
+  };
+
+  const handleRestoreProject = async (projectId: string) => {
+      const targetProject = deletedProjects.find(p => p.id === projectId);
+      if (!targetProject) return;
+
+      // Restore: status -> original_status or 0
+      const originalStatus = targetProject.task_states?.meta?.original_status ?? 0;
+      
+      const updatedProject: Project = { 
+          ...targetProject, 
+          status: originalStatus,
+          deleted_at: undefined, // Remove deleted flag
+          last_updated: new Date().toISOString()
+      };
+
+      // Update States
+      const nextDeleted = deletedProjects.filter(p => p.id !== projectId);
+      const nextActive = [updatedProject, ...projects];
+
+      setDeletedProjects(nextDeleted);
+      setProjects(nextActive);
+
+      // Update Storage
+      localStorage.setItem('grafy_projects', JSON.stringify([...nextActive, ...nextDeleted]));
+
+      // Update Supabase
+      await syncProjectToSupabase(updatedProject);
+      showToast("프로젝트가 복구되었습니다.");
   };
 
   const handleToggleLock = async (locked: boolean) => {
@@ -1188,47 +1247,52 @@ const App: React.FC = () => {
     }
 
     try {
-        // Omit fields that are NOT in DB schema (they are in meta)
         const { 
             id, 
-            created_at, // Omit to generate new? Or keep? usually template needs new created_at
+            created_at, 
             rounds_count, 
             rounds2_count, 
             rounds_navigation_count, 
             client_visible_tasks, 
+            deleted_at, // Omit
             ...projectData 
         } = currentProject;
         
-        // 현재 화면의 라운드 개수를 사용 (중요!)
+        // Use current state for rounds to ensure accuracy
         const templateFullData = {
             ...projectData,
-            id: crypto.randomUUID(), // Generate ID manually
+            id: crypto.randomUUID(),
             name: templateName,
             pm_name: 'TEMPLATE', 
             status: -1,
             is_locked: true,
-            // created_at: new Date().toISOString(), // DB default or set new
             last_updated: new Date().toISOString(),
             task_states: {
                 ...(currentProject.task_states || {}),
                 meta: {
-                    rounds_count: rounds, // 현재 state 값 사용
-                    rounds2_count: rounds2, // 현재 state 값 사용
-                    rounds_navigation_count: roundsNavigation, // 현재 state 값 사용
-                    client_visible_tasks: currentProject.client_visible_tasks
+                    rounds_count: rounds,
+                    rounds2_count: rounds2,
+                    rounds_navigation_count: roundsNavigation, // Ensure this is captured
+                    client_visible_tasks: currentProject.client_visible_tasks,
+                    is_expedition2_hidden: currentProject.task_states?.meta?.is_expedition2_hidden
                 }
             }
         };
         
-        const { error } = await supabase.from('projects').insert(templateFullData);
+        // Explicitly cast to any to bypass strict checks if Supabase types are partial
+        const { error } = await supabase.from('projects').insert(templateFullData as any);
         
-        if (error) throw error;
+        if (error) {
+            console.error('Template save error object:', error);
+            throw new Error(error.message || "Unknown Supabase error");
+        }
         
         showToast("템플릿이 저장되었습니다.");
         fetchTemplates(); // Refresh
+        
     } catch (e: any) {
-        console.error(e);
-        showToast("템플릿 저장 실패: " + e.message);
+        console.error("Template Save Exception:", e);
+        showToast(`템플릿 저장 실패: ${e.message}`);
     }
   };
 
@@ -1350,9 +1414,21 @@ const App: React.FC = () => {
             onLogout={handleLogout}
             onLogin={handleGoogleLogin}
             user={user}
+            deletedProjects={deletedProjects}
+            onRestoreProject={handleRestoreProject}
           />
           {showCreateModal && <CreateProjectModal teamMembers={teamMembers} templates={templates} onClose={() => setShowCreateModal(false)} onCreate={handleCreateProject} />}
-          {showTeamModal && <TeamManagementModal members={teamMembers} onClose={() => setShowTeamModal(false)} onUpdate={(t) => { setTeamMembers(t); localStorage.setItem('grafy_team', JSON.stringify(t)); showToast("팀 명단 저장"); }} />}
+          {showTeamModal && (
+            <TeamManagementModal 
+                members={teamMembers} 
+                onClose={() => setShowTeamModal(false)} 
+                onUpdate={(t) => { 
+                    setTeamMembers(t); 
+                    localStorage.setItem('grafy_team', JSON.stringify(t)); 
+                    showToast("팀 명단 저장"); 
+                }} 
+            />
+          )}
         </>
       )}
 

@@ -108,4 +108,5 @@ export interface Project {
   };
   client_visible_tasks?: string[]; // IDs of tasks visible to clients
   template_name?: string; // Name of the template used to create the project
+  deleted_at?: string; // Timestamp of soft delete
 }

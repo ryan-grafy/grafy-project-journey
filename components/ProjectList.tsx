@@ -13,6 +13,8 @@ interface ProjectListProps {
   onLogout: () => void;
   onLogin: () => void;
   isLoading: boolean;
+  deletedProjects: Project[];
+  onRestoreProject: (id: string) => void;
 }
 
 type SortOption = 'recent_created' | 'name' | 'progress' | 'recent_ended';
@@ -297,7 +299,7 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
   );
 };
 
-const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest', userId: 'guest', name: 'Guest', avatarUrl: '' } as User, onSelectProject, onNewProject, onManageTeam, onDeleteProject, onLogout, onLogin, isLoading }) => {
+const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest', userId: 'guest', name: 'Guest', avatarUrl: '' } as User, onSelectProject, onNewProject, onManageTeam, onDeleteProject, onLogout, onLogin, isLoading, deletedProjects, onRestoreProject }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('recent_created');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -548,10 +550,10 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest
         <DeletedDataModal
           onClose={() => setShowDeletedDataModal(false)}
           onRestore={(projectId) => {
-            console.log('Restore project:', projectId);
+            onRestoreProject(projectId);
             setShowDeletedDataModal(false);
           }}
-          deletedProjects={[]}
+          deletedProjects={deletedProjects}
         />
       )}
     </div>
