@@ -1206,7 +1206,8 @@ const App: React.FC = () => {
             template_name: templateName,
             custom_tasks: finalCustomTasks,
             task_order: finalTaskOrder,
-            deleted_tasks: templateProject?.deleted_tasks ? [...templateProject.deleted_tasks] : finalDeletedTasks
+            deleted_tasks: templateProject?.deleted_tasks ? [...templateProject.deleted_tasks] : finalDeletedTasks,
+            is_expedition2_hidden: templateProject?.task_states?.meta?.is_expedition2_hidden
         }
       },
       client_visible_tasks: [],
