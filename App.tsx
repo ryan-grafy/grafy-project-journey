@@ -163,6 +163,12 @@ const App: React.FC = () => {
         // Critical: Do NOT change view if we are already in SHARE mode
         if (window.location.pathname.startsWith('/share/')) return;
 
+        // BUG FIX: Do not reset view on token refresh (happens on tab switch)
+        if (event === 'TOKEN_REFRESHED') {
+          console.log("Token refreshed, preserving current view.");
+          return;
+        }
+
         if (session?.user) {
           // AUTHORIZATION CHECK
           const isAuthorized = await checkEmailAuthorization(session.user.email);
