@@ -1420,15 +1420,7 @@ const App: React.FC = () => {
             onRestoreProject={handleRestoreProject}
           />
           {showCreateModal && <CreateProjectModal teamMembers={teamMembers} templates={templates} onClose={() => setShowCreateModal(false)} onCreate={handleCreateProject} />}
-          {showTemplateSaveModal && (
-            <TemplateSaveModal 
-                onClose={() => setShowTemplateSaveModal(false)} 
-                onSave={(name) => {
-                    handleSaveTemplate(name);
-                    setShowTemplateSaveModal(false);
-                }} 
-            />
-          )}
+
           {showTeamModal && (
             <TeamManagementModal 
                 members={teamMembers} 
@@ -1640,6 +1632,15 @@ const App: React.FC = () => {
             </div>
           </div>
         </div >
+      )}
+      {showTemplateSaveModal && (
+        <TemplateSaveModal 
+            onClose={() => setShowTemplateSaveModal(false)} 
+            onSave={(name) => {
+                handleSaveTemplate(name);
+                setShowTemplateSaveModal(false);
+            }} 
+        />
       )}
       {
         toastMsg && (
