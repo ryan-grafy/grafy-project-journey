@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Read Supabase credentials from environment variables
-export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+export const SUPABASE_URL = 'https://ttfwcadegttbvtksindn.supabase.co';
+export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR0ZndjYWRlZ3R0YnZ0a3NpbmRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzNzk1ODAsImV4cCI6MjA4Mzk1NTU4MH0.v5iNq9z2H2doIAJXAo9A54O3yGiSTWtajCnPn_Bq9UM';
 
 // Robust check for configuration
 const isConfigured =
