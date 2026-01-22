@@ -17,6 +17,8 @@ interface NavbarProps {
   isSnapshotMode?: boolean;
   onSnapshotToggle?: () => void;
   onSaveTemplate?: () => void;
+  onManageDeletedData?: () => void;
+  onManageTemplates?: () => void;
 }
 
 const getTemplateBadgeColor = (name: string) => {
@@ -41,7 +43,7 @@ const getTemplateBadgeColor = (name: string) => {
 
 const Navbar: React.FC<NavbarProps> = ({
   project, user = { id: 'guest', userId: 'guest', name: 'Guest', avatarUrl: '' } as User, teamMembers, activeRole, onRoleChange, onBack, onUpdateInfo, onLogout, onLogin, onToast, onToggleLock,
-  isSnapshotMode, onSnapshotToggle, onSaveTemplate
+  isSnapshotMode, onSnapshotToggle, onSaveTemplate, onManageDeletedData, onManageTemplates
 }) => {
   const [localProjectName, setLocalProjectName] = useState(project.name);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -53,9 +55,25 @@ const Navbar: React.FC<NavbarProps> = ({
 
   const titleInputRef = useRef<HTMLInputElement>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const navRef = useRef<HTMLElement>(null); // Ref for the entire Navbar
 
   useEffect(() => { setLocalProjectName(project.name); }, [project.name]);
   useEffect(() => { setLocalDate(project.start_date || ''); }, [project.start_date]);
+
+  // Click Outside Handler
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // If click is inside the navbar, do NOT close the menus
+      if (navRef.current && navRef.current.contains(event.target as Node)) {
+        return;
+      }
+      setEditMenu(prev => ({ ...prev, isOpen: false }));
+      setContactPopover(prev => ({ ...prev, isOpen: false }));
+      setProfileMenuOpen(false);
+    };
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
 
   useEffect(() => { if (isEditingTitle) titleInputRef.current?.focus(); }, [isEditingTitle]);
   useEffect(() => { if (isEditingDate) dateInputRef.current?.focus(); }, [isEditingDate]);
@@ -134,7 +152,7 @@ const Navbar: React.FC<NavbarProps> = ({
   ];
 
   return (
-    <nav className="w-full bg-white border-b border-slate-200 py-3 md:py-4 sticky top-0 z-40 shadow-sm" onClick={() => { setEditMenu({ ...editMenu, isOpen: false }); setContactPopover({ ...contactPopover, isOpen: false }); setProfileMenuOpen(false); }}>
+    <nav ref={navRef} className="w-full bg-white border-b border-slate-200 py-3 md:py-4 sticky top-0 z-40 shadow-sm">
       <div className="max-w-[2100px] mx-auto px-4 md:px-6 flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-center">
 
         {/* Left Side: Title & Info */}
@@ -149,16 +167,16 @@ const Navbar: React.FC<NavbarProps> = ({
                 onBlur={() => { setIsEditingTitle(false); onUpdateInfo({ name: localProjectName }); }}
                 placeholder="프로젝트명을 입력하세요"
                 onKeyDown={(e) => e.key === 'Enter' && (titleInputRef.current?.blur())}
-                className="text-[18px] md:text-[22px] font-black text-black border-b-2 border-black outline-none bg-transparent w-full md:w-auto min-w-[200px]"
+                className="text-[22px] md:text-[26px] font-black text-black border-b-2 border-black outline-none bg-transparent w-full md:w-auto min-w-[200px]"
               />
             ) : (
                 <div className="flex items-center gap-2">
-                    <span onClick={() => !project.is_locked && setIsEditingTitle(true)} className={`text-[18px] md:text-[22px] font-black text-black truncate max-w-[200px] md:max-w-none ${!project.is_locked ? 'cursor-pointer hover:opacity-70 underline decoration-black/20 underline-offset-4' : ''}`}>
+                    <span onClick={() => !project.is_locked && setIsEditingTitle(true)} className={`text-[22px] md:text-[26px] font-black text-black truncate max-w-[200px] md:max-w-none ${!project.is_locked ? 'cursor-pointer hover:opacity-70' : ''}`}>
                         {project.name}
                     </span>
-                    {project.template_name && (
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] md:text-[11px] font-bold uppercase tracking-wider whitespace-nowrap ${getTemplateBadgeColor(project.template_name)}`}>
-                            {project.template_name}
+                    {(project.template_name || project.task_states?.meta?.template_name) && (
+                        <span className={`px-2 py-0.5 rounded-full text-[12px] font-bold uppercase tracking-wide whitespace-nowrap ${getTemplateBadgeColor(project.template_name || project.task_states?.meta?.template_name || '')}`}>
+                            {project.template_name || project.task_states?.meta?.template_name}
                         </span>
                     )}
                     {project.is_locked && <i className="fa-solid fa-lock text-black/30 ml-2 text-base md:text-lg"></i>}
@@ -285,13 +303,14 @@ const Navbar: React.FC<NavbarProps> = ({
                 ) : (
                   <div className="relative">
                     <button
-                      onClick={(e) => { e.stopPropagation(); setProfileMenuOpen(!profileMenuOpen); }}
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setProfileMenuOpen(prev => !prev); }}
                       className="w-10 h-10 rounded-full border-2 border-white shadow-md overflow-hidden bg-slate-200 hover:scale-105 transition-all flex-shrink-0"
                     >
                       <img
                         src={user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}
                         alt={user.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover pointer-events-none"
                       />
                     </button>
 
@@ -299,9 +318,36 @@ const Navbar: React.FC<NavbarProps> = ({
                       <div className="absolute right-0 top-12 w-[220px] bg-white border border-slate-200 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100" onClick={(e) => e.stopPropagation()}>
                         <div className="px-4 py-3 border-b border-slate-100">
                           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">내 정보</p>
-                          <p className="text-[14px] font-bold text-black">{user.name}</p>
+                          <div className="flex items-center gap-2">
+                             <p className="text-[14px] font-bold text-black">{user.name}</p>
+                             {ADMIN_EMAILS.includes(user.email || '') && (
+                                <span className="text-[9px] font-black px-1.5 py-0.5 bg-black text-white rounded uppercase tracking-wider">ADMIN</span>
+                             )}
+                          </div>
                         </div>
                         <div className="py-1">
+                          {ADMIN_EMAILS.includes(user.email || '') && (
+                             <>
+                               {onManageDeletedData && (
+                                  <button
+                                    onClick={() => { setProfileMenuOpen(false); onManageDeletedData(); }}
+                                    className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors flex items-center gap-3 text-slate-700"
+                                  >
+                                    <i className="fa-solid fa-trash-arrow-up text-sm text-amber-600"></i>
+                                    <span className="text-[13px] font-bold">삭제 데이터 관리</span>
+                                  </button>
+                               )}
+                               {onManageTemplates && (
+                                  <button
+                                    onClick={() => { setProfileMenuOpen(false); onManageTemplates(); }}
+                                    className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors flex items-center gap-3 text-slate-700"
+                                  >
+                                    <i className="fa-solid fa-layer-group text-sm text-purple-600"></i>
+                                    <span className="text-[13px] font-bold">템플릿 관리</span>
+                                  </button>
+                               )}
+                             </>
+                          )}
                           <button
                             onClick={onLogout}
                             className="w-full text-left px-4 py-2 hover:bg-red-50 transition-colors flex items-center gap-3 text-red-500"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Project, Role, Task } from '../types';
 import { supabase } from '../supabaseClient';
 import StepColumn from './StepColumn';
@@ -13,74 +13,172 @@ const SharedProjectView: React.FC<SharedProjectViewProps> = ({ projectId }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const [contactPopover, setContactPopover] = useState<{ isOpen: boolean; memberName: string; phone?: string; email?: string; x: number; y: number }>({ isOpen: false, memberName: '', x: 0, y: 0 });
+    const navRef = useRef<HTMLElement>(null);
+
+    // Click Outside Handler
     useEffect(() => {
-        const fetchProject = async () => {
-            if (!supabase) {
-                console.error("Supabase client not initialized");
-                setError("시스템 설정 오류: 데이터베이스 연결 불가");
-                setLoading(false);
+        const handleClickOutside = (event: MouseEvent) => {
+            if (navRef.current && navRef.current.contains(event.target as Node)) {
                 return;
             }
-
-            try {
-                // Fetch project by ID. Note: RLS must allow this for anon/public or use a secure edge function.
-                // Assuming 'projects' table is publicly readable for now or specific RLS policies allow reading by ID.
-                const { data, error } = await supabase
-                    .from('projects')
-                    .select('*')
-                    .eq('id', projectId)
-                    .single();
-
-                if (error) throw error;
-                if (!data) throw new Error('Project not found');
-
-                setProject(data);
-            } catch (err: any) {
-                console.error('Error fetching shared project:', err);
-                setError('프로젝트를 불러올 수 없습니다. 올바른 링크인지 확인해주세요.');
-            } finally {
-                setLoading(false);
-            }
+            setContactPopover(prev => ({ ...prev, isOpen: false }));
         };
+        window.addEventListener('click', handleClickOutside);
+        return () => window.removeEventListener('click', handleClickOutside);
+    }, []);
 
-        fetchProject();
+    // Fetch project data from Supabase
+    const fetchProject = useCallback(async () => {
+        // console.log('[Client View] Fetching project data...', new Date().toLocaleTimeString());
+        if (!supabase) {
+            console.error("Supabase client not initialized");
+            setError("시스템 설정 오류: 데이터베이스 연결 불가");
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const { data, error } = await supabase
+                .from('projects')
+                .select('*')
+                .eq('id', projectId)
+                .single();
+
+            if (error) throw error;
+            if (!data) throw new Error('Project not found');
+
+            // Metadata Fallback Logic:
+            // Ensure we use the latest data even if top-level columns are not yet synced but meta is.
+            // Priority: Top-level Column > Meta Backup > Default
+            const meta = data.task_states?.meta;
+            const normalizedProject = {
+                ...data,
+                client_visible_tasks: (data.client_visible_tasks && data.client_visible_tasks.length > 0) ? data.client_visible_tasks : (meta?.client_visible_tasks || []),
+                
+                // Real-time Worker Info Fallback (Meta priority if standard columns lag or missing)
+                // Real-time Worker Info Fallback (Meta priority if standard columns lag or missing)
+                pm_name: meta?.pm_name || data.pm_name,
+                pm_phone: meta?.pm_phone || data.pm_phone,
+                pm_email: meta?.pm_email || data.pm_email,
+                designer_name: meta?.designer_name || data.designer_name,
+                designer_phone: meta?.designer_phone || data.designer_phone,
+                designer_email: meta?.designer_email || data.designer_email,
+                designer_2_name: meta?.designer_2_name || data.designer_2_name,
+                designer_2_phone: meta?.designer_2_phone || data.designer_2_phone,
+                designer_2_email: meta?.designer_2_email || data.designer_2_email,
+                designer_3_name: meta?.designer_3_name || data.designer_3_name,
+                designer_3_phone: meta?.designer_3_phone || data.designer_3_phone,
+                designer_3_email: meta?.designer_3_email || data.designer_3_email,
+
+                // Checks if custom_tasks is populated, otherwise fallback to meta
+                custom_tasks: (data.custom_tasks && Object.keys(data.custom_tasks).length > 0) ? data.custom_tasks : (meta?.custom_tasks || {}),
+                task_order: (data.task_order && Object.keys(data.task_order).length > 0) ? data.task_order : (meta?.task_order || {}),
+                deleted_tasks: (data.deleted_tasks && data.deleted_tasks.length > 0) ? data.deleted_tasks : (meta?.deleted_tasks || []),
+                rounds_count: data.rounds_count ?? meta?.rounds_count ?? 2,
+                rounds2_count: data.rounds2_count ?? meta?.rounds2_count ?? 2,
+                rounds_navigation_count: data.rounds_navigation_count ?? meta?.rounds_navigation_count ?? 2,
+                template_name: data.template_name || meta?.template_name
+            };
+
+            console.log('[Client View] Worker Info Received:', {
+                pm_name_meta: meta?.pm_name,
+                pm_name_data: data.pm_name,
+                pm_name_final: normalizedProject.pm_name,
+                designer_name_meta: meta?.designer_name,
+                designer_name_data: data.designer_name,
+                designer_name_final: normalizedProject.designer_name,
+                last_updated: data.last_updated
+            });
+
+            // console.log('[Client View] Project data updated:', data.status + '%');
+            setProject(normalizedProject);
+            setLoading(false);
+        } catch (err: any) {
+            console.error('Error fetching shared project:', err);
+            setError('프로젝트를 불러올 수 없습니다. 올바른 링크인지 확인해주세요.');
+            setLoading(false);
+        }
     }, [projectId]);
+
+    // Initial fetch
+    useEffect(() => {
+        fetchProject();
+    }, [fetchProject]);
+
+    // Realtime Subscription
+    useEffect(() => {
+        // console.log('[Client View] Setting up Realtime Subscription');
+        const channel = supabase
+            .channel(`public:projects:id=eq.${projectId}`)
+            .on('postgres_changes', 
+                { event: 'UPDATE', schema: 'public', table: 'projects', filter: `id=eq.${projectId}` }, 
+                (payload) => {
+                    console.log('[Client View] Realtime Update Received');
+                    fetchProject();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            // console.log('[Client View] Cleaning up subscription');
+            supabase.removeChannel(channel);
+        };
+    }, [projectId, fetchProject]);
+
+    // Polling Fallback: Refresh every 3 seconds to ensure data is synced even if Realtime fails
+    useEffect(() => {
+        const interval = setInterval(() => {
+            fetchProject();
+        }, 3000);
+        return () => clearInterval(interval);
+    }, [fetchProject]);
 
     const getVisibleTasks = (stepId: number, project: Project) => {
         // Only show tasks that are in the client_visible_tasks list
         const visibleSet = new Set(project.client_visible_tasks || []);
+        const deletedSet = new Set(project.deleted_tasks || []);
         const stepCustomTasks = project.custom_tasks?.[stepId] || [];
-        let allTasks: Task[] = [];
+        
+        // 1. Generate Base Tasks (Dynamic + Static)
+        let generatedTasks: Task[] = [];
 
-        // Helper to check visibility
-        const isVisible = (taskId: string) => visibleSet.has(taskId);
-
-        if (stepId === 3) {
-            // Step 3 Logic (Simplified for read-only)
-            const roundCount = project.rounds_count || 2;
-            const baseTask = STEPS_STATIC[2].tasks[0];
-            const finalTask = STEPS_STATIC[2].tasks[1];
-
-            if (isVisible('t3-base-1')) allTasks.push(stepCustomTasks.find(t => t.id === 't3-base-1') || baseTask);
-
+        if (stepId === 2) { // Step 2: Navigation
+            const roundCount = project.rounds_navigation_count || 1;
             for (let r = 1; r <= roundCount; r++) {
-                const pmId = `t3-round-${r}-pm`;
-                const desId = `t3-round-${r}-des`;
-                if (isVisible(pmId)) allTasks.push(stepCustomTasks.find(t => t.id === pmId) || { id: pmId, roles: [Role.PM], title: `${r}차 피드백 수급` } as Task);
-                if (isVisible(desId)) allTasks.push(stepCustomTasks.find(t => t.id === desId) || { id: desId, roles: [Role.DESIGNER], title: `${r}차 수정 및 업데이트` } as Task);
+                generatedTasks.push({ id: `t2-round-${r}-prop`, title: `${r}차 제안`, completed_date: '00-00-00', roles: [Role.PM, Role.DESIGNER] });
+                generatedTasks.push({ id: `t2-round-${r}-feed`, title: `${r}차 피드백`, completed_date: '00-00-00', roles: [Role.CLIENT, Role.PM] });
             }
-
-            if (isVisible('t3-final')) allTasks.push(stepCustomTasks.find(t => t.id === 't3-final') || finalTask);
-
-        } else {
-            // Standard Steps
-            const stepStaticTasks = STEPS_STATIC.find(s => s.id === stepId)?.tasks || [];
-            allTasks = stepStaticTasks.filter(t => isVisible(t.id)).map(st => stepCustomTasks.find(ct => ct.id === st.id) || st);
-            const onlyCustoms = stepCustomTasks.filter(ct => isVisible(ct.id) && !stepStaticTasks.some(st => st.id === ct.id));
-            allTasks = [...allTasks, ...onlyCustoms];
+        } else if (stepId === 3) { // Step 3: Expedition 1
+            const roundCount = project.rounds_count || 2;
+            generatedTasks.push(STEPS_STATIC[2].tasks[0]); // Base 1
+            
+            for (let r = 1; r <= roundCount; r++) {
+                generatedTasks.push({ id: `t3-round-${r}-pm`, title: `${r}차 피드백 수급`, completed_date: '00-00-00', roles: [Role.PM] });
+                generatedTasks.push({ id: `t3-round-${r}-des`, title: `${r}차 수정`, completed_date: '00-00-00', roles: [Role.DESIGNER] });
+            }
+            generatedTasks.push(STEPS_STATIC[2].tasks[1]); // Final
+        } else if (stepId === 4) { // Step 4: Expedition 2
+            const roundCount = project.rounds2_count || 2;
+            for (let r = 1; r <= roundCount; r++) {
+                generatedTasks.push({ id: `t4-round-${r}-pm`, title: `${r}차 피드백 수급`, completed_date: '00-00-00', roles: [Role.PM] });
+                generatedTasks.push({ id: `t4-round-${r}-des`, title: `${r}차 수정`, completed_date: '00-00-00', roles: [Role.DESIGNER] });
+            }
+        } else { // Standard Steps
+            generatedTasks = STEPS_STATIC.find(s => s.id === stepId)?.tasks || [];
         }
 
-        // Sort logic
+        // 2. Merge Custom Tasks (Override info)
+        generatedTasks = generatedTasks.map(t => stepCustomTasks.find(ct => ct.id === t.id) || t);
+
+        // 3. Add Pure Custom Tasks (Added manually via "Checklist Add")
+        const pureCustoms = stepCustomTasks.filter(ct => !generatedTasks.some(gt => gt.id === ct.id));
+        let allTasks = [...generatedTasks, ...pureCustoms];
+
+        // 4. Filter by Visibility & Deleted
+        allTasks = allTasks.filter(t => visibleSet.has(t.id) && !deletedSet.has(t.id));
+
+        // 5. Sort logic
         const order = project.task_order?.[stepId];
         if (order && order.length > 0) {
             allTasks.sort((a, b) => {
@@ -128,65 +226,157 @@ const SharedProjectView: React.FC<SharedProjectViewProps> = ({ projectId }) => {
     const getAllProjectTasks = (stepId: number) => {
         const stepCustomTasks = project.custom_tasks?.[stepId] || [];
         const deletedSet = new Set(project.deleted_tasks || []);
-        let allTasks: Task[] = [];
+        let generatedTasks: Task[] = [];
 
-        if (stepId === 3) {
-            const roundCount = project.rounds_count || 2;
-            const baseTask = STEPS_STATIC[2].tasks[0];
-            const finalTask = STEPS_STATIC[2].tasks[1];
-
-            if (!deletedSet.has('t3-base-1')) allTasks.push(stepCustomTasks.find(t => t.id === 't3-base-1') || baseTask);
+        if (stepId === 2) { // Step 2: Navigation
+            const roundCount = project.rounds_navigation_count || 1;
             for (let r = 1; r <= roundCount; r++) {
-                const pmId = `t3-round-${r}-pm`;
-                const desId = `t3-round-${r}-des`;
-                if (!deletedSet.has(pmId)) allTasks.push(stepCustomTasks.find(t => t.id === pmId) || { id: pmId, roles: [Role.PM], title: `${r}차 피드백 수급` } as Task);
-                if (!deletedSet.has(desId)) allTasks.push(stepCustomTasks.find(t => t.id === desId) || { id: desId, roles: [Role.DESIGNER], title: `${r}차 수정 및 업데이트` } as Task);
+                generatedTasks.push({ id: `t2-round-${r}-prop`, title: `${r}차 제안`, completed_date: '00-00-00', roles: [Role.PM, Role.DESIGNER] });
+                generatedTasks.push({ id: `t2-round-${r}-feed`, title: `${r}차 피드백`, completed_date: '00-00-00', roles: [Role.CLIENT, Role.PM] });
             }
-            if (!deletedSet.has('t3-final')) allTasks.push(stepCustomTasks.find(t => t.id === 't3-final') || finalTask);
+        } else if (stepId === 3) { // Step 3: Expedition 1
+            const roundCount = project.rounds_count || 2;
+            generatedTasks.push(STEPS_STATIC[2].tasks[0]); // Base 1
             
-             // Add only-custom tasks
-             const onlyCustoms = stepCustomTasks.filter(ct => !['t3-base-1', 't3-final'].includes(ct.id) && !ct.id.includes('-round-'));
-             allTasks = [...allTasks, ...onlyCustoms];
-
-        } else {
-             const stepStaticTasks = STEPS_STATIC.find(s => s.id === stepId)?.tasks || [];
-             allTasks = stepStaticTasks.filter(st => !deletedSet.has(st.id)).map(st => stepCustomTasks.find(ct => ct.id === st.id) || st);
-             const onlyCustoms = stepCustomTasks.filter(ct => !stepStaticTasks.some(st => st.id === ct.id));
-             allTasks = [...allTasks, ...onlyCustoms];
+            for (let r = 1; r <= roundCount; r++) {
+                generatedTasks.push({ id: `t3-round-${r}-pm`, title: `${r}차 피드백 수급`, completed_date: '00-00-00', roles: [Role.PM] });
+                generatedTasks.push({ id: `t3-round-${r}-des`, title: `${r}차 수정`, completed_date: '00-00-00', roles: [Role.DESIGNER] });
+            }
+            generatedTasks.push(STEPS_STATIC[2].tasks[1]); // Final
+        } else if (stepId === 4) { // Step 4: Expedition 2
+            const roundCount = project.rounds2_count || 2;
+            for (let r = 1; r <= roundCount; r++) {
+                generatedTasks.push({ id: `t4-round-${r}-pm`, title: `${r}차 피드백 수급`, completed_date: '00-00-00', roles: [Role.PM] });
+                generatedTasks.push({ id: `t4-round-${r}-des`, title: `${r}차 수정`, completed_date: '00-00-00', roles: [Role.DESIGNER] });
+            }
+        } else { // Standard Steps
+            generatedTasks = STEPS_STATIC.find(s => s.id === stepId)?.tasks || [];
         }
-        return allTasks;
+
+        // Merge Custom Tasks (Override info)
+        generatedTasks = generatedTasks.map(t => stepCustomTasks.find(ct => ct.id === t.id) || t);
+
+        // Add Pure Custom Tasks
+        const pureCustoms = stepCustomTasks.filter(ct => !generatedTasks.some(gt => gt.id === ct.id));
+        let allTasks = [...generatedTasks, ...pureCustoms];
+
+        // Filter out deleted tasks
+        return allTasks.filter(t => !deletedSet.has(t.id));
     };
 
     const isLockedStep = (stepId: number): boolean => {
         if (stepId === 1) return false;
+
+        // Special handling for Step 5 (Landing) when Expedition 2 is hidden
+        const isExpedition2Hidden = project.task_states?.meta?.is_expedition2_hidden;
         
-        // 1. Check Real Project Progress (Previous Step Complete?)
-        const prevStepId = stepId - 1;
-        const prevAllTasks = getAllProjectTasks(prevStepId);
-        // If previous step has tasks and ANY is not complete, current is locked
-        if (!prevAllTasks.every(t => completedTasks.has(t.id))) return true;
+        let prevStepId = stepId - 1;
+        if (stepId === 5 && isExpedition2Hidden) {
+            prevStepId = 3; // Check Step 3 (Expedition 1) instead
+        }
 
-        // 2. Visual Lock for Empty Client Steps
-        // If the client has no tasks to see in this step, show it as gray (locked style) for better aesthetics
-        const currentClientTasks = getVisibleTasks(stepId, project);
-        if (currentClientTasks.length === 0) return true;
-
+        // Use getAllProjectTasks to check real project progress based on ALL tasks (not just visible ones)
+        const prevStepTasks = getAllProjectTasks(prevStepId);
+        
+        // If previous step has tasks, check if all are completed
+        if (prevStepTasks.length > 0) {
+            return !prevStepTasks.every(t => completedTasks.has(t.id));
+        }
+        
         return false;
+    };
+
+
+
+    const openContactInfo = (e: React.MouseEvent, field: 'pm' | 'designer' | 'designer_2' | 'designer_3') => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        let memberName = '';
+        let phone = '';
+        let email = '';
+
+        if (field === 'pm') {
+            memberName = project.pm_name;
+            phone = project.pm_phone || '';
+            email = project.pm_email || '';
+        } else if (field === 'designer') {
+            memberName = project.designer_name;
+            phone = project.designer_phone || '';
+            email = project.designer_email || '';
+        } else if (field === 'designer_2') {
+            memberName = project.designer_2_name || '';
+            phone = project.designer_2_phone || '';
+            email = project.designer_2_email || '';
+        } else if (field === 'designer_3') {
+            memberName = project.designer_3_name || '';
+            phone = project.designer_3_phone || '';
+            email = project.designer_3_email || '';
+        }
+
+        if (!memberName) return;
+
+        setContactPopover({ isOpen: true, memberName, phone, email, x: e.clientX, y: e.clientY });
     };
 
     return (
         <div className="min-h-screen pb-20 bg-[#e3e7ed] selection:bg-black selection:text-white">
             {/* Read-Only Navbar */}
-            <nav className="w-full bg-white border-b border-slate-200 py-4 sticky top-0 z-40 shadow-sm">
+            <nav ref={navRef} className="w-full bg-white border-b border-slate-200 py-4 sticky top-0 z-40 shadow-sm">
                 <div className="max-w-[1900px] mx-auto px-6 flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <span className="bg-black text-white text-[10px] px-2 py-0.5 rounded uppercase font-bold tracking-widest">Client View</span>
                         <h1 className="text-2xl font-black text-black uppercase tracking-tight">{project.name}</h1>
                     </div>
-                    <div className="text-sm font-bold text-slate-500">
-                        {project.start_date ? `Start: ${project.start_date}` : ''}
+                    
+                    {/* Team Info Header */}
+                    <div className="hidden lg:flex items-center gap-3.5 border-l border-slate-200 pl-4 shrink-0">
+                        <div className="flex flex-col">
+                            <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">시작일</span>
+                            <span className="text-[14px] font-bold text-black">{project.start_date || '-'}</span>
+                        </div>
+                        <div className="w-[1px] h-3.5 bg-slate-200"></div>
+                        <div className="flex flex-col cursor-pointer hover:opacity-70 transition-opacity" onContextMenu={(e) => openContactInfo(e, 'pm')}>
+                            <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">PM</span>
+                            <span className="text-[14px] font-bold text-black whitespace-nowrap">{project.pm_name || '-'}</span>
+                        </div>
+                        <div className="w-[1px] h-3.5 bg-slate-200"></div>
+                        <div className="flex flex-col cursor-pointer hover:opacity-70 transition-opacity" onContextMenu={(e) => openContactInfo(e, 'designer')}>
+                            <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">DESIGNER A</span>
+                            <span className="text-[14px] font-bold text-black whitespace-nowrap">{project.designer_name || '-'}</span>
+                        </div>
+                        <div className="w-[1px] h-3.5 bg-slate-200"></div>
+                        <div className="flex flex-col cursor-pointer hover:opacity-70 transition-opacity" onContextMenu={(e) => openContactInfo(e, 'designer_2')}>
+                            <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">DESIGNER B</span>
+                            <span className="text-[14px] font-bold text-black whitespace-nowrap">{project.designer_2_name || '-'}</span>
+                        </div>
+                        <div className="w-[1px] h-3.5 bg-slate-200 ml-1"></div>
+                        <div className="flex flex-col cursor-pointer hover:opacity-70 transition-opacity" onContextMenu={(e) => openContactInfo(e, 'designer_3')}>
+                            <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">DESIGNER C</span>
+                            <span className="text-[14px] font-bold text-black whitespace-nowrap">{project.designer_3_name || '-'}</span>
+                        </div>
                     </div>
                 </div>
+
+                {/* Popover */}
+                {contactPopover.isOpen && (
+                    <div className="fixed z-[110] bg-white text-black border border-slate-200 rounded-2xl shadow-2xl p-6 w-[240px] animate-in fade-in zoom-in-95 duration-100" style={{ top: contactPopover.y, left: contactPopover.x }} onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{contactPopover.memberName} INFO</div>
+                            <button onClick={() => setContactPopover({ ...contactPopover, isOpen: false })} className="text-slate-300 hover:text-black transition-colors"><i className="fa-solid fa-times"></i></button>
+                        </div>
+                        <div className="flex flex-col gap-3">
+                            <div className="flex items-center gap-3">
+                                <i className="fa-solid fa-phone text-blue-600 text-[12px]"></i>
+                                <span className="text-[14px] font-bold text-black">{contactPopover.phone || '정보 없음'}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <i className="fa-solid fa-envelope text-blue-600 text-[12px]"></i>
+                                <span className="text-[14px] font-bold text-black truncate">{contactPopover.email || '정보 없음'}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </nav>
 
             <main className="w-full px-4 md:px-6 py-10 max-w-[1900px] mx-auto">
@@ -214,13 +404,26 @@ const SharedProjectView: React.FC<SharedProjectViewProps> = ({ projectId }) => {
                     {/* Steps Layout - Horizontal Scroll */}
                     <div className="overflow-x-auto pb-8 no-scrollbar scroll-smooth">
                         <div className="flex gap-2 md:gap-4 min-w-max md:min-w-0 md:w-full px-0">
-                            {STEPS_STATIC.map((step) => {
+                            {STEPS_STATIC.filter((step) => {
+                                // Filter out Expedition 2 if hidden in team view
+                                const isHidden = project.task_states?.meta?.is_expedition2_hidden;
+                                return !(step.id === 4 && isHidden);
+                            }).map((step) => {
                                 const tasks = getVisibleTasks(step.id, project);
                                 const locked = isLockedStep(step.id);
+                                
+                                // Apply custom step title if exists
+                                const savedTitle = project.task_states?.meta?.step_titles?.[step.id];
+                                const displayStep = savedTitle ? { ...step, title: savedTitle } : step;
+
+                                // Create unique key that changes when task completion changes
+                                const completedTasksList = Array.from(completedTasks).sort().join(',');
+                                const uniqueKey = `${step.id}-${completedTasksList}`;
+                                
                                 return (
                                     <StepColumn
-                                        key={step.id}
-                                        step={step}
+                                        key={uniqueKey}
+                                        step={displayStep}
                                         tasks={tasks}
                                         isLocked={locked} // Dynamic locking for visuals
                                         filter={Role.ALL}

@@ -25,6 +25,8 @@ interface StepColumnProps {
   displayIndex?: number;
   headerLeftButtons?: React.ReactNode;
   isClientView?: boolean;
+  clientVisibleTasks?: Set<string>;
+  onUpdateTitle?: (newTitle: string) => void;
 }
 
 const StepColumn: React.FC<StepColumnProps> = ({
@@ -49,7 +51,9 @@ const StepColumn: React.FC<StepColumnProps> = ({
   onSnapshotTaskSelect,
   displayIndex,
   headerLeftButtons,
-  isClientView
+  isClientView,
+  clientVisibleTasks,
+  onUpdateTitle // Destructure onUpdateTitle
 }) => {
   /* Migration Safe Access: task.roles might be undefined during transition if data not migrated yet. 
      We treat missing roles as [Role.PM] or empty based on context, but let's safely access. */
@@ -78,6 +82,44 @@ const StepColumn: React.FC<StepColumnProps> = ({
 
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  // Title Editing State
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editTitle, setEditTitle] = useState(step.title);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setEditTitle(step.title);
+  }, [step.title]);
+
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+        titleInputRef.current.focus();
+    }
+  }, [isEditingTitle]);
+
+  const handleTitleClick = () => {
+    if (isClientView || isLockedProject) return;
+    setIsEditingTitle(true);
+  };
+
+  const handleTitleBlur = () => {
+    setIsEditingTitle(false);
+    if (editTitle.trim() !== step.title && onUpdateTitle) {
+        onUpdateTitle(editTitle.trim());
+    } else {
+        setEditTitle(step.title);
+    }
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+        handleTitleBlur();
+    } else if (e.key === 'Escape') {
+        setIsEditingTitle(false);
+        setEditTitle(step.title);
+    }
+  };
 
   const scrollRafRef = useRef<number | null>(null);
   const mouseYRef = useRef<number>(0);
@@ -171,7 +213,8 @@ const StepColumn: React.FC<StepColumnProps> = ({
     isSnapshotMode,
     isSelectedForSnapshot: snapshotSelectedTasks?.has(task.id),
     onSnapshotSelect: () => onSnapshotTaskSelect?.(task.id),
-    isClientView
+    isClientView,
+    isClientVisible: clientVisibleTasks?.has(task.id)
   });
 
   const renderTasks = () => {
@@ -280,7 +323,7 @@ const StepColumn: React.FC<StepColumnProps> = ({
 
   return (
     <div
-      className={`relative h-fit flex flex-col flex-1 w-full min-w-[280px] md:min-w-0 p-2.5 md:p-4 rounded-[1.25rem] md:rounded-[1.5rem] border transition-all duration-700 ${bgColor} ${borderColor} ${isLocked && !isSnapshotMode ? 'opacity-40 grayscale blur-[0.5px]' : 'opacity-100 shadow-2xl shadow-black/5'}`}
+      className={`relative h-fit flex flex-col flex-1 w-full min-w-[280px] md:min-w-0 p-2.5 md:p-4 rounded-[1.25rem] md:rounded-[1.5rem] border transition-all duration-700 ${bgColor} ${borderColor} ${isLocked && (!isSnapshotMode || isClientView) ? 'opacity-40 grayscale blur-[0.5px]' : 'opacity-100 shadow-2xl shadow-black/5'}`}
       onDragOver={(e) => {
         e.preventDefault();
         if (draggedIndex !== null && dragOverIndex === null) setDragOverIndex(visibleTasks.length);
@@ -291,10 +334,28 @@ const StepColumn: React.FC<StepColumnProps> = ({
         <span className="bg-black text-[10px] md:text-[12px] font-bold px-3 py-2 rounded-xl border border-black mr-4 text-white uppercase tracking-tighter shadow-sm">
           STEP {String(displayIndex || step.id).padStart(2, '0')}
         </span>
-        <h3 className="font-bold text-xl md:text-2xl text-black uppercase tracking-tight truncate">{step.title}</h3>
-        <div className="ml-auto flex items-center gap-2 md:gap-3">
+        {isEditingTitle ? (
+            <input
+                ref={titleInputRef}
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                onBlur={handleTitleBlur}
+                onKeyDown={handleTitleKeyDown}
+                className="font-bold text-xl md:text-2xl text-black uppercase tracking-tight truncate bg-transparent border-b-2 border-black focus:outline-none w-full min-w-[100px]"
+            />
+        ) : (
+            <h3 
+                onClick={handleTitleClick}
+                className={`font-bold text-xl md:text-2xl text-black uppercase tracking-tight truncate ${!isLockedProject && !isClientView ? 'cursor-pointer hover:bg-black/5 px-1 -mx-1 rounded' : ''}`}
+                title={!isLockedProject && !isClientView ? "클릭하여 제목 수정" : undefined}
+            >
+                {step.title}
+            </h3>
+        )}
+        <div className="ml-auto flex items-center gap-2">
           {headerLeftButtons && (
-            <div className="flex items-center gap-2 mr-2">
+            <div className="flex items-center gap-2">
               {headerLeftButtons}
             </div>
           )}

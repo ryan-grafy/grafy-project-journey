@@ -20,6 +20,7 @@ interface TaskCardProps {
   isSelectedForSnapshot?: boolean;
   onSnapshotSelect?: () => void;
   isClientView?: boolean;
+  isClientVisible?: boolean;
 }
 
 const roleStyles: Record<Role, { style: string; icon: string }> = {
@@ -46,7 +47,7 @@ const accentColors: Record<number, string> = {
 
 const TaskCard: React.FC<TaskCardProps> = ({
   task, isCompleted, isLockedStep, stepId, linkUrl, linkLabel, onToggle, onContextMenu, onEditContextMenu, onDelete, onToast, isLockedProject, projectId,
-  isSnapshotMode, isSelectedForSnapshot, onSnapshotSelect, isClientView
+  isSnapshotMode, isSelectedForSnapshot, onSnapshotSelect, isClientView, isClientVisible
 }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
@@ -120,13 +121,17 @@ const TaskCard: React.FC<TaskCardProps> = ({
     <div
       onClick={handleToggleClick}
       onContextMenu={handleRightClickInfo}
-      className={`relative flex flex-col p-4 mb-2 bg-white border rounded-2xl cursor-pointer transition-all duration-300 min-h-[100px] group overflow-hidden ${isCompleted ? 'bg-white border-black/10 opacity-80 shadow-inner' : 'border-black/25 hover:border-black/50 hover:-translate-y-1 hover:shadow-xl shadow-sm'} ${isLockedStep && !isSnapshotMode ? 'grayscale-[0.5]' : ''} ${isSelectedForSnapshot && !isClientView ? '!border-emerald-500 !border-4 !ring-2 !ring-emerald-200 z-50' : ''}`}
+      className={`relative flex flex-col p-4 mb-2 bg-white border rounded-2xl cursor-pointer transition-all duration-300 min-h-[100px] group overflow-hidden ${isCompleted ? 'bg-white border-black/10 opacity-80 shadow-inner' : 'border-black/25 hover:border-black/50 hover:-translate-y-1 hover:shadow-xl shadow-sm'} ${isLockedStep && !isSnapshotMode ? 'grayscale-[0.5]' : ''} ${isSnapshotMode && isSelectedForSnapshot && !isClientView ? '!border-emerald-500 !border-4 !ring-2 !ring-emerald-200 z-50' : ''}`}
     >
       <div className="absolute top-3 right-3 flex items-center gap-2 z-20">
+        {isClientVisible && !isClientView && (
+          <div className="flex items-center justify-center w-7 h-7 bg-emerald-500 rounded-full shadow-sm" title="클라이언트 뷰 공개됨">
+            <i className="fa-solid fa-magnifying-glass text-white text-[12px]"></i>
+          </div>
+        )}
         {isCompleted ? (
-          <div className="flex items-center gap-2">
-            {(isLockedProject || isLockedStep) && <i className="fa-solid fa-lock text-slate-300 text-[10px]"></i>}
-            <i className="fa-solid fa-circle-check text-emerald-500 text-2xl shadow-sm rounded-full bg-white"></i>
+          <div className="flex items-center gap-2 w-7 h-7 justify-center">
+            <i className="fa-solid fa-circle-check text-emerald-500 text-[28px] shadow-sm rounded-full bg-white"></i>
           </div>
         ) : (
           !isLockedProject && (
