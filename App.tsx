@@ -893,13 +893,14 @@ const App: React.FC = () => {
     updateProjectProgress(nextCompleted, updatedProject);
   };
 
-  const updateProjectProgress = async (nextCompleted: Set<string>, project: Project) => {
-    syncTasks(project, nextCompleted, taskLinks); // Save to local backup
+  const updateProjectProgress = async (nextCompleted: Set<string>, project: Project, nextLinks?: Map<string, { url: string, label: string }>) => {
+    const currentLinks = nextLinks || taskLinks;
+    syncTasks(project, nextCompleted, currentLinks); // Save to local backup
     const total = calculateTotalTasks(project);
     const percent = total === 0 ? 0 : Math.round((nextCompleted.size / total) * 100);
     const task_states = {
       completed: Array.from(nextCompleted),
-      links: Object.fromEntries(taskLinks),
+      links: Object.fromEntries(currentLinks),
       meta: {
         rounds_count: project.rounds_count,
         rounds2_count: project.rounds2_count,
@@ -1494,7 +1495,7 @@ const App: React.FC = () => {
         last_updated: new Date().toISOString() 
     };
     
-    updateProjectProgress(completedTasks, updatedProject);
+    updateProjectProgress(completedTasks, updatedProject, nextLinks);
     // Explicitly sync
     setCurrentProject(updatedProject);
     const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);

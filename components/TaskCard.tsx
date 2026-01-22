@@ -181,17 +181,19 @@ const TaskCard: React.FC<TaskCardProps> = ({
         <div onClick={(e) => e.stopPropagation()}>
           <FileDropzone onToast={onToast} isCompleted={isCompleted} accentColor={pointColor} isLockedProject={isLockedProject} projectId={projectId} taskId={task.id} />
         </div>
-        <button
-          type="button"
-          onContextMenu={handleContextMenuLink}
-          onClick={(e) => {
-            e.stopPropagation();
-            linkUrl ? window.open(linkUrl, '_blank') : onToast("우클릭하여 링크를 설정해주세요.");
-          }}
-          className={`w-full inline-flex justify-center items-center gap-1.5 px-3 py-2.5 rounded-xl text-[13px] font-black border transition-all ${linkUrl ? `${pointColor} text-white border-transparent hover:brightness-90 shadow-md` : 'bg-white text-slate-600 border-slate-200 hover:border-black hover:text-black'} overflow-hidden`}
-        >
-          <span className="truncate max-w-full">{linkUrl ? (linkLabel || "자료 확인") : "우클릭 링크 지정"}</span>
-        </button>
+        {(!isClientView || linkUrl) && (
+          <button
+            type="button"
+            onContextMenu={handleContextMenuLink}
+            onClick={(e) => {
+              e.stopPropagation();
+              linkUrl ? window.open(linkUrl, '_blank') : onToast("우클릭하여 링크를 설정해주세요.");
+            }}
+            className={`w-full inline-flex justify-center items-center gap-1.5 px-3 py-2.5 rounded-xl text-[13px] font-black border transition-all ${linkUrl ? `${pointColor} text-white border-transparent hover:brightness-90 shadow-md` : 'bg-white text-slate-600 border-slate-200 hover:border-black hover:text-black'} overflow-hidden`}
+          >
+            <span className="truncate max-w-full">{linkUrl ? (linkLabel || "자료 확인") : "우클릭 링크 지정"}</span>
+          </button>
+        )}
       </div>
     </div>
   );
