@@ -19,6 +19,26 @@ interface NavbarProps {
   onSaveTemplate?: () => void;
 }
 
+const getTemplateBadgeColor = (name: string) => {
+  const colors = [
+    'bg-red-100 text-red-700', 'bg-orange-100 text-orange-700',
+    'bg-amber-100 text-amber-700', 'bg-yellow-100 text-yellow-700',
+    'bg-lime-100 text-lime-700', 'bg-green-100 text-green-700',
+    'bg-emerald-100 text-emerald-700', 'bg-teal-100 text-teal-700',
+    'bg-cyan-100 text-cyan-700', 'bg-sky-100 text-sky-700',
+    'bg-blue-100 text-blue-700', 'bg-indigo-100 text-indigo-700',
+    'bg-violet-100 text-violet-700', 'bg-purple-100 text-purple-700',
+    'bg-fuchsia-100 text-fuchsia-700', 'bg-pink-100 text-pink-700',
+    'bg-rose-100 text-rose-700'
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % colors.length;
+  return colors[index];
+};
+
 const Navbar: React.FC<NavbarProps> = ({
   project, user = { id: 'guest', userId: 'guest', name: 'Guest', avatarUrl: '' } as User, teamMembers, activeRole, onRoleChange, onBack, onUpdateInfo, onLogout, onLogin, onToast, onToggleLock,
   isSnapshotMode, onSnapshotToggle, onSaveTemplate
@@ -127,18 +147,22 @@ const Navbar: React.FC<NavbarProps> = ({
                 value={localProjectName}
                 onChange={(e) => setLocalProjectName(e.target.value)}
                 onBlur={() => { setIsEditingTitle(false); onUpdateInfo({ name: localProjectName }); }}
+                placeholder="프로젝트명을 입력하세요"
                 onKeyDown={(e) => e.key === 'Enter' && (titleInputRef.current?.blur())}
-                className="text-[23px] md:text-[26px] font-bold text-black border-b-2 border-black outline-none w-full bg-transparent leading-none py-1"
+                className="text-[18px] md:text-[22px] font-black text-black border-b-2 border-black outline-none bg-transparent w-full md:w-auto min-w-[200px]"
               />
             ) : (
-              <div
-                onClick={() => !project.is_locked && setIsEditingTitle(true)}
-                className={`relative overflow-hidden whitespace-nowrap min-w-0 max-w-full ${!project.is_locked ? 'cursor-pointer hover:opacity-70' : ''}`}
-              >
-                <h1 className="text-[23px] md:text-[26px] font-bold text-black leading-none uppercase tracking-tight inline-block py-1 truncate max-w-full">
-                  {project.name} {project.is_locked && <i className="fa-solid fa-lock text-black/30 ml-2 text-base md:text-lg"></i>}
-                </h1>
-              </div>
+                <div className="flex items-center gap-2">
+                    <span onClick={() => !project.is_locked && setIsEditingTitle(true)} className={`text-[18px] md:text-[22px] font-black text-black truncate max-w-[200px] md:max-w-none ${!project.is_locked ? 'cursor-pointer hover:opacity-70 underline decoration-black/20 underline-offset-4' : ''}`}>
+                        {project.name}
+                    </span>
+                    {project.template_name && (
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] md:text-[11px] font-bold uppercase tracking-wider whitespace-nowrap ${getTemplateBadgeColor(project.template_name)}`}>
+                            {project.template_name}
+                        </span>
+                    )}
+                    {project.is_locked && <i className="fa-solid fa-lock text-black/30 ml-2 text-base md:text-lg"></i>}
+                </div>
             )}
           </div>
         </div>

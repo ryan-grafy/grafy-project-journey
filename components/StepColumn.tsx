@@ -24,6 +24,7 @@ interface StepColumnProps {
   onSnapshotTaskSelect?: (taskId: string) => void;
   displayIndex?: number;
   headerLeftButtons?: React.ReactNode;
+  isClientView?: boolean;
 }
 
 const StepColumn: React.FC<StepColumnProps> = ({
@@ -47,7 +48,8 @@ const StepColumn: React.FC<StepColumnProps> = ({
   snapshotSelectedTasks,
   onSnapshotTaskSelect,
   displayIndex,
-  headerLeftButtons
+  headerLeftButtons,
+  isClientView
 }) => {
   /* Migration Safe Access: task.roles might be undefined during transition if data not migrated yet. 
      We treat missing roles as [Role.PM] or empty based on context, but let's safely access. */
@@ -168,7 +170,8 @@ const StepColumn: React.FC<StepColumnProps> = ({
     projectId,
     isSnapshotMode,
     isSelectedForSnapshot: snapshotSelectedTasks?.has(task.id),
-    onSnapshotSelect: () => onSnapshotTaskSelect?.(task.id)
+    onSnapshotSelect: () => onSnapshotTaskSelect?.(task.id),
+    isClientView
   });
 
   const renderTasks = () => {
@@ -289,13 +292,13 @@ const StepColumn: React.FC<StepColumnProps> = ({
           STEP {String(displayIndex || step.id).padStart(2, '0')}
         </span>
         <h3 className="font-bold text-xl md:text-2xl text-black uppercase tracking-tight truncate">{step.title}</h3>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2 md:gap-3">
           {headerLeftButtons && (
             <div className="flex items-center gap-2 mr-2">
               {headerLeftButtons}
             </div>
           )}
-          {!isLocked && !isLockedProject && onAddTask && (
+          {!isLockedProject && onAddTask && (
             <button
               onClick={(e) => { e.stopPropagation(); onAddTask(); }}
               className={`w-10 h-10 md:w-11 md:h-11 rounded-full bg-white border ${borderColor} flex items-center justify-center text-slate-400 hover:bg-black hover:text-white hover:border-black transition-all shadow-md active:scale-90`}
@@ -304,7 +307,6 @@ const StepColumn: React.FC<StepColumnProps> = ({
               <i className="fa-solid fa-plus text-sm md:text-base"></i>
             </button>
           )}
-          {(isLocked || isLockedProject) && <i className="fa-solid fa-lock text-slate-300 text-lg md:text-xl"></i>}
         </div>
       </div>
       <div className="relative z-10 flex flex-col gap-3 h-full min-h-[150px]">

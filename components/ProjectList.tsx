@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Project, User, Role, Task } from '../types';
 import { STEPS_STATIC } from '../constants';
 import DeletedDataModal from './DeletedDataModal';
+import TemplateManagerModal from './TemplateManagerModal';
 
 interface ProjectListProps {
   projects: Project[];
@@ -15,9 +16,32 @@ interface ProjectListProps {
   isLoading: boolean;
   deletedProjects: Project[];
   onRestoreProject: (id: string) => void;
+  onUpdateProject: (projectId: string, updates: Partial<Project>) => void;
+  templates: Project[];
 }
 
 type SortOption = 'recent_created' | 'name' | 'progress' | 'recent_ended';
+
+
+const getTemplateBadgeColor = (name: string) => {
+  const colors = [
+    'bg-red-100 text-red-700', 'bg-orange-100 text-orange-700',
+    'bg-amber-100 text-amber-700', 'bg-yellow-100 text-yellow-700',
+    'bg-lime-100 text-lime-700', 'bg-green-100 text-green-700',
+    'bg-emerald-100 text-emerald-700', 'bg-teal-100 text-teal-700',
+    'bg-cyan-100 text-cyan-700', 'bg-sky-100 text-sky-700',
+    'bg-blue-100 text-blue-700', 'bg-indigo-100 text-indigo-700',
+    'bg-violet-100 text-violet-700', 'bg-purple-100 text-purple-700',
+    'bg-fuchsia-100 text-fuchsia-700', 'bg-pink-100 text-pink-700',
+    'bg-rose-100 text-rose-700'
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % colors.length;
+  return colors[index];
+};
 
 interface ProjectRowItemProps {
   project: Project;
@@ -174,9 +198,6 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
         <div className="col-span-1 px-4 py-0.5 flex items-center justify-center text-slate-300 font-black text-xl group-hover:text-black transition-colors border-r border-slate-100 relative z-10 pointer-events-none">
           {String(index + 1).padStart(2, '0')}
         </div>
-        <div className="col-span-1 px-2 py-0.5 flex items-center justify-center text-[13px] font-bold text-slate-400 border-r border-slate-100 overflow-hidden relative z-10 pointer-events-none">
-          <span className="truncate" title={project.template_name || '-'}>{project.template_name || '-'}</span>
-        </div>
         <div className="col-span-1 px-4 py-0.5 flex items-center justify-center text-[15px] font-bold text-slate-500 whitespace-nowrap border-r border-slate-100 relative z-10 pointer-events-none">
           {project.start_date || '-'}
         </div>
@@ -184,14 +205,14 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
             {isProjectEnded ? (
                <span className="text-[13px] font-bold text-white bg-emerald-500 px-3 py-1.5 rounded-full whitespace-nowrap shadow-sm">프로젝트 종료</span>
             ) : nextSchedule ? (
-                <>
+                <div className="flex flex-col items-center justify-center gap-0 leading-none">
                     <span className={`font-mono text-[15px] font-bold ${nextSchedule.isOverdue ? 'text-red-500 animate-pulse' : 'text-emerald-500'}`}>
                         {nextSchedule.date}
                     </span>
-                    <span className={`text-[11px] truncate w-full text-center px-1 ${nextSchedule.isOverdue ? 'text-red-500' : 'text-emerald-500'}`} title={nextSchedule.title}>
+                    <span className={`text-[11px] truncate w-full text-center px-1 mt-0.5 ${nextSchedule.isOverdue ? 'text-red-500' : 'text-emerald-500'}`} title={nextSchedule.title}>
                         {nextSchedule.title}
                     </span>
-                </>
+                </div>
             ) : (
                 <span className="text-xs text-slate-300">-</span>
             )}
@@ -199,8 +220,13 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
         <div className={`col-span-1 px-4 py-0.5 flex items-center justify-center text-[15px] font-bold ${isCompleted ? 'text-emerald-500' : 'text-slate-400'} whitespace-nowrap transition-colors duration-500 border-r border-slate-100 relative z-10 pointer-events-none`}>
           {project.end_date || '-'}
         </div>
-        <div className="col-span-3 px-6 py-0.5 flex items-center font-black text-black text-[16px] group-hover:translate-x-1 transition-transform border-r border-slate-100 overflow-hidden relative z-10 pointer-events-none">
+        <div className="col-span-4 px-6 py-0.5 flex items-center font-black text-black text-[16px] group-hover:translate-x-1 transition-transform border-r border-slate-100 overflow-hidden relative z-10 pointer-events-none">
           <span className="truncate">{project.name}</span>
+          {project.template_name && (
+             <span className={`ml-2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider whitespace-nowrap ${getTemplateBadgeColor(project.template_name)}`}>
+                 {project.template_name}
+             </span>
+          )}
           {project.is_locked && (
             <div className="w-5 h-5 ml-2 rounded-full bg-red-500 flex items-center justify-center text-white shadow-sm shrink-0">
               <i className="fa-solid fa-lock text-[8px]"></i>
@@ -299,11 +325,12 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
   );
 };
 
-const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest', userId: 'guest', name: 'Guest', avatarUrl: '' } as User, onSelectProject, onNewProject, onManageTeam, onDeleteProject, onLogout, onLogin, isLoading, deletedProjects, onRestoreProject }) => {
+const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest', userId: 'guest', name: 'Guest', avatarUrl: '' } as User, onSelectProject, onNewProject, onManageTeam, onDeleteProject, onLogout, onLogin, isLoading, deletedProjects, onRestoreProject, onUpdateProject, templates }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('recent_created');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [showDeletedDataModal, setShowDeletedDataModal] = useState(false);
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
 
   useEffect(() => {
     const closeMenu = () => setProfileMenuOpen(false);
@@ -429,16 +456,28 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest
                     </div>
                     <div className="py-1">
                       {['mondo.kim@gmail.com', 'wjatnsdl527@gmail.com'].includes(user.email || '') && (
-                        <button
-                          onClick={() => {
-                            setProfileMenuOpen(false);
-                            setShowDeletedDataModal(true);
-                          }}
-                          className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors flex items-center gap-3 text-slate-700"
-                        >
-                          <i className="fa-solid fa-trash-arrow-up text-sm text-amber-600"></i>
-                          <span className="text-[13px] font-bold">삭제 데이터 관리</span>
-                        </button>
+                        <>
+                          <button
+                            onClick={() => {
+                              setProfileMenuOpen(false);
+                              setShowDeletedDataModal(true);
+                            }}
+                            className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors flex items-center gap-3 text-slate-700"
+                          >
+                            <i className="fa-solid fa-trash-arrow-up text-sm text-amber-600"></i>
+                            <span className="text-[13px] font-bold">삭제 데이터 관리</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setProfileMenuOpen(false);
+                              setShowTemplateManager(true);
+                            }}
+                            className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors flex items-center gap-3 text-slate-700"
+                          >
+                            <i className="fa-solid fa-layer-group text-sm text-purple-600"></i>
+                            <span className="text-[13px] font-bold">템플릿 관리</span>
+                          </button>
+                        </>
                       )}
                       <button
                         onClick={onLogout}
@@ -513,11 +552,10 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest
           {/* Desktop Header */}
           <div className="hidden md:grid grid-cols-12 bg-black text-[13px] md:text-[14px] font-black text-white uppercase tracking-widest text-center rounded-t-[1rem] md:rounded-t-[1.25rem]">
             <div className="col-span-1 py-1.5 border-r border-white/20">No.</div>
-            <div className="col-span-1 py-1.5 border-r border-white/20">카테고리</div>
             <div className="col-span-1 py-1.5 border-r border-white/20">시작일</div>
             <div className="col-span-1 py-1.5 border-r border-white/20 text-emerald-300">다음 일정</div>
             <div className="col-span-1 py-1.5 border-r border-white/20">종료일</div>
-            <div className="col-span-3 py-1.5 border-r border-white/20 px-6 text-left">클라이언트 / 프로젝트명</div>
+            <div className="col-span-4 py-1.5 border-r border-white/20 px-6 text-left">클라이언트 / 프로젝트명</div>
             <div className="col-span-2 py-1.5 border-r border-white/20 px-6 text-left">진행 인원</div>
             <div className="col-span-2 py-1.5">진행율</div>
           </div>
@@ -554,6 +592,14 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest
             setShowDeletedDataModal(false);
           }}
           deletedProjects={deletedProjects}
+        />
+      )}
+      {showTemplateManager && (
+        <TemplateManagerModal
+          templates={templates}
+          onClose={() => setShowTemplateManager(false)}
+          onUpdate={onUpdateProject}
+          onDelete={onDeleteProject}
         />
       )}
     </div>

@@ -133,7 +133,6 @@ const App: React.FC = () => {
                     // Fetch Data
                     fetchTeamMembers();
                     fetchProjects();
-                    fetchTemplates(); // Ensure templates are fetched
                     
                     setIsAuthLoading(false);
                     setIsInitializing(false);
@@ -165,7 +164,7 @@ const App: React.FC = () => {
                          }
                      });
                  }
-             }, 1000);
+             }, 3000);
         }
     };
     
@@ -355,8 +354,9 @@ const App: React.FC = () => {
     try {
       let remoteData: Project[] = [];
       let localData: Project[] = [];
+      let remoteTemplates: Project[] = [];
 
-      // 1. Fetch Remote
+      // 1. Fetch Remote Projects (excluding templates)
       if (isSupabaseReady && supabase) {
         const { data, error } = await supabase.from('projects').select('*').neq('status', -1).order('last_updated', { ascending: false });
         if (!error && data) {
@@ -378,6 +378,12 @@ const App: React.FC = () => {
                 }
                 return p;
             });
+        }
+
+        // Fetch Templates separately
+        const { data: templateData, error: templateError } = await supabase.from('projects').select('*').eq('status', -1).order('created_at', { ascending: false });
+        if (!templateError && templateData) {
+          remoteTemplates = templateData;
         }
       }
 
@@ -420,6 +426,7 @@ const App: React.FC = () => {
 
       setProjects(active);
       setDeletedProjects(deleted);
+      setTemplates(remoteTemplates); // Set templates separately
     } catch (e) { console.error(e); }
     setIsProjectLoading(false);
   };
@@ -825,7 +832,8 @@ const App: React.FC = () => {
         // Backup complex objects in meta
         custom_tasks: project.custom_tasks,
         task_order: project.task_order,
-        deleted_tasks: project.deleted_tasks
+        deleted_tasks: project.deleted_tasks,
+        is_expedition2_hidden: project.task_states?.meta?.is_expedition2_hidden
       }
     };
     const updatedProject = {
@@ -1168,6 +1176,16 @@ const App: React.FC = () => {
     const finalTaskOrder = taskOrderTemplate ? JSON.parse(JSON.stringify(taskOrderTemplate)) : {};
     const finalDeletedTasks: string[] = [];
 
+    // Reset all task dates to 00-00-00 for new projects
+    for (let stepId = 1; stepId <= 5; stepId++) {
+      if (finalCustomTasks[stepId]) {
+        finalCustomTasks[stepId] = finalCustomTasks[stepId].map((task: Task) => ({
+          ...task,
+          completed_date: '00-00-00'
+        }));
+      }
+    }
+
     const newProject: Project = {
       id: crypto.randomUUID(),
       created_at: new Date().toISOString(),
@@ -1309,13 +1327,43 @@ const App: React.FC = () => {
         }
         
         showToast("템플릿이 저장되었습니다.");
-        fetchTemplates(); // Refresh
+        fetchProjects(); // Refresh templates
         
     } catch (e: any) {
         console.error("Template Save Exception:", e);
         showToast(`템플릿 저장 실패: ${e.message}`);
     }
   };
+
+  const handleUpdateProject = async (projectId: string, updates: Partial<Project>) => {
+    if (!isSupabaseReady || !supabase) {
+      showToast("데이터베이스 연결 오류");
+      return;
+    }
+
+    try {
+      // Update local state
+      const updatedProjects = projects.map(p => 
+        p.id === projectId ? { ...p, ...updates, last_updated: new Date().toISOString() } : p
+      );
+      setProjects(updatedProjects);
+      localStorage.setItem('grafy_projects', JSON.stringify(updatedProjects));
+
+      // Update in Supabase
+      const { error } = await supabase
+        .from('projects')
+        .update({ ...updates, last_updated: new Date().toISOString() })
+        .eq('id', projectId);
+
+      if (error) throw error;
+      
+      showToast("프로젝트가 업데이트되었습니다.");
+    } catch (e: any) {
+      console.error("Project update error:", e);
+      showToast(`업데이트 실패: ${e.message}`);
+    }
+  };
+
 
 
 
@@ -1437,6 +1485,8 @@ const App: React.FC = () => {
             user={user}
             deletedProjects={deletedProjects}
             onRestoreProject={handleRestoreProject}
+            onUpdateProject={handleUpdateProject}
+            templates={templates}
           />
           {showCreateModal && <CreateProjectModal teamMembers={teamMembers} templates={templates} onClose={() => setShowCreateModal(false)} onCreate={handleCreateProject} />}
 
@@ -1584,7 +1634,7 @@ const App: React.FC = () => {
                         onAddTask={() => handleAddCustomTask(step.id)}
                       >
                         {step.id === 2 && (
-                          <div className="flex justify-center gap-4 md:gap-6 py-1">
+                          <div className="flex justify-center gap-2 md:gap-3 py-1">
                             <button
                               onClick={() => roundsNavigation > 2 && handleUpdateRoundsNavigation(roundsNavigation - 1)}
                               className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-white border border-slate-300 shadow-lg transition-all flex items-center justify-center text-black font-bold active:scale-90 ${currentProject?.is_locked || roundsNavigation <= 2 ? 'opacity-50 cursor-not-allowed' : 'hover:border-black'}`}
@@ -1602,7 +1652,7 @@ const App: React.FC = () => {
                           </div>
                         )}
                         {step.id === 3 && (
-                          <div className="flex justify-center gap-4 md:gap-6 py-1">
+                          <div className="flex justify-center gap-2 md:gap-3 py-1">
                             <button
                               onClick={() => rounds > 2 && handleUpdateRounds(rounds - 1)}
                               className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-white border border-slate-300 shadow-lg transition-all flex items-center justify-center text-black font-bold active:scale-90 ${currentProject?.is_locked || rounds <= 2 ? 'opacity-50 cursor-not-allowed' : 'hover:border-black'}`}
@@ -1620,7 +1670,7 @@ const App: React.FC = () => {
                           </div>
                         )}
                         {step.id === 4 && (
-                          <div className="flex justify-center gap-4 md:gap-6 py-1">
+                          <div className="flex justify-center gap-2 md:gap-3 py-1">
                             <button
                               onClick={() => rounds2 > 2 && handleUpdateRounds2(rounds2 - 1)}
                               className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-white border border-slate-300 shadow-lg transition-all flex items-center justify-center text-black font-bold active:scale-90 ${currentProject?.is_locked || rounds2 <= 2 ? 'opacity-50 cursor-not-allowed' : 'hover:border-black'}`}

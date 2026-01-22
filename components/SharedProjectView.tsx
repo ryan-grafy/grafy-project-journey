@@ -238,6 +238,7 @@ const SharedProjectView: React.FC<SharedProjectViewProps> = ({ projectId }) => {
                                         snapshotSelectedTasks={new Set(project.client_visible_tasks || [])}
                                         onSnapshotTaskSelect={() => { }}
                                         onAddTask={() => { }}
+                                        isClientView={true}
                                     />
                                 );
                             })}
