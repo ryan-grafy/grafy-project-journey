@@ -22,11 +22,8 @@ interface TaskCardProps {
   isSelectedForSnapshot?: boolean;
   onSnapshotSelect?: () => void;
   isClientView?: boolean;
-<<<<<<< HEAD
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void;
-=======
   isClientVisible?: boolean;
->>>>>>> origin/main
 }
 
 const roleStyles: Record<Role, { style: string; icon: string }> = {
@@ -53,11 +50,7 @@ const accentColors: Record<number, string> = {
 
 const TaskCard: React.FC<TaskCardProps> = ({
   task, isCompleted, isLockedStep, stepId, linkUrl, linkLabel, onToggle, onContextMenu, onEditContextMenu, onDelete, onToast, isLockedProject, projectId,
-<<<<<<< HEAD
-  isSnapshotMode, isSelectedForSnapshot, onSnapshotSelect, isClientView, onUpdateTask
-=======
-  isSnapshotMode, isSelectedForSnapshot, onSnapshotSelect, isClientView, isClientVisible
->>>>>>> origin/main
+  isSnapshotMode, isSelectedForSnapshot, onSnapshotSelect, isClientView, onUpdateTask, isClientVisible
 }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
