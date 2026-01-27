@@ -7,6 +7,8 @@ import TaskCard from './components/TaskCard.tsx';
 import ProjectList from './components/ProjectList.tsx';
 import CreateProjectModal from './components/CreateProjectModal.tsx';
 import TeamManagementModal from './components/TeamManagementModal.tsx';
+import DeletedDataModal from './components/DeletedDataModal.tsx';
+import TemplateManagerModal from './components/TemplateManagerModal.tsx';
 import WelcomeScreen from './components/WelcomeScreen.tsx';
 import { supabase, isSupabaseReady, signInWithGoogle, signOut } from './supabaseClient.ts';
 import SharedProjectView from './components/SharedProjectView.tsx';
@@ -28,6 +30,8 @@ const App: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [showTemplateSaveModal, setShowTemplateSaveModal] = useState(false);
+  const [showDeletedDataModal, setShowDeletedDataModal] = useState(false);
+  const [showTemplateManagerModal, setShowTemplateManagerModal] = useState(false);
   const [activeRole, setActiveRole] = useState<Role>(Role.ALL);
 
   const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
@@ -373,10 +377,11 @@ const App: React.FC = () => {
                         // Restore complex objects from meta backup
                         custom_tasks: meta.custom_tasks ?? p.custom_tasks,
                         task_order: meta.task_order ?? p.task_order,
-                        deleted_tasks: meta.deleted_tasks ?? p.deleted_tasks
+                        deleted_tasks: meta.deleted_tasks ?? p.deleted_tasks,
+                        template_name: meta.template_name ?? p.template_name // Restore template_name
                     };
                 }
-                return p;
+                return { ...p, template_name: p.task_states?.meta?.template_name ?? p.template_name }; // Ensure template_name is set even if meta check fails above
             });
         }
 
@@ -389,7 +394,13 @@ const App: React.FC = () => {
 
       // 2. Fetch Local
       const local = localStorage.getItem('grafy_projects');
-      if (local) localData = JSON.parse(local);
+      if (local) {
+        const parsed = JSON.parse(local);
+        localData = parsed.map((p: any) => ({
+            ...p,
+            template_name: p.template_name || p.task_states?.meta?.template_name // Ensure local data also has template_name restored
+        }));
+      }
 
       // 3. Merge: Prefer Local if it has more critical info or is newer
       const mergedMap = new Map<string, Project>();
@@ -456,26 +467,54 @@ const App: React.FC = () => {
 
   const syncProjectToSupabase = async (project: Project) => {
     if (isSupabaseReady && supabase) {
-      // Remove columns that might not exist in Supabase schema to prevent errors
-      // All this data is backed up in task_states.meta
-      const { 
-        rounds_count, 
-        rounds2_count,
-        rounds_navigation_count, 
-        client_visible_tasks,
-        custom_tasks,
-        task_order,
-        deleted_tasks,
-        ...safeProject 
-      } = project;
+      // Explicitly define all fields to sync - ensures reliability
+      const updateData = {
+        id: project.id,
+        // Project basic info
+        name: project.name,
+        start_date: project.start_date,
+        end_date: project.end_date,
+        status: project.status,
+        is_locked: project.is_locked,
+        last_updated: project.last_updated,
+        created_at: project.created_at,
+        
+        // Worker info - CRITICAL for real-time sync
+        pm_name: project.pm_name || '',
+        pm_phone: project.pm_phone || '',
+        pm_email: project.pm_email || '',
+        designer_name: project.designer_name || '',
+        designer_phone: project.designer_phone || '',
+        designer_email: project.designer_email || '',
+        designer_2_name: project.designer_2_name || '',
+        designer_2_phone: project.designer_2_phone || '',
+        designer_2_email: project.designer_2_email || '',
+        designer_3_name: project.designer_3_name || '',
+        designer_3_phone: project.designer_3_phone || '',
+        designer_3_email: project.designer_3_email || '',
+        
+        // JSONB fields - Contains metadata, task states, etc.
+        task_states: project.task_states || { completed: [], links: {}, meta: {} }
+      };
 
-      const { error } = await supabase.from('projects').upsert(safeProject);
-      if (error) console.error("Supabase upsert error:", error);
+      const { error } = await supabase.from('projects').upsert(updateData);
+      if (error) {
+        console.error("Supabase upsert error:", error);
+      } else {
+        console.log('[Sync] Project synced to Supabase:', project.id, 'Updated:', project.last_updated);
+      }
     }
   };
 
   const handleDeleteProject = async (projectId: string) => {
-    const targetProject = projects.find(p => p.id === projectId);
+    let targetProject = projects.find(p => p.id === projectId);
+    let isTemplate = false;
+
+    if (!targetProject) {
+        targetProject = templates.find(t => t.id === projectId);
+        isTemplate = true;
+    }
+
     if (!targetProject) return;
 
     // Soft Delete: status -> -99
@@ -495,18 +534,29 @@ const App: React.FC = () => {
     };
     
     // Update States
-    const nextActive = projects.filter(p => p.id !== projectId);
+    if (isTemplate) {
+        const nextTemplates = templates.filter(t => t.id !== projectId);
+        setTemplates(nextTemplates);
+    } else {
+        const nextActive = projects.filter(p => p.id !== projectId);
+        setProjects(nextActive);
+    }
+
     const nextDeleted = [updatedProject, ...deletedProjects];
-    
-    setProjects(nextActive);
     setDeletedProjects(nextDeleted);
 
     // Update Storage (Active + Deleted)
-    localStorage.setItem('grafy_projects', JSON.stringify([...nextActive, ...nextDeleted]));
+    // Note: LocalStorage mainly tracks 'grafy_projects'. Templates are re-fetched from Supabase usually, 
+    // but if we want to sync local state, we should know if templates are stored in 'grafy_projects' or not.
+    // In fetchProjects, we separate them.
+    
+    // For now, update global storage with all non-template projects + deleted ones
+    const activeProjects = isTemplate ? projects : projects.filter(p => p.id !== projectId);
+    localStorage.setItem('grafy_projects', JSON.stringify([...activeProjects, ...nextDeleted]));
 
     // Update Supabase
     await syncProjectToSupabase(updatedProject);
-    showToast("프로젝트가 삭제되었습니다 (복구 가능).");
+    showToast(isTemplate ? "템플릿이 삭제되었습니다." : "프로젝트가 삭제되었습니다 (복구 가능).");
   };
 
   const handleRestoreProject = async (projectId: string) => {
@@ -606,7 +656,24 @@ const App: React.FC = () => {
 
   const updateProjectInfo = (updates: Partial<Project>) => {
     if (!currentProject || currentProject.is_locked) return;
-    const updatedProject = { ...currentProject, ...updates, last_updated: new Date().toISOString() };
+
+    // Sync updates to meta for backup & realtime trigger assurance
+    const updatedMeta = {
+        ...(currentProject.task_states?.meta || {}),
+        ...updates
+    };
+
+    const updatedTaskStates = {
+        ...(currentProject.task_states || { completed: [], links: {}, meta: {} }),
+        meta: updatedMeta
+    };
+
+    const updatedProject = { 
+        ...currentProject, 
+        ...updates, 
+        task_states: updatedTaskStates,
+        last_updated: new Date().toISOString() 
+    };
     setCurrentProject(updatedProject);
     
     // Update projects array
@@ -701,6 +768,15 @@ const App: React.FC = () => {
 
   const isLockedStep = (stepId: number): boolean => {
     if (stepId === 1 || !currentProject) return false;
+    
+    // Special handling for Step 5 (Landing) when Expedition 2 is hidden
+    const isExpedition2Hidden = currentProject?.task_states?.meta?.is_expedition2_hidden;
+    if (stepId === 5 && isExpedition2Hidden) {
+      // If Expedition 2 is hidden, check Step 3 (Expedition 1) instead
+      const step3Tasks = getVisibleTasks(3, currentProject, rounds);
+      return !step3Tasks.every(t => completedTasks.has(t.id));
+    }
+    
     const prevStepId = stepId - 1;
     const prevVisibleTasks = getVisibleTasks(prevStepId, currentProject, rounds);
     return !prevVisibleTasks.every(t => completedTasks.has(t.id));
@@ -817,13 +893,14 @@ const App: React.FC = () => {
     updateProjectProgress(nextCompleted, updatedProject);
   };
 
-  const updateProjectProgress = async (nextCompleted: Set<string>, project: Project) => {
-    syncTasks(project, nextCompleted, taskLinks); // Save to local backup
+  const updateProjectProgress = async (nextCompleted: Set<string>, project: Project, nextLinks?: Map<string, { url: string, label: string }>) => {
+    const currentLinks = nextLinks || taskLinks;
+    syncTasks(project, nextCompleted, currentLinks); // Save to local backup
     const total = calculateTotalTasks(project);
     const percent = total === 0 ? 0 : Math.round((nextCompleted.size / total) * 100);
     const task_states = {
       completed: Array.from(nextCompleted),
-      links: Object.fromEntries(taskLinks),
+      links: Object.fromEntries(currentLinks),
       meta: {
         rounds_count: project.rounds_count,
         rounds2_count: project.rounds2_count,
@@ -833,7 +910,9 @@ const App: React.FC = () => {
         custom_tasks: project.custom_tasks,
         task_order: project.task_order,
         deleted_tasks: project.deleted_tasks,
-        is_expedition2_hidden: project.task_states?.meta?.is_expedition2_hidden
+        is_expedition2_hidden: project.task_states?.meta?.is_expedition2_hidden,
+        step_titles: project.task_states?.meta?.step_titles,
+        template_name: project.template_name || project.task_states?.meta?.template_name
       }
     };
     const updatedProject = {
@@ -845,9 +924,23 @@ const App: React.FC = () => {
     setCurrentProject(updatedProject);
     saveProjectsLocal(projects.map(p => p.id === project.id ? updatedProject : p));
     
-    // Use upsert via syncProjectToSupabase to ensure ALL fields (including rounds, client_visible_tasks) are saved
-    // Previously, specifically listed fields in .update() missed some new properties
-    await syncProjectToSupabase(updatedProject);
+    // Explicitly update Supabase to ensure all fields are saved
+    if (isSupabaseReady && supabase) {
+        try {
+            await supabase.from('projects').update({
+                task_states: updatedProject.task_states,
+                custom_tasks: updatedProject.custom_tasks,
+                task_order: updatedProject.task_order,
+                status: updatedProject.status,
+                last_updated: updatedProject.last_updated,
+                client_visible_tasks: updatedProject.client_visible_tasks
+                // Removing rounds_* and deleted_tasks columns as they might not exist in DB schema,
+                // causing the entire update to fail. They are backed up in task_states.meta.
+            }).eq('id', updatedProject.id);
+        } catch (err) {
+            console.error("Failed to sync project progress to Supabase:", err);
+        }
+    }
   };
 
   const calculateTotalTasks = (project: Project) => {
@@ -1298,7 +1391,8 @@ const App: React.FC = () => {
             custom_tasks: finalCustomTasks,
             task_order: finalTaskOrder,
             deleted_tasks: templateProject?.deleted_tasks ? [...templateProject.deleted_tasks] : finalDeletedTasks,
-            is_expedition2_hidden: templateProject?.task_states?.meta?.is_expedition2_hidden
+            is_expedition2_hidden: templateProject?.task_states?.meta?.is_expedition2_hidden,
+            step_titles: templateProject?.task_states?.meta?.step_titles
         }
       },
       client_visible_tasks: [],
@@ -1330,7 +1424,8 @@ const App: React.FC = () => {
           task_order: newProject.task_order || {},
           task_states: newProject.task_states || { completed: [], links: {}, meta: { 
             rounds_count, rounds2_count, rounds_navigation_count, client_visible_tasks,
-            custom_tasks: newProject.custom_tasks, task_order: newProject.task_order, deleted_tasks: newProject.deleted_tasks
+            custom_tasks: newProject.custom_tasks, task_order: newProject.task_order, deleted_tasks: newProject.deleted_tasks,
+            step_titles: templateProject?.task_states?.meta?.step_titles
           }}, // Ensure meta is populated
           deleted_tasks: newProject.deleted_tasks || []
         };
@@ -1386,7 +1481,8 @@ const App: React.FC = () => {
                     template_name: template_name,
                     custom_tasks: currentProject.custom_tasks,
                     task_order: currentProject.task_order,
-                    deleted_tasks: currentProject.deleted_tasks
+                    deleted_tasks: currentProject.deleted_tasks,
+                    step_titles: currentProject.task_states?.meta?.step_titles
                 }
             }
         };
@@ -1415,12 +1511,23 @@ const App: React.FC = () => {
     }
 
     try {
-      // Update local state
-      const updatedProjects = projects.map(p => 
-        p.id === projectId ? { ...p, ...updates, last_updated: new Date().toISOString() } : p
-      );
-      setProjects(updatedProjects);
-      localStorage.setItem('grafy_projects', JSON.stringify(updatedProjects));
+      // Check if it's a template or project
+      const isTemplate = templates.some(t => t.id === projectId);
+      
+      if (isTemplate) {
+          const updatedTemplates = templates.map(t => 
+             t.id === projectId ? { ...t, ...updates, last_updated: new Date().toISOString() } : t
+          );
+          setTemplates(updatedTemplates);
+          // Templates usually not in local 'grafy_projects' if status is -1, but we update Supabase securely
+      } else {
+          // Update local state for projects
+          const updatedProjects = projects.map(p => 
+            p.id === projectId ? { ...p, ...updates, last_updated: new Date().toISOString() } : p
+          );
+          setProjects(updatedProjects);
+          localStorage.setItem('grafy_projects', JSON.stringify(updatedProjects));
+      }
 
       // Update in Supabase
       const { error } = await supabase
@@ -1430,7 +1537,7 @@ const App: React.FC = () => {
 
       if (error) throw error;
       
-      showToast("프로젝트가 업데이트되었습니다.");
+      showToast(isTemplate ? "템플릿이 업데이트되었습니다." : "프로젝트가 업데이트되었습니다.");
     } catch (e: any) {
       console.error("Project update error:", e);
       showToast(`업데이트 실패: ${e.message}`);
@@ -1461,7 +1568,7 @@ const App: React.FC = () => {
         last_updated: new Date().toISOString() 
     };
     
-    updateProjectProgress(completedTasks, updatedProject);
+    updateProjectProgress(completedTasks, updatedProject, nextLinks);
     // Explicitly sync
     setCurrentProject(updatedProject);
     const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
@@ -1505,6 +1612,35 @@ const App: React.FC = () => {
     }
     setIsSnapshotMode(false);
     showToast("클라이언트 뷰 설정이 저장되었습니다.");
+  };
+
+  const handleUpdateStepTitle = async (stepId: number, newTitle: string) => {
+    if (!currentProject) return;
+
+    // Deep clone the metadata and update step_titles
+    const updatedMeta = { ...currentProject.task_states.meta } || {};
+    updatedMeta.step_titles = { ...updatedMeta.step_titles, [stepId]: newTitle };
+
+    const updatedTaskStates = {
+        ...currentProject.task_states,
+        meta: updatedMeta
+    };
+
+    const updatedProject = {
+        ...currentProject,
+        task_states: updatedTaskStates,
+        last_updated: new Date().toISOString()
+    };
+
+    setCurrentProject(updatedProject);
+    saveProjectsLocal(projects.map(p => p.id === updatedProject.id ? updatedProject : p));
+    
+    if (isSupabaseReady && supabase) {
+        await supabase.from('projects').update({
+            task_states: updatedTaskStates,
+            last_updated: updatedProject.last_updated
+        }).eq('id', updatedProject.id);
+    }
   };
 
   const status = currentProject?.status || 0;
@@ -1560,6 +1696,8 @@ const App: React.FC = () => {
             onRestoreProject={handleRestoreProject}
             onUpdateProject={handleUpdateProject}
             templates={templates}
+            onManageDeletedData={() => setShowDeletedDataModal(true)}
+            onManageTemplates={() => setShowTemplateManagerModal(true)}
           />
           {showCreateModal && <CreateProjectModal teamMembers={teamMembers} templates={templates} onClose={() => setShowCreateModal(false)} onCreate={handleCreateProject} />}
 
@@ -1601,6 +1739,8 @@ const App: React.FC = () => {
             onLogin={handleGoogleLogin}
             isSnapshotMode={isSnapshotMode}
             onSnapshotToggle={handleSnapshotToggle}
+            onManageDeletedData={() => setShowDeletedDataModal(true)}
+            onManageTemplates={() => setShowTemplateManagerModal(true)}
           />
           <main className="w-full px-4 md:px-6 py-10 max-w-[2100px] mx-auto">
             <div className="max-w-[2100px] mx-auto">
@@ -1633,6 +1773,8 @@ const App: React.FC = () => {
                   }).map((step, index) => {
                     const allVisibleTasks = currentProject ? getVisibleTasks(step.id, currentProject, rounds) : [];
                     const locked = isLockedStep(step.id);
+                    const savedTitle = currentProject?.task_states?.meta?.step_titles?.[step.id];
+                    const displayStep = savedTitle ? { ...step, title: savedTitle } : step;
                     
                     let headerLeftButtons = null;
                     const isExpedition2Hidden = currentProject?.task_states?.meta?.is_expedition2_hidden;
@@ -1650,10 +1792,10 @@ const App: React.FC = () => {
                                         setTimeout(() => setConfirmHideExpedition2(false), 3000);
                                     }
                                 }}
-                                className={`w-9 h-9 md:w-10 md:h-10 rounded-full bg-white border ${confirmHideExpedition2 ? 'border-red-500 text-red-500' : 'border-slate-300 text-slate-300'} flex items-center justify-center hover:bg-black hover:text-white hover:border-black transition-all shadow-sm active:scale-90`}
+                                className={`w-7 h-7 md:w-8 md:h-8 rounded-full bg-white border ${confirmHideExpedition2 ? 'border-red-500 text-red-500' : 'border-slate-300 text-slate-300'} flex items-center justify-center hover:bg-black hover:text-white hover:border-black transition-all shadow-sm active:scale-90`}
                                 title={confirmHideExpedition2 ? "한 번 더 누르면 숨겨집니다" : "Expedition 2 숨기기"}
                             >
-                                <i className={`fa-solid ${confirmHideExpedition2 ? 'fa-xmark' : 'fa-minus'} text-[12px] md:text-sm`}></i>
+                                <i className={`fa-solid ${confirmHideExpedition2 ? 'fa-xmark' : 'fa-minus'} text-[10px] md:text-xs`}></i>
                             </button>
                         );
                     }
@@ -1666,10 +1808,10 @@ const App: React.FC = () => {
                                     e.stopPropagation();
                                     handleToggleExpedition2(false);
                                 }}
-                                className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-white border border-slate-300 text-blue-500 flex items-center justify-center hover:bg-black hover:text-white hover:border-black transition-all shadow-sm active:scale-90"
+                                className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-white border border-slate-300 text-blue-500 flex items-center justify-center hover:bg-black hover:text-white hover:border-black transition-all shadow-sm active:scale-90"
                                 title="Expedition 2 복원"
                             >
-                                <i className="fa-solid fa-arrow-right text-[12px] md:text-sm"></i>
+                                <i className="fa-solid fa-arrow-right text-[10px] md:text-xs"></i>
                             </button>
                         );
                     }
@@ -1677,7 +1819,7 @@ const App: React.FC = () => {
                     return (
                       <StepColumn
                         key={step.id}
-                        step={step}
+                        step={displayStep}
                         tasks={allVisibleTasks}
                         isLocked={locked}
                         filter={activeRole}
@@ -1688,6 +1830,7 @@ const App: React.FC = () => {
                         onDeleteTask={handleDeleteTask}
                         displayIndex={index + 1}
                         headerLeftButtons={headerLeftButtons}
+                        onUpdateTitle={(newTitle) => handleUpdateStepTitle(step.id, newTitle)}
                         onContextMenu={(e, id, url, label) => {
                           setPopover({ isOpen: true, taskId: id, currentUrl: url || '', currentLabel: label || '', x: e.pageX, y: e.pageY });
                           setTaskEditPopover(p => ({ ...p, isOpen: false }));
@@ -1706,6 +1849,7 @@ const App: React.FC = () => {
                         onSnapshotTaskSelect={handleSnapshotTaskSelect}
                         onAddTask={() => handleAddCustomTask(step.id)}
                         onUpdateTask={handleUpdateTask}
+                        clientVisibleTasks={new Set(currentProject.client_visible_tasks || [])}
                       >
                         {step.id === 2 && (
                           <div className="flex justify-center gap-2 md:gap-3 py-1">
@@ -1798,6 +1942,28 @@ const App: React.FC = () => {
           </div>
         )
       }
+      
+      {/* Global Modals */}
+      {showDeletedDataModal && (
+        <DeletedDataModal
+          onClose={() => setShowDeletedDataModal(false)}
+          onRestore={(projectId) => {
+            handleRestoreProject(projectId);
+            setShowDeletedDataModal(false);
+          }}
+          deletedProjects={deletedProjects}
+        />
+      )}
+
+      {showTemplateManagerModal && (
+        <TemplateManagerModal
+          templates={templates}
+          onClose={() => setShowTemplateManagerModal(false)}
+          onUpdate={handleUpdateProject}
+          onDelete={handleDeleteProject}
+        />
+      )}
+
     </div >
   );
 };
