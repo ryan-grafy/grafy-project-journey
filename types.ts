@@ -44,6 +44,13 @@ export interface Task {
   toolIcon?: string;
   isDynamic?: boolean;
   completed_date?: string; // Manually entryable date
+  todos?: Todo[]; // Google Tasks-like sub-tasks
+}
+
+export interface Todo {
+  id: string;
+  text: string;
+  isCompleted: boolean;
 }
 
 export interface Step {

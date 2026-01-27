@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Role, Task } from '../types';
 import FileDropzone from './FileDropzone';
 
+import TodoList from './TodoList';
+
 interface TaskCardProps {
   task: Task;
   isCompleted: boolean;
@@ -20,6 +22,7 @@ interface TaskCardProps {
   isSelectedForSnapshot?: boolean;
   onSnapshotSelect?: () => void;
   isClientView?: boolean;
+  onUpdateTask?: (taskId: string, updates: Partial<Task>) => void;
 }
 
 const roleStyles: Record<Role, { style: string; icon: string }> = {
@@ -46,7 +49,7 @@ const accentColors: Record<number, string> = {
 
 const TaskCard: React.FC<TaskCardProps> = ({
   task, isCompleted, isLockedStep, stepId, linkUrl, linkLabel, onToggle, onContextMenu, onEditContextMenu, onDelete, onToast, isLockedProject, projectId,
-  isSnapshotMode, isSelectedForSnapshot, onSnapshotSelect, isClientView
+  isSnapshotMode, isSelectedForSnapshot, onSnapshotSelect, isClientView, onUpdateTask
 }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
@@ -163,6 +166,15 @@ const TaskCard: React.FC<TaskCardProps> = ({
         </div>
         <h4 className="font-bold text-lg mb-1 leading-tight tracking-tight text-black">{task.title}</h4>
         {task.description && <p className="text-[12.5px] leading-snug font-bold text-slate-500 line-clamp-3 break-all whitespace-normal">{task.description}</p>}
+
+        {/* Todo List Component Integration */}
+        {onUpdateTask && !isClientView && (
+           <TodoList 
+             todos={task.todos || []} 
+             onUpdate={(newTodos) => onUpdateTask(task.id, { todos: newTodos })}
+             isClientView={isClientView}
+           />
+        )}
 
         <div className="mt-1.5 inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2 py-1 rounded-full">
           <i className="fa-solid fa-calendar-check text-slate-400 text-[9px]"></i>

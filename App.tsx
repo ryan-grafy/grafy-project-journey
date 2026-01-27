@@ -1013,6 +1013,79 @@ const App: React.FC = () => {
     await syncProjectToSupabase(updatedProject);
   };
 
+  const handleUpdateTask = (taskId: string, updates: Partial<Task>) => {
+    if (!currentProject || currentProject.is_locked) return;
+
+    let targetTask = findTaskInProject(taskId);
+    if (!targetTask) return;
+
+    // 1. Prepare new task object
+    const updatedTask = { ...targetTask, ...updates };
+
+    // 2. Determine Step ID
+    let stepId = 0;
+    
+    // Check custom tasks first to find step affiliation
+    const currentCustoms = currentProject.custom_tasks || {};
+    for (const sId in currentCustoms) {
+      if (currentCustoms[sId].some(t => t.id === taskId)) {
+        stepId = parseInt(sId);
+        break;
+      }
+    }
+
+    // If not found in custom, check static
+    if (stepId === 0) {
+      for (const step of STEPS_STATIC) {
+        if (step.tasks.some(t => t.id === taskId)) {
+          stepId = step.id;
+          break;
+        }
+      }
+    }
+    
+    // Fallback for dynamic tasks (t2-..., t3-..., t4-...)
+    if (stepId === 0) {
+        if (taskId.startsWith('t')) stepId = parseInt(taskId[1]);
+        else if (taskId.startsWith('custom')) stepId = parseInt(taskId.split('-')[1]);
+    }
+
+    if (stepId === 0) {
+        console.error("Cannot determine step for task", taskId);
+        return;
+    }
+
+    // 3. Update Custom Tasks
+    const nextCustomTasks = { ...currentCustoms };
+    const stepTasks = nextCustomTasks[stepId] || [];
+    
+    const existingIndex = stepTasks.findIndex(t => t.id === taskId);
+    
+    if (existingIndex > -1) {
+        // Already custom task -> update
+        stepTasks[existingIndex] = updatedTask;
+        nextCustomTasks[stepId] = stepTasks;
+    } else {
+        // Static task -> promote to custom
+        nextCustomTasks[stepId] = [...stepTasks, updatedTask];
+    }
+
+    // 4. Save
+    const updatedProject = {
+        ...currentProject,
+        custom_tasks: nextCustomTasks,
+        last_updated: new Date().toISOString()
+    };
+    
+    // Optimistic Update
+    setCurrentProject(updatedProject);
+    const nextProjects = projects.map(p => p.id === updatedProject.id ? updatedProject : p);
+    setProjects(nextProjects);
+    localStorage.setItem('grafy_projects', JSON.stringify(nextProjects));
+    
+    syncProjectToSupabase(updatedProject);
+  };
+
   const handleSaveTaskInfo = (taskId: string, roles: Role[], title: string, description: string, completed_date: string) => {
     if (!currentProject || currentProject.is_locked) return;
     const nextCustomTasks = { ...(currentProject.custom_tasks || {}) };
@@ -1632,6 +1705,7 @@ const App: React.FC = () => {
                         snapshotSelectedTasks={snapshotSelectedTasks}
                         onSnapshotTaskSelect={handleSnapshotTaskSelect}
                         onAddTask={() => handleAddCustomTask(step.id)}
+                        onUpdateTask={handleUpdateTask}
                       >
                         {step.id === 2 && (
                           <div className="flex justify-center gap-2 md:gap-3 py-1">

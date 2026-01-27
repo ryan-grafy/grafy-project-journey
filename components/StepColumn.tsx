@@ -25,6 +25,7 @@ interface StepColumnProps {
   displayIndex?: number;
   headerLeftButtons?: React.ReactNode;
   isClientView?: boolean;
+  onUpdateTask?: (taskId: string, updates: Partial<Task>) => void;
 }
 
 const StepColumn: React.FC<StepColumnProps> = ({
@@ -49,7 +50,8 @@ const StepColumn: React.FC<StepColumnProps> = ({
   onSnapshotTaskSelect,
   displayIndex,
   headerLeftButtons,
-  isClientView
+  isClientView,
+  onUpdateTask
 }) => {
   /* Migration Safe Access: task.roles might be undefined during transition if data not migrated yet. 
      We treat missing roles as [Role.PM] or empty based on context, but let's safely access. */
@@ -171,7 +173,8 @@ const StepColumn: React.FC<StepColumnProps> = ({
     isSnapshotMode,
     isSelectedForSnapshot: snapshotSelectedTasks?.has(task.id),
     onSnapshotSelect: () => onSnapshotTaskSelect?.(task.id),
-    isClientView
+    isClientView,
+    onUpdateTask
   });
 
   const renderTasks = () => {
