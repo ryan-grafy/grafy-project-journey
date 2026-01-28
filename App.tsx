@@ -902,132 +902,16 @@ const App: React.FC = () => {
     const hiddenSet = new Set(project.task_states?.meta?.hidden_template_tasks || []);
     let allVisibleTasks: Task[] = [];
 
-    if (stepId === 2) {
-      const roundCount = project.rounds_navigation_count || 1;
-      const roundTasks = Array.from({ length: roundCount }).flatMap(
-        (_, rIdx) => {
-          const propId = `t2-round-${rIdx + 1}-prop`;
-          const feedId = `t2-round-${rIdx + 1}-feed`;
-          const rTs = [];
-          if (!deletedSet.has(propId) && !hiddenSet.has(propId)) {
-            rTs.push(
-              stepCustomTasks.find((ct) => ct.id === propId) || {
-                id: propId,
-                roles: [Role.PM, Role.DESIGNER],
-                title: `${rIdx + 1}차 제안_버벌 아이덴티티 / 브랜드네임, 슬로건 등 도출_Ver${rIdx + 1}.0`,
-                description:
-                  "시장 조사, 기획, 디자인 원칙, 전체적인 비주얼아이덴티티 도출을 위한 맥락 등의 디자인 소스를 제작",
-                completed_date: "00-00-00",
-              },
-            );
-          }
-          if (!deletedSet.has(feedId) && !hiddenSet.has(feedId)) {
-            rTs.push(
-              stepCustomTasks.find((ct) => ct.id === feedId) || {
-                id: feedId,
-                roles: [Role.CLIENT, Role.PM],
-                title: `${rIdx + 1}차 제안에 대한 피드백`,
-                description:
-                  "( 초기 스냅샷 금지 ) 1차 피드백을 확인할 수 있습니다",
-                completed_date: "00-00-00",
-              },
-            );
-          }
-          return rTs;
-        },
-      );
-      const onlyCustoms = stepCustomTasks.filter(
-        (ct) => !ct.id.includes("-round-"),
-      );
-      allVisibleTasks = [...roundTasks, ...onlyCustoms];
-    } else if (stepId === 3) {
-      const baseTask = STEPS_STATIC[2].tasks[0];
-      const finalTask = STEPS_STATIC[2].tasks[1];
-      const roundTasks = Array.from({ length: roundCount }).flatMap(
-        (_, rIdx) => {
-          const pmId = `t3-round-${rIdx + 1}-pm`;
-          const desId = `t3-round-${rIdx + 1}-des`;
-          const rTs = [];
-          if (!deletedSet.has(pmId) && !hiddenSet.has(pmId))
-            rTs.push(
-              stepCustomTasks.find((ct) => ct.id === pmId) || {
-                id: pmId,
-                roles: [Role.PM],
-                title: `${rIdx + 1}차 피드백 수급`,
-                completed_date: "00-00-00",
-              },
-            );
-          if (!deletedSet.has(desId) && !hiddenSet.has(desId))
-            rTs.push(
-              stepCustomTasks.find((ct) => ct.id === desId) || {
-                id: desId,
-                roles: [Role.DESIGNER],
-                title: `${rIdx + 1}차 수정 및 업데이트`,
-                completed_date: "00-00-00",
-              },
-            );
-          return rTs;
-        },
-      );
+    const staticStep = STEPS_STATIC.find((s) => s.id === stepId);
+    const stepStaticTasks = (staticStep?.tasks || [])
+      .filter((st) => !deletedSet.has(st.id) && !hiddenSet.has(st.id))
+      .map((st) => stepCustomTasks.find((ct) => ct.id === st.id) || st);
 
-      const onlyCustoms = stepCustomTasks.filter(
-        (ct) =>
-          !["t3-base-1", "t3-final"].includes(ct.id) &&
-          !ct.id.includes("-round-"),
-      );
+    const onlyCustoms = stepCustomTasks.filter(
+      (ct) => !staticStep?.tasks?.some((st) => st.id === ct.id)
+    );
 
-      if (!deletedSet.has("t3-base-1") && !hiddenSet.has("t3-base-1"))
-        allVisibleTasks.push(
-          stepCustomTasks.find((t) => t.id === "t3-base-1") || baseTask,
-        );
-      allVisibleTasks = [...allVisibleTasks, ...roundTasks, ...onlyCustoms];
-      if (!deletedSet.has("t3-final") && !hiddenSet.has("t3-final"))
-        allVisibleTasks.push(
-          stepCustomTasks.find((t) => t.id === "t3-final") || finalTask,
-        );
-    } else if (stepId === 4) {
-      const roundCount2 = project.rounds2_count || 2;
-      const roundTasks = Array.from({ length: roundCount2 }).flatMap(
-        (_, rIdx) => {
-          const pmId = `t4-round-${rIdx + 1}-pm`;
-          const desId = `t4-round-${rIdx + 1}-des`;
-          const rTs = [];
-          if (!deletedSet.has(pmId) && !hiddenSet.has(pmId))
-            rTs.push(
-              stepCustomTasks.find((ct) => ct.id === pmId) || {
-                id: pmId,
-                roles: [Role.PM],
-                title: `${rIdx + 1}차 피드백 수급`,
-                completed_date: "00-00-00",
-              },
-            );
-          if (!deletedSet.has(desId) && !hiddenSet.has(desId))
-            rTs.push(
-              stepCustomTasks.find((ct) => ct.id === desId) || {
-                id: desId,
-                roles: [Role.DESIGNER],
-                title: `${rIdx + 1}차 수정 및 업데이트`,
-                completed_date: "00-00-00",
-              },
-            );
-          return rTs;
-        },
-      );
-      const onlyCustoms = stepCustomTasks.filter(
-        (ct) => !ct.id.includes("-round-"),
-      );
-      allVisibleTasks = [...roundTasks, ...onlyCustoms];
-    } else {
-      const stepStaticTasks =
-        STEPS_STATIC.find((s) => s.id === stepId)?.tasks || [];
-      allVisibleTasks = stepStaticTasks
-        .filter((st) => !deletedSet.has(st.id) && !hiddenSet.has(st.id))
-        .map((st) => stepCustomTasks.find((ct) => ct.id === st.id) || st);
-      const onlyCustoms = stepCustomTasks.filter(
-        (ct) => !stepStaticTasks.some((st) => st.id === ct.id),
-      );
-      allVisibleTasks = [...allVisibleTasks, ...onlyCustoms];
-    }
+    allVisibleTasks = [...stepStaticTasks, ...onlyCustoms];
 
     const order = project.task_order?.[stepId];
     if (order && order.length > 0) {
@@ -1068,9 +952,18 @@ const App: React.FC = () => {
     const isNowChecking = !completedTasks.has(taskId);
 
     let taskStepId = 0;
-    if (taskId.startsWith("t")) taskStepId = parseInt(taskId[1]);
-    else if (taskId.startsWith("custom"))
-      taskStepId = parseInt(taskId.split("-")[1]);
+    const staticStep = STEPS_STATIC.find(s => s.tasks.some(t => t.id === taskId));
+    if (staticStep) taskStepId = staticStep.id;
+    else if (taskId.startsWith("id-")) {
+      // Find which step this custom task belongs to
+      const ct = currentProject.custom_tasks as Record<string, Task[]> || {};
+      for (const [sid, tasks] of Object.entries(ct)) {
+        if (tasks.some(t => t.id === taskId)) {
+          taskStepId = parseInt(sid);
+          break;
+        }
+      }
+    }
 
     if (isNowChecking) {
       const nextCompleted = new Set<string>(completedTasks);
@@ -1117,7 +1010,7 @@ const App: React.FC = () => {
           (id) => id !== taskId,
         );
     }
-    if (taskId.startsWith("t")) {
+    if (taskId.startsWith("id-t")) { // Template tasks in our new format start with id-tX...
       if (!nextDeletedTasks.includes(taskId)) nextDeletedTasks.push(taskId);
       found = true;
     }
@@ -1261,38 +1154,11 @@ const App: React.FC = () => {
 
   const calculateTotalTasks = (project: Project) => {
     let count = 0;
-    const deletedSet = new Set(project.deleted_tasks || []);
-    STEPS_STATIC.forEach((step) => {
-      if (step.id === 2) {
-        const roundCount = project.rounds_navigation_count || 1;
-        for (let r = 1; r <= roundCount; r++) {
-          if (!deletedSet.has(`t2-round-${r}-prop`)) count += 1;
-          if (!deletedSet.has(`t2-round-${r}-feed`)) count += 1;
-        }
-      } else if (step.id === 3) {
-        if (!deletedSet.has("t3-base-1")) count += 1;
-        if (!deletedSet.has("t3-final")) count += 1;
-        const roundCount = project.rounds_count || 2;
-        for (let r = 1; r <= roundCount; r++) {
-          if (!deletedSet.has(`t3-round-${r}-pm`)) count += 1;
-          if (!deletedSet.has(`t3-round-${r}-des`)) count += 1;
-        }
-      } else if (step.id === 4) {
-        const roundCount2 = project.rounds2_count || 2;
-        for (let r = 1; r <= roundCount2; r++) {
-          if (!deletedSet.has(`t4-round-${r}-pm`)) count += 1;
-          if (!deletedSet.has(`t4-round-${r}-des`)) count += 1;
-        }
-      } else {
-        step.tasks.forEach((t) => {
-          if (!deletedSet.has(t.id)) count += 1;
-        });
-      }
-      if (project.custom_tasks?.[step.id]) {
-        count += project.custom_tasks[step.id].filter(
-          (t) => !t.id.startsWith("t"),
-        ).length;
-      }
+    
+    // Total count is simply the sum of visible tasks in each step
+    [1, 2, 3, 4, 5].forEach(stepId => {
+      const tasks = getVisibleTasks(stepId, project, project.rounds_count || 1);
+      count += tasks.length;
     });
     return count;
   };
@@ -1371,27 +1237,22 @@ const App: React.FC = () => {
     if (stepId === 3 || stepId === 2) {
       const grouped: (Task | Task[])[] = [];
       let i = 0;
+      const taskGroups = project.task_states?.meta?.task_groups || {};
+
       while (i < allVisibleTasks.length) {
         const task = allVisibleTasks[i];
-        // Regex to match t3-round-X-pm OR t2-round-X-prop
-        const isRoundStart = task.id.match(/t[23]-round-\d+-(pm|prop)/);
+        const currentGroup = taskGroups[task.id];
 
-        if (isRoundStart) {
-          const next = allVisibleTasks[i + 1];
-          // Check if next is the partner: pm->des OR prop->feed
-          const partnerSuffix = task.id.includes("-pm") ? "-des" : "-feed";
-          const currentSuffix = task.id.includes("-pm") ? "-pm" : "-prop";
-
-          if (
-            next &&
-            next.id === task.id.replace(currentSuffix, partnerSuffix)
-          ) {
-            grouped.push([task, next]);
-            i += 2;
-          } else {
-            grouped.push(task);
-            i++;
+        if (currentGroup) {
+          // Find all tasks in the same group
+          const sameGroupTasks = [task];
+          let j = i + 1;
+          while (j < allVisibleTasks.length && taskGroups[allVisibleTasks[j].id] === currentGroup) {
+            sameGroupTasks.push(allVisibleTasks[j]);
+            j++;
           }
+          grouped.push(sameGroupTasks.length > 1 ? sameGroupTasks : task);
+          i = j;
         } else {
           grouped.push(task);
           i++;
