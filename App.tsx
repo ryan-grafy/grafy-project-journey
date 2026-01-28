@@ -2107,7 +2107,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleExportToExcel = () => {
+  const handleExportToExcel = async () => {
     if (!currentProject) {
       showToast("내보낼 프로젝트를 선택해주세요.");
       return;
@@ -2159,6 +2159,7 @@ const App: React.FC = () => {
         // Get all tasks across all steps
         const tasksData: any[] = [];
         let lastGroupName = "";
+        const exportTaskGroups: Record<string, string> = {}; // Track groups for export
 
         STEPS_STATIC.forEach((step, stepIdx) => {
           // Skip Step 4 (Expedition 2) if hidden
@@ -2183,10 +2184,11 @@ const App: React.FC = () => {
 
             // Determine group name based on task ID pattern
             let groupName = "";
-            const roundMatch = task.id.match(/t([234])-round-(\d+)-(pm|prop)/);
+            const roundMatch = task.id.match(/t([234])-round-(\d+)-(pm|prop|des|feed)/);
             if (roundMatch) {
               const roundNum = roundMatch[2];
               groupName = `${roundNum}차 제안_Ver${roundNum}.0`;
+              exportTaskGroups[task.id] = groupName;
             }
 
             // Format todos as checklist with checkmarks
@@ -2240,6 +2242,27 @@ const App: React.FC = () => {
             });
           });
         });
+
+        // Save group metadata to project
+        const updatedMeta = {
+          ...(currentProject.task_states?.meta || {}),
+          task_groups: exportTaskGroups,
+        };
+        const updatedTaskStates = {
+          ...currentProject.task_states,
+          meta: updatedMeta,
+        };
+        const updatedProject = {
+          ...currentProject,
+          task_states: updatedTaskStates,
+        };
+        setCurrentProject(updatedProject);
+        saveProjectsLocal(
+          projects.map((p) => (p.id === currentProject.id ? updatedProject : p)),
+        );
+        if (isSupabaseReady && supabase) {
+          syncProjectToSupabase(updatedProject);
+        }
 
         // Create workbook
         const wb = XLSX.utils.book_new();
