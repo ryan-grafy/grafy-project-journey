@@ -899,6 +899,7 @@ const App: React.FC = () => {
   ) => {
     const stepCustomTasks = project.custom_tasks?.[stepId] || [];
     const deletedSet = new Set(project.deleted_tasks || []);
+    const hiddenSet = new Set(project.task_states?.meta?.hidden_template_tasks || []);
     let allVisibleTasks: Task[] = [];
 
     if (stepId === 2) {
@@ -908,7 +909,7 @@ const App: React.FC = () => {
           const propId = `t2-round-${rIdx + 1}-prop`;
           const feedId = `t2-round-${rIdx + 1}-feed`;
           const rTs = [];
-          if (!deletedSet.has(propId)) {
+          if (!deletedSet.has(propId) && !hiddenSet.has(propId)) {
             rTs.push(
               stepCustomTasks.find((ct) => ct.id === propId) || {
                 id: propId,
@@ -920,7 +921,7 @@ const App: React.FC = () => {
               },
             );
           }
-          if (!deletedSet.has(feedId)) {
+          if (!deletedSet.has(feedId) && !hiddenSet.has(feedId)) {
             rTs.push(
               stepCustomTasks.find((ct) => ct.id === feedId) || {
                 id: feedId,
@@ -947,20 +948,20 @@ const App: React.FC = () => {
           const pmId = `t3-round-${rIdx + 1}-pm`;
           const desId = `t3-round-${rIdx + 1}-des`;
           const rTs = [];
-          if (!deletedSet.has(pmId))
+          if (!deletedSet.has(pmId) && !hiddenSet.has(pmId))
             rTs.push(
               stepCustomTasks.find((ct) => ct.id === pmId) || {
                 id: pmId,
-                role: Role.PM,
+                roles: [Role.PM],
                 title: `${rIdx + 1}차 피드백 수급`,
                 completed_date: "00-00-00",
               },
             );
-          if (!deletedSet.has(desId))
+          if (!deletedSet.has(desId) && !hiddenSet.has(desId))
             rTs.push(
               stepCustomTasks.find((ct) => ct.id === desId) || {
                 id: desId,
-                role: Role.DESIGNER,
+                roles: [Role.DESIGNER],
                 title: `${rIdx + 1}차 수정 및 업데이트`,
                 completed_date: "00-00-00",
               },
@@ -975,12 +976,12 @@ const App: React.FC = () => {
           !ct.id.includes("-round-"),
       );
 
-      if (!deletedSet.has("t3-base-1"))
+      if (!deletedSet.has("t3-base-1") && !hiddenSet.has("t3-base-1"))
         allVisibleTasks.push(
           stepCustomTasks.find((t) => t.id === "t3-base-1") || baseTask,
         );
       allVisibleTasks = [...allVisibleTasks, ...roundTasks, ...onlyCustoms];
-      if (!deletedSet.has("t3-final"))
+      if (!deletedSet.has("t3-final") && !hiddenSet.has("t3-final"))
         allVisibleTasks.push(
           stepCustomTasks.find((t) => t.id === "t3-final") || finalTask,
         );
@@ -991,7 +992,7 @@ const App: React.FC = () => {
           const pmId = `t4-round-${rIdx + 1}-pm`;
           const desId = `t4-round-${rIdx + 1}-des`;
           const rTs = [];
-          if (!deletedSet.has(pmId))
+          if (!deletedSet.has(pmId) && !hiddenSet.has(pmId))
             rTs.push(
               stepCustomTasks.find((ct) => ct.id === pmId) || {
                 id: pmId,
@@ -1000,7 +1001,7 @@ const App: React.FC = () => {
                 completed_date: "00-00-00",
               },
             );
-          if (!deletedSet.has(desId))
+          if (!deletedSet.has(desId) && !hiddenSet.has(desId))
             rTs.push(
               stepCustomTasks.find((ct) => ct.id === desId) || {
                 id: desId,
@@ -1020,7 +1021,7 @@ const App: React.FC = () => {
       const stepStaticTasks =
         STEPS_STATIC.find((s) => s.id === stepId)?.tasks || [];
       allVisibleTasks = stepStaticTasks
-        .filter((st) => !deletedSet.has(st.id))
+        .filter((st) => !deletedSet.has(st.id) && !hiddenSet.has(st.id))
         .map((st) => stepCustomTasks.find((ct) => ct.id === st.id) || st);
       const onlyCustoms = stepCustomTasks.filter(
         (ct) => !stepStaticTasks.some((st) => st.id === ct.id),
@@ -2401,6 +2402,8 @@ const App: React.FC = () => {
         const nextTaskOrder: Record<number, string[]> = {};
         const nextTaskGroups: Record<string, string> = {}; // taskId -> groupName
         const nextClientVisibleTasks: string[] = [...(updatedProjectInfo.client_visible_tasks || [])];
+        const nextHiddenTemplateTasks: string[] = [];
+        const usedTemplateIdsInThisImport = new Set<string>();
 
         let currentStepId: number | null = null;
         let currentStepTitle: string | null = null;
@@ -2556,6 +2559,10 @@ const App: React.FC = () => {
           if (currentGroupName) {
             nextTaskGroups[taskId] = currentGroupName;
           }
+          
+          if (!taskId.startsWith('custom-')) {
+            usedTemplateIdsInThisImport.add(taskId);
+          }
 
           // Track client visibility
           if (clientVisible) {
@@ -2570,12 +2577,22 @@ const App: React.FC = () => {
           }
         });
 
+        // Any template tasks NOT used in this import should be hidden to prevent duplicates/ghosts
+        STEPS_STATIC.forEach(step => {
+          step.tasks.forEach(t => {
+            if (!usedTemplateIdsInThisImport.has(t.id)) {
+              nextHiddenTemplateTasks.push(t.id);
+            }
+          });
+        });
+
         // Prepare final updated metadata and task states
         const finalMeta = {
           ...(updatedProjectInfo.task_states?.meta || {}),
           step_titles: nextStepTitles,
           custom_tasks: nextCustomTasks,
           task_groups: nextTaskGroups,
+          hidden_template_tasks: nextHiddenTemplateTasks,
         };
 
         // Merge task_order with Excel order
