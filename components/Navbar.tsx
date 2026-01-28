@@ -19,6 +19,8 @@ interface NavbarProps {
   onSaveTemplate?: () => void;
   onManageDeletedData?: () => void;
   onManageTemplates?: () => void;
+  onExportToExcel?: () => void;
+  onImportFromExcel?: () => void;
 }
 
 const getTemplateBadgeColor = (name: string) => {
@@ -43,7 +45,7 @@ const getTemplateBadgeColor = (name: string) => {
 
 const Navbar: React.FC<NavbarProps> = ({
   project, user = { id: 'guest', userId: 'guest', name: 'Guest', avatarUrl: '' } as User, teamMembers, activeRole, onRoleChange, onBack, onUpdateInfo, onLogout, onLogin, onToast, onToggleLock,
-  isSnapshotMode, onSnapshotToggle, onSaveTemplate, onManageDeletedData, onManageTemplates
+  isSnapshotMode, onSnapshotToggle, onSaveTemplate, onManageDeletedData, onManageTemplates, onExportToExcel, onImportFromExcel
 }) => {
   const [localProjectName, setLocalProjectName] = useState(project.name);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -347,6 +349,24 @@ const Navbar: React.FC<NavbarProps> = ({
                                   </button>
                                )}
                              </>
+                          )}
+                          {onExportToExcel && (
+                             <button
+                               onClick={() => { setProfileMenuOpen(false); onExportToExcel(); }}
+                               className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors flex items-center gap-3 text-slate-700"
+                             >
+                               <i className="fa-solid fa-file-excel text-sm text-green-600"></i>
+                               <span className="text-[13px] font-bold">엑셀 다운로드</span>
+                             </button>
+                          )}
+                          {ADMIN_EMAILS.includes(user.email || '') && onImportFromExcel && (
+                             <button
+                               onClick={() => { setProfileMenuOpen(false); onImportFromExcel(); }}
+                               className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors flex items-center gap-3 text-slate-700"
+                             >
+                               <i className="fa-solid fa-file-import text-sm text-blue-600"></i>
+                               <span className="text-[13px] font-bold">엑셀 임포트</span>
+                             </button>
                           )}
                           <button
                             onClick={onLogout}

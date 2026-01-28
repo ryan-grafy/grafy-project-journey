@@ -1617,8 +1617,8 @@ const App: React.FC = () => {
   const handleUpdateStepTitle = async (stepId: number, newTitle: string) => {
     if (!currentProject) return;
 
-    // Deep clone the metadata and update step_titles
-    const updatedMeta = { ...currentProject.task_states.meta } || {};
+    // Deep clone metadata and update step_titles
+    const updatedMeta = currentProject.task_states?.meta ? { ...currentProject.task_states.meta } : {};
     updatedMeta.step_titles = { ...updatedMeta.step_titles, [stepId]: newTitle };
 
     const updatedTaskStates = {
@@ -1634,13 +1634,349 @@ const App: React.FC = () => {
 
     setCurrentProject(updatedProject);
     saveProjectsLocal(projects.map(p => p.id === updatedProject.id ? updatedProject : p));
-    
+
     if (isSupabaseReady && supabase) {
         await supabase.from('projects').update({
             task_states: updatedTaskStates,
             last_updated: updatedProject.last_updated
         }).eq('id', updatedProject.id);
     }
+  };
+
+  const handleExportToExcel = () => {
+    if (!currentProject) {
+      showToast("내보낼 프로젝트를 선택해주세요.");
+      return;
+    }
+
+    import('xlsx').then((XLSX) => {
+      // Prepare project header information
+      const headerData = [
+        { 필드: '프로젝트명', 값: currentProject.name },
+        { 필드: '시작일', 값: currentProject.start_date || '-' },
+        { 필드: '종료일', 값: currentProject.end_date || '-' },
+        { 필드: '진행률', 값: `${currentProject.status}%` },
+        { 필드: 'PM', 값: currentProject.pm_name || '-' },
+        { 필드: 'PM 전화', 값: currentProject.pm_phone || '-' },
+        { 필드: 'PM 이메일', 값: currentProject.pm_email || '-' },
+        { 필드: '디자이너 A', 값: currentProject.designer_name || '-' },
+        { 필드: '디자이너 A 전화', 값: currentProject.designer_phone || '-' },
+        { 필드: '디자이너 A 이메일', 값: currentProject.designer_email || '-' },
+        { 필드: '디자이너 B', 값: currentProject.designer_2_name || '-' },
+        { 필드: '디자이너 B 전화', 값: currentProject.designer_2_phone || '-' },
+        { 필드: '디자이너 B 이메일', 값: currentProject.designer_2_email || '-' },
+        { 필드: '디자이너 C', 값: currentProject.designer_3_name || '-' },
+        { 필드: '디자이너 C 전화', 값: currentProject.designer_3_phone || '-' },
+        { 필드: '디자이너 C 이메일', 값: currentProject.designer_3_email || '-' },
+        { 필드: '최종 업데이트', 값: currentProject.last_updated ? new Date(currentProject.last_updated).toLocaleString('ko-KR') : '-' },
+      ];
+
+      // Get all tasks across all steps
+      const tasksData: any[] = [];
+
+      STEPS_STATIC.forEach((step) => {
+        // Skip Step 4 (Expedition 2) if hidden
+        if (step.id === 4 && currentProject.task_states?.meta?.is_expedition2_hidden) {
+          return;
+        }
+
+        const stepCustomTasks = currentProject.custom_tasks?.[step.id] || [];
+        const deletedSet = new Set(currentProject.deleted_tasks || []);
+
+        let allTasks: Task[] = [];
+
+        // Generate dynamic tasks based on step type
+        if (step.id === 2) {
+          const roundCount = currentProject.rounds_navigation_count || 1;
+          for (let r = 1; r <= roundCount; r++) {
+            const propTask = stepCustomTasks.find(ct => ct.id === `t2-round-${r}-prop`) || {
+              id: `t2-round-${r}-prop`,
+              title: `${r}차 제안`,
+              roles: [Role.PM, Role.DESIGNER],
+              completed_date: '00-00-00'
+            };
+            const feedTask = stepCustomTasks.find(ct => ct.id === `t2-round-${r}-feed`) || {
+              id: `t2-round-${r}-feed`,
+              title: `${r}차 피드백`,
+              roles: [Role.CLIENT, Role.PM],
+              completed_date: '00-00-00'
+            };
+            allTasks.push(propTask, feedTask);
+          }
+        } else if (step.id === 3) {
+          const roundCount = currentProject.rounds_count || 2;
+          allTasks.push(STEPS_STATIC[2].tasks[0]);
+          for (let r = 1; r <= roundCount; r++) {
+            const pmTask = stepCustomTasks.find(ct => ct.id === `t3-round-${r}-pm`) || {
+              id: `t3-round-${r}-pm`,
+              title: `${r}차 피드백 수급`,
+              roles: [Role.PM],
+              completed_date: '00-00-00'
+            };
+            const desTask = stepCustomTasks.find(ct => ct.id === `t3-round-${r}-des`) || {
+              id: `t3-round-${r}-des`,
+              title: `${r}차 수정`,
+              roles: [Role.DESIGNER],
+              completed_date: '00-00-00'
+            };
+            allTasks.push(pmTask, desTask);
+          }
+          allTasks.push(STEPS_STATIC[2].tasks[1]);
+        } else if (step.id === 4) {
+          const roundCount = currentProject.rounds2_count || 2;
+          for (let r = 1; r <= roundCount; r++) {
+            const pmTask = stepCustomTasks.find(ct => ct.id === `t4-round-${r}-pm`) || {
+              id: `t4-round-${r}-pm`,
+              title: `${r}차 피드백 수급`,
+              roles: [Role.PM],
+              completed_date: '00-00-00'
+            };
+            const desTask = stepCustomTasks.find(ct => ct.id === `t4-round-${r}-des`) || {
+              id: `t4-round-${r}-des`,
+              title: `${r}차 수정`,
+              roles: [Role.DESIGNER],
+              completed_date: '00-00-00'
+            };
+            allTasks.push(pmTask, desTask);
+          }
+        } else {
+          allTasks = STEPS_STATIC.find(s => s.id === step.id)?.tasks || [];
+        }
+
+        // Merge custom tasks
+        allTasks = allTasks.map(t => stepCustomTasks.find(ct => ct.id === t.id) || t);
+
+        // Add pure custom tasks
+        const pureCustoms = stepCustomTasks.filter(ct => !allTasks.some(gt => gt.id === ct.id));
+        allTasks = [...allTasks, ...pureCustoms];
+
+        // Filter out deleted tasks and apply order
+        const visibleTasks = allTasks.filter(t => !deletedSet.has(t.id));
+
+        const order = currentProject.task_order?.[step.id];
+        if (order && order.length > 0) {
+          visibleTasks.sort((a, b) => {
+            const idxA = order.indexOf(a.id);
+            const idxB = order.indexOf(b.id);
+            const valA = idxA === -1 ? 999 : idxA;
+            const valB = idxB === -1 ? 999 : idxB;
+            return valA - valB;
+          });
+        }
+
+        // Get step title from metadata or use default
+        const stepTitle = currentProject.task_states?.meta?.step_titles?.[step.id] || step.title;
+
+        visibleTasks.forEach((task) => {
+          const taskLink = currentProject.task_states?.links?.[task.id];
+          const isCompleted = completedTasks.has(task.id);
+
+          tasksData.push({
+            스텝: stepTitle,
+            태스크_ID: task.id,
+            태스크명: task.title,
+            설명: task.description || '',
+            담당자: task.roles?.map(r => {
+              switch(r) {
+                case Role.PM: return 'PM';
+                case Role.DESIGNER: return '디자이너';
+                case Role.CLIENT: return '클라이언트';
+                case Role.MANAGER: return '매니저';
+                case Role.DEVELOPER: return '개발자';
+                default: return '전체';
+              }
+            }).join(', ') || '-',
+            완료일: task.completed_date || '00-00-00',
+            완료여부: isCompleted ? '완료' : '미완료',
+            링크: taskLink?.url || '',
+            링크라벨: taskLink?.label || ''
+          });
+        });
+      });
+
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+
+      // Add project info sheet
+      const wsHeader = XLSX.utils.json_to_sheet(headerData);
+      XLSX.utils.book_append_sheet(wb, wsHeader, '프로젝트 정보');
+
+      // Add tasks sheet
+      const wsTasks = XLSX.utils.json_to_sheet(tasksData);
+      XLSX.utils.book_append_sheet(wb, wsTasks, '태스크 목록');
+
+      // Generate filename
+      const filename = `${currentProject.name}_프로젝트_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+      // Download
+      XLSX.writeFile(wb, filename);
+      showToast("엑셀 파일이 다운로드되었습니다.");
+    }).catch((error) => {
+      console.error('Error loading xlsx:', error);
+      showToast("엑셀 다운로드 중 오류가 발생했습니다.");
+    });
+  };
+
+  const handleImportFromExcel = () => {
+    if (!currentProject) {
+      showToast("임포트할 프로젝트를 선택해주세요.");
+      return;
+    }
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xlsx,.xls';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      try {
+        const XLSX = await import('xlsx');
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data, { type: 'array' });
+
+        // Get tasks sheet
+        const tasksSheetName = workbook.SheetNames.find(name => name.includes('태스크'));
+        if (!tasksSheetName) {
+          showToast("엑셀 파일에 '태스크 목록' 시트가 없습니다.");
+          return;
+        }
+
+        const tasksSheet = workbook.Sheets[tasksSheetName];
+        const tasksData = XLSX.utils.sheet_to_json<any>(tasksSheet);
+
+        if (tasksData.length === 0) {
+          showToast("태스크 데이터가 없습니다.");
+          return;
+        }
+
+        // Parse Excel data and update project
+        const newCompletedTasks = new Set(completedTasks);
+        const newTaskLinks = new Map(taskLinks);
+        const nextCustomTasks = { ...currentProject.custom_tasks };
+
+        tasksData.forEach((row) => {
+          const taskId = row['태스크_ID'];
+          if (!taskId) return;
+
+          // Update completion status
+          const isCompleted = row['완료여부'] === '완료';
+          if (isCompleted) {
+            newCompletedTasks.add(taskId);
+          } else {
+            newCompletedTasks.delete(taskId);
+          }
+
+          // Update completion date
+          const completedDate = row['완료일'] || '00-00-00';
+
+          // Update links
+          const linkUrl = row['링크'] || '';
+          const linkLabel = row['링크라벨'] || '';
+          if (linkUrl) {
+            newTaskLinks.set(taskId, { url: linkUrl, label: linkLabel });
+          } else {
+            newTaskLinks.delete(taskId);
+          }
+
+          // Update task info (title, description)
+          const title = row['태스크명'];
+          const description = row['설명'] || '';
+
+          if (title) {
+            // Find task in custom tasks or static tasks
+            let foundInCustom = false;
+
+            for (const stepId in nextCustomTasks) {
+              const stepTasks = nextCustomTasks[stepId];
+              const idx = stepTasks.findIndex(t => t.id === taskId);
+              if (idx > -1) {
+                nextCustomTasks[stepId][idx] = {
+                  ...stepTasks[idx],
+                  title,
+                  description,
+                  completed_date: completedDate
+                };
+                foundInCustom = true;
+                break;
+              }
+            }
+
+            // If not found in custom, add to custom tasks
+            if (!foundInCustom) {
+              let stepId = 0;
+              if (taskId.startsWith('t')) {
+                stepId = parseInt(taskId[1]);
+              } else if (taskId.startsWith('custom')) {
+                stepId = parseInt(taskId.split('-')[1]);
+              }
+
+              if (stepId > 0) {
+                if (!nextCustomTasks[stepId]) {
+                  nextCustomTasks[stepId] = [];
+                }
+                nextCustomTasks[stepId].push({
+                  id: taskId,
+                  title,
+                  description,
+                  roles: [Role.PM],
+                  completed_date: completedDate
+                });
+              }
+            }
+          }
+        });
+
+        // Update project
+        setCompletedTasks(newCompletedTasks);
+        setTaskLinks(newTaskLinks);
+
+        // Calculate new progress
+        const total = calculateTotalTasks(currentProject);
+        const percent = total === 0 ? 0 : Math.round((newCompletedTasks.size / total) * 100);
+
+        const updatedProject = {
+          ...currentProject,
+          custom_tasks: nextCustomTasks,
+          task_states: {
+            completed: Array.from(newCompletedTasks),
+            links: Object.fromEntries(newTaskLinks),
+            meta: {
+              ...currentProject.task_states?.meta,
+              custom_tasks: nextCustomTasks
+            }
+          },
+          status: Math.min(100, percent),
+          last_updated: new Date().toISOString()
+        };
+
+        setCurrentProject(updatedProject);
+        const nextProjects = projects.map(p => p.id === currentProject.id ? updatedProject : p);
+        setProjects(nextProjects);
+        localStorage.setItem('grafy_projects', JSON.stringify(nextProjects));
+
+        // Sync to Supabase
+        if (isSupabaseReady && supabase) {
+          try {
+            await supabase.from('projects').update({
+              task_states: updatedProject.task_states,
+              custom_tasks: updatedProject.custom_tasks,
+              status: updatedProject.status,
+              last_updated: updatedProject.last_updated
+            }).eq('id', updatedProject.id);
+          } catch (err) {
+            console.error("Supabase sync error:", err);
+          }
+        }
+
+        showToast("엑셀 파일이 성공적으로 임포트되었습니다.");
+      } catch (error) {
+        console.error('Error importing excel:', error);
+        showToast("엑셀 임포트 중 오류가 발생했습니다.");
+      }
+    };
+
+    input.click();
   };
 
   const status = currentProject?.status || 0;
@@ -1727,9 +2063,9 @@ const App: React.FC = () => {
             activeRole={activeRole}
             onRoleChange={setActiveRole}
             onSaveTemplate={() => setShowTemplateSaveModal(true)}
-            onBack={() => { 
-              setCurrentProject(null); 
-              setCurrentView('list'); 
+            onBack={() => {
+              setCurrentProject(null);
+              setCurrentView('list');
               window.history.pushState({}, '', '/');
             }}
             onUpdateInfo={updateProjectInfo}
@@ -1741,6 +2077,8 @@ const App: React.FC = () => {
             onSnapshotToggle={handleSnapshotToggle}
             onManageDeletedData={() => setShowDeletedDataModal(true)}
             onManageTemplates={() => setShowTemplateManagerModal(true)}
+            onExportToExcel={handleExportToExcel}
+            onImportFromExcel={handleImportFromExcel}
           />
           <main className="w-full px-4 md:px-6 py-10 max-w-[2100px] mx-auto">
             <div className="max-w-[2100px] mx-auto">

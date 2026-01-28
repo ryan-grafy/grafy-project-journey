@@ -323,7 +323,7 @@ const SharedProjectView: React.FC<SharedProjectViewProps> = ({ projectId }) => {
         <div className="min-h-screen pb-20 bg-[#e3e7ed] selection:bg-black selection:text-white">
             {/* Read-Only Navbar */}
             <nav ref={navRef} className="w-full bg-white border-b border-slate-200 py-4 sticky top-0 z-40 shadow-sm">
-                <div className="max-w-[1900px] mx-auto px-6 flex justify-between items-center">
+                <div className="max-w-[2100px] mx-auto px-6 flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <span className="bg-black text-white text-[10px] px-2 py-0.5 rounded uppercase font-bold tracking-widest">Client View</span>
                         <h1 className="text-2xl font-black text-black uppercase tracking-tight">{project.name}</h1>
@@ -379,8 +379,8 @@ const SharedProjectView: React.FC<SharedProjectViewProps> = ({ projectId }) => {
                 )}
             </nav>
 
-            <main className="w-full px-4 md:px-6 py-10 max-w-[1900px] mx-auto">
-                <div className="max-w-[1900px] mx-auto">
+            <main className="w-full px-4 md:px-6 py-10 max-w-[2100px] mx-auto">
+                <div className="max-w-[2100px] mx-auto">
                     {/* Progress Section */}
                     <div className="bg-white p-6 md:p-8 rounded-[1.5rem] mb-10 flex flex-col md:flex-row items-center gap-10 border border-slate-200 shadow-sm relative overflow-visible">
                         <div className="shrink-0 relative z-10">

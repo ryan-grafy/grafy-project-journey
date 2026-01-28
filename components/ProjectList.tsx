@@ -227,7 +227,7 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
         </div>
         <div className="px-2 py-0.5 flex items-center justify-center border-r border-slate-100 relative z-10 pointer-events-none">
             {(project.template_name || project.task_states?.meta?.template_name) ? (
-                <span className={`px-1.5 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider whitespace-nowrap overflow-hidden text-ellipsis max-w-full ${getTemplateBadgeColor(project.template_name || project.task_states?.meta?.template_name || '')}`}>
+                <span className={`px-1.5 py-0.5 rounded text-[13px] font-bold uppercase tracking-wider whitespace-nowrap overflow-hidden text-ellipsis max-w-full ${getTemplateBadgeColor(project.template_name || project.task_states?.meta?.template_name || '')}`}>
                     {project.template_name || project.task_states?.meta?.template_name}
                 </span>
             ) : (
@@ -242,10 +242,10 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
                <span className="text-[13px] font-bold text-white bg-emerald-500 px-2 py-0.75 rounded-full whitespace-nowrap shadow-sm">프로젝트 종료!</span>
             ) : nextSchedule ? (
                 <div className="flex flex-col items-center justify-center gap-0 leading-none w-full overflow-hidden">
-                    <span className={`font-mono text-[14px] font-bold ${nextSchedule.isOverdue ? 'text-red-500 animate-pulse' : 'text-emerald-500'}`}>
+                    <span className={`font-mono text-[13px] font-bold ${nextSchedule.isOverdue ? 'text-red-500 animate-pulse' : 'text-emerald-500'}`}>
                         {formatDateWithDay(nextSchedule.date)}
                     </span>
-                    <span className={`text-[10px] w-full text-center px-1 mt-0.5 block truncate ${nextSchedule.isOverdue ? 'text-red-500' : 'text-emerald-500'}`} title={nextSchedule.title}>
+                    <span className={`text-[10.5px] w-full text-center px-1 mt-0.5 block truncate ${nextSchedule.isOverdue ? 'text-red-500' : 'text-emerald-500'}`} title={nextSchedule.title}>
                         {nextSchedule.title}
                     </span>
                 </div>

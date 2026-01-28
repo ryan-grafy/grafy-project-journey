@@ -11,9 +11,11 @@
     "save-cloud": "git add . && git commit -m \"Auto-save by Button\" && git push"
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.48.1",
+    "@types/xlsx": "^0.0.35",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "@supabase/supabase-js": "2.48.1"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
