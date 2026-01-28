@@ -73,6 +73,20 @@ const App: React.FC = () => {
     }, 5000);
     return () => clearTimeout(timer);
   }, [isInitializing]);
+
+  // Handle browser back button
+  useEffect(() => {
+    const handlePopState = () => {
+      const hasProjectParam = window.location.search.includes('project=');
+      if (!hasProjectParam && currentView === 'detail') {
+        setCurrentView('list');
+        setCurrentProject(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [currentView]);
   // ------------------
 
   useEffect(() => {
