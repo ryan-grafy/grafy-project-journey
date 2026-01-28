@@ -1327,8 +1327,9 @@ const App: React.FC = () => {
       return;
     }
     const nextCustomTasks = { ...(currentProject.custom_tasks || {}) };
+    const newId = `id-${Math.random().toString(36).substr(2, 4)}`;
     const newTask: Task = {
-      id: `custom-${stepId}-${Date.now()}`,
+      id: newId,
       roles: [Role.PM],
       title: "새로운 태스크",
       description: "",
@@ -2488,7 +2489,7 @@ const App: React.FC = () => {
           const staticStep = STEPS_STATIC.find((s) => s.id === currentStepId);
           const staticTask = staticStep?.tasks?.find((t) => t.id === taskId);
 
-          if (staticTask || (taskId && !taskId.startsWith('custom-'))) {
+          if (staticTask || (taskId && !taskId.startsWith('id-') && !taskId.startsWith('custom-'))) {
             // It's a template task or has a specific template ID
             taskId = taskId || staticTask?.id || ""; 
             const newTask = {
@@ -2509,7 +2510,7 @@ const App: React.FC = () => {
           } else {
             // New task or matched custom task
             if (!taskId) {
-               taskId = `custom-${currentStepId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+               taskId = `id-${Math.random().toString(36).substr(2, 4)}`;
             }
             const newTask: Task = {
               id: taskId,
@@ -2534,7 +2535,7 @@ const App: React.FC = () => {
             nextTaskGroups[taskId] = currentGroupName;
           }
           
-          if (!taskId.startsWith('custom-')) {
+          if (!taskId.startsWith('id-') && !taskId.startsWith('custom-')) {
             usedTemplateIdsInThisImport.add(taskId);
           }
 
