@@ -70,6 +70,7 @@ const App: React.FC = () => {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const isDataLoadedRef = React.useRef(false); // Track if initial data load is complete
+  const [locationKey, setLocationKey] = useState(0); // Track URL changes manually for useEffect sync
 
   const [popover, setPopover] = useState<PopoverState>({
     isOpen: false,
@@ -119,19 +120,15 @@ const App: React.FC = () => {
     return () => clearTimeout(timer);
   }, [isInitializing]);
 
-  // Handle browser back button
+  // Listen for browser history changes (Back/Forward)
   useEffect(() => {
     const handlePopState = () => {
-      const hasProjectParam = window.location.search.includes("project=");
-      if (!hasProjectParam && currentView === "detail") {
-        setCurrentView("list");
-        setCurrentProject(null);
-      }
+      console.log("Browser navigation detected (popstate)");
+      setLocationKey((k) => k + 1);
     };
-
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [currentView]);
+  }, []);
   // ------------------
 
   useEffect(() => {
@@ -270,38 +267,46 @@ const App: React.FC = () => {
     };
   }, [isSupabaseReady]);
 
-  // URL Search Params for Direct Project Navigation & Anti-Flicker Logic
+  // URL Search Params for Direct Project Navigation & History Handling
   useEffect(() => {
-    // 1. Initial Load Check
     const params = new URLSearchParams(window.location.search);
     const projectIdParam = params.get("project");
 
-    if (projectIdParam && currentView !== "detail") {
-      // Prevent list flash by setting detail view immediately if param exists
-      // even before projects are loaded (will show empty detail or loading)
-      // But we need project object. So we wait for projects.
-      // Better strategy: Keep isInitializing true until project is found OR confirmed not found.
-    }
-
+    // Wait until projects are loaded to perform selection
     if (!projects || projects.length === 0) return;
 
     if (projectIdParam) {
       const targetProject = projects.find((p) => p.id === projectIdParam);
       if (targetProject) {
-        if (currentProject?.id !== targetProject.id) {
-          selectProject(targetProject);
-          // Force view to detail again just in case
+        // Only trigger if the project actually changed (avoids infinite loops/redundant sets)
+        if (currentProject?.id !== targetProject.id || currentView !== "detail") {
+          console.log("Syncing state to URL Project:", targetProject.id);
+          // Manually apply state without pushState (since we're already handling a URL change)
+          setCurrentProject(targetProject);
+          setRounds(targetProject.rounds_count || 2);
+          setRounds2(targetProject.rounds2_count || 2);
+          setRoundsNavigation(targetProject.rounds_navigation_count || 2);
+          loadTasks(targetProject);
           setCurrentView("detail");
+          setActiveRole(Role.ALL);
         }
       } else {
-        // Project ID in URL but not found in data.
-        // Could be deleted or invalid. Go to list.
         console.warn("Project in URL not found:", projectIdParam);
-        // Only switch to list if we were stuck in welcome/loading
-        if (currentView !== "list") setCurrentView("list");
+        if (currentView !== "list") {
+          setCurrentView("list");
+          setCurrentProject(null);
+        }
+      }
+    } else {
+      // If no project param, ensure we are in the correct view
+      // This handles the "Back" button from detail to list
+      if (currentView === "detail") {
+        console.log("No project param in URL. Switching to list view.");
+        setCurrentView("list");
+        setCurrentProject(null);
       }
     }
-  }, [projects]); // Depend only on projects to trigger when data arrives
+  }, [projects, locationKey]); // Depend on projects load AND manual locationKey trigger
 
   // Initial View Setup based on URL
   useEffect(() => {

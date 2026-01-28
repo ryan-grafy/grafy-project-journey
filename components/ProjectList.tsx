@@ -214,7 +214,7 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
     <>
       {/* Desktop Row View */}
       <div
-        className={`hidden md:grid grid-cols-[80px_200px_150px_200px_150px_1fr_200px_250px] border-b border-slate-100 hover:bg-slate-50/50 transition-all items-center group relative h-[33px] ${isLast ? 'rounded-b-[1rem] md:rounded-b-[1.25rem] border-b-0' : ''}`}
+        className={`hidden md:grid grid-cols-[60px_170px_120px_200px_120px_1fr_350px_250px] border-b border-slate-100 hover:bg-slate-50/50 transition-all items-center group relative h-[33px] ${isLast ? 'rounded-b-[1rem] md:rounded-b-[1.25rem] border-b-0' : ''}`}
       >
         <a 
           href={`?project=${project.id}`}
@@ -264,7 +264,7 @@ const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, 
             </div>
           )}
         </div>
-        <div className="px-4 py-0.5 flex items-center text-[13px] font-bold text-slate-600 border-r border-slate-100 overflow-hidden relative z-10 pointer-events-none">
+        <div className="px-4 py-0.5 flex items-center text-[15px] font-bold text-slate-600 border-r border-slate-100 overflow-hidden relative z-10 pointer-events-none">
           <span className="truncate">{getTeamString(project)}</span>
         </div>
         <div className="px-6 py-0.5 flex items-center justify-end gap-3 ml-auto w-full relative z-10 pointer-events-none">
@@ -590,13 +590,13 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest
       ) : (
         <div className="bg-white rounded-[1rem] md:rounded-[1.25rem] shadow-xl shadow-black/5 border border-slate-100">
           {/* Desktop Header */}
-          <div className="hidden md:grid grid-cols-[80px_200px_150px_200px_150px_1fr_200px_250px] bg-black text-[13px] md:text-[14px] font-black text-white uppercase tracking-widest text-center rounded-t-[1rem] md:rounded-t-[1.25rem]">
+          <div className="hidden md:grid grid-cols-[60px_170px_120px_200px_120px_1fr_350px_250px] bg-black text-[13px] md:text-[14px] font-black text-white uppercase tracking-widest text-center rounded-t-[1rem] md:rounded-t-[1.25rem]">
             <div className="py-1.5 border-r border-white/20">No.</div>
-            <div className="py-1.5 border-r border-white/20">카테고리</div>
+            <div className="py-1.5 border-r border-white/20">프로젝트 종류</div>
             <div className="py-1.5 border-r border-white/20">시작일</div>
-            <div className="py-1.5 border-r border-white/20 text-emerald-300">다음 일정</div>
+            <div className="py-1.5 border-r border-white/20 text-emerald-300">다음 미션</div>
             <div className="py-1.5 border-r border-white/20">종료일</div>
-            <div className="py-1.5 border-r border-white/20 px-6 text-left">클라이언트 / 프로젝트명</div>
+            <div className="py-1.5 border-r border-white/20 px-6 text-left">프로젝트시작일정_클라이언트_프로젝트명 ( 서버 폴더명과 동일하게 저장 )</div>
             <div className="py-1.5 border-r border-white/20 px-4 text-left">진행 인원</div>
             <div className="py-1.5">진행율</div>
           </div>
