@@ -2427,10 +2427,14 @@ const App: React.FC = () => {
           }
 
           // Parse group name
-          const groupVal = row["그룹"] || "";
+          const groupVal = row["그룹"];
+          // If groupVal is explicitly provided and not "=", update current group.
+          // If it's empty or "=", keep the previous currentGroupName (inherit).
           if (groupVal && groupVal !== "=") {
             currentGroupName = groupVal;
           }
+          // Note: If !groupVal (empty), we intentionally do nothing, creating an inheritance effect.
+          // This ensures that inserting a row without filling the Group column keeps it in the same group.
 
           const title = row["태스크명"];
           if (!title) return;
