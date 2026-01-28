@@ -200,7 +200,7 @@ const App: React.FC = () => {
 
               // Fetch Data
               fetchTeamMembers();
-              fetchProjects();
+              fetchProjects(true); // Silent background update
 
               setIsAuthLoading(false);
               setIsInitializing(false);
@@ -463,8 +463,17 @@ const App: React.FC = () => {
     }
   };
 
-  const fetchProjects = async () => {
-    setIsProjectLoading(true);
+  /* 
+   * FIX: Modified to accept isBackground parameter.
+   * If isBackground is true, or if we already have projects loaded,
+   * we do NOT show the full screen loading spinner.
+   */
+  const fetchProjects = async (isBackground: boolean = false) => {
+    // Only show spinner if it's NOT a background fetch AND we don't have data yet
+    if (!isBackground && projects.length === 0) {
+      setIsProjectLoading(true);
+    }
+    
     try {
       let remoteData: Project[] = [];
       let localData: Project[] = [];
@@ -1912,7 +1921,7 @@ const App: React.FC = () => {
       }
 
       showToast("템플릿이 저장되었습니다.");
-      fetchProjects(); // Refresh templates
+      fetchProjects(true); // Refresh templates silently
     } catch (e: any) {
       console.error("Template Save Exception:", e);
       showToast(`템플릿 저장 실패: ${e.message}`);
