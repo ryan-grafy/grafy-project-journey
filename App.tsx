@@ -767,6 +767,98 @@ const App: React.FC = () => {
     showToast("프로젝트가 복구되었습니다.");
   };
 
+  // Force all IDs to id-xxxx or id-tX... format for consistency
+  const normalizeProjectIds = (project: Project): Project => {
+    const idMap = new Map<string, string>();
+    const nextCustomTasks: Record<number, Task[]> = {};
+    const nextTaskOrder: Record<number, string[]> = {};
+    const nextDeletedTasks: string[] = [];
+    
+    // Normalize ID to be short and clean
+    const normalizeId = (oldId: string): string => {
+      if (idMap.has(oldId)) return idMap.get(oldId)!;
+      // If already id-xxxx or id-tX..., and is short (<= 10 chars), keep it.
+      if (oldId.startsWith('id-') && oldId.length <= 10) return oldId;
+      
+      const newId = `id-${Math.random().toString(36).substr(2, 4)}`;
+      idMap.set(oldId, newId);
+      return newId;
+    };
+
+    // 1. Process custom tasks
+    Object.entries(project.custom_tasks || {}).forEach(([stepId, tasks]) => {
+      nextCustomTasks[parseInt(stepId)] = (tasks as Task[]).map(task => {
+        const newId = normalizeId(task.id);
+        return { ...task, id: newId };
+      });
+    });
+
+    // 2. Process task order (very important for UI consistency)
+    Object.entries(project.task_order || {}).forEach(([stepId, order]) => {
+      nextTaskOrder[parseInt(stepId)] = (order as string[]).map(id => normalizeId(id));
+    });
+
+    // 3. Process deleted tasks
+    (project.deleted_tasks || []).forEach(id => {
+      nextDeletedTasks.push(normalizeId(id));
+    });
+
+    // 4. Update task_states (completed, links, groups, hidden)
+    const nextCompleted = (project.task_states?.completed || []).map(id => normalizeId(id));
+    const nextLinks: Record<string, any> = {};
+    Object.entries(project.task_states?.links || {}).forEach(([id, link]) => {
+      nextLinks[normalizeId(id)] = link;
+    });
+
+    const nextHidden = (project.task_states?.meta?.hidden_template_tasks || []).map(id => normalizeId(id));
+    const nextGroups: Record<string, string> = {};
+    Object.entries(project.task_states?.meta?.task_groups || {}).forEach(([id, group]) => {
+      nextGroups[normalizeId(id)] = group as string;
+    });
+
+    return {
+      ...project,
+      custom_tasks: nextCustomTasks,
+      task_order: nextTaskOrder,
+      deleted_tasks: nextDeletedTasks,
+      task_states: {
+        ...project.task_states,
+        completed: nextCompleted,
+        links: nextLinks,
+        meta: {
+          ...project.task_states?.meta,
+          hidden_template_tasks: nextHidden,
+          task_groups: nextGroups
+        }
+      }
+    };
+  };
+
+  const selectProject = async (project: Project) => {
+    // RUN NORMALIZATION ON SELECT (MIGRATION)
+    const normalized = normalizeProjectIds(project);
+
+    // Update URL to support persistence and sharing
+    const newUrl = `${window.location.pathname}?project=${normalized.id}`;
+    window.history.pushState({ projectId: normalized.id }, "", newUrl);
+ 
+    setCurrentProject(normalized);
+    setRounds(normalized.rounds_count || 1);
+    setRounds2(normalized.rounds2_count || 2);
+    setRoundsNavigation(normalized.rounds_navigation_count || 1);
+    loadTasks(normalized);
+    setCurrentView("detail");
+    setActiveRole(Role.ALL);
+
+    // AUTO-SAVE MIGRATED DATA
+    if (JSON.stringify(normalized) !== JSON.stringify(project)) {
+      const nextProjects = projects.map(p => p.id === normalized.id ? normalized : p);
+      setProjects(nextProjects);
+      localStorage.setItem("grafy_projects", JSON.stringify(nextProjects));
+      await syncProjectToSupabase(normalized);
+    }
+  };
+
   const handleToggleLock = async (locked: boolean) => {
     if (!currentProject) return;
 
@@ -799,20 +891,6 @@ const App: React.FC = () => {
         ? "프로젝트가 잠겼습니다. 종료일이 기록되었습니다."
         : "프로젝트 잠금이 해제되었습니다.",
     );
-  };
-
-  const selectProject = (project: Project) => {
-    // Update URL to support persistence and sharing
-    const newUrl = `${window.location.pathname}?project=${project.id}`;
-    window.history.pushState({ projectId: project.id }, "", newUrl);
-
-    setCurrentProject(project);
-    setRounds(project.rounds_count || 2);
-    setRounds2(project.rounds2_count || 2);
-    setRoundsNavigation(project.rounds_navigation_count || 2);
-    loadTasks(project);
-    setCurrentView("detail");
-    setActiveRole(Role.ALL);
   };
 
   const loadTasks = (project: Project) => {
