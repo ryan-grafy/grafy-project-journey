@@ -16,7 +16,7 @@ interface StepColumnProps {
   onDeleteTask: (taskId: string) => void;
   onToast: (msg: string) => void;
   isLockedProject?: boolean;
-  projectId: string; // New
+  projectId: string;
   onAddTask?: () => void;
   children?: React.ReactNode;
   isSnapshotMode?: boolean;
@@ -28,6 +28,7 @@ interface StepColumnProps {
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void;
   clientVisibleTasks?: Set<string>;
   onUpdateTitle?: (newTitle: string) => void;
+  taskGroups?: Record<string, string>; // taskId -> groupName
 }
 
 const StepColumn: React.FC<StepColumnProps> = ({
@@ -55,7 +56,8 @@ const StepColumn: React.FC<StepColumnProps> = ({
   isClientView,
   onUpdateTask,
   clientVisibleTasks,
-  onUpdateTitle
+  onUpdateTitle,
+  taskGroups = {},
 }) => {
   /* Migration Safe Access: task.roles might be undefined during transition if data not migrated yet. 
      We treat missing roles as [Role.PM] or empty based on context, but let's safely access. */
@@ -223,7 +225,7 @@ const StepColumn: React.FC<StepColumnProps> = ({
   const renderTasks = () => {
     const rendered = [];
 
-    // 마지막 라운드 PM 태스크의 ID를 찾아 그 바로 밑에 조작 버튼을 넣기 위함
+    // Find last round task for control buttons placement
     const lastRoundPmId = (step.id === 3 || step.id === 4 || step.id === 2)
       ? [...visibleTasks].reverse().find(t => t.id.includes('-round-') && (t.id.endsWith('-pm') || t.id.endsWith('-prop')))?.id
       : null;
@@ -235,19 +237,22 @@ const StepColumn: React.FC<StepColumnProps> = ({
       const canDrag = !isLockedProject && !isTaskCompleted;
       const currentIndex = i;
 
-      const roundMatch = task.id.match(/t([234])-round-(\d+)-(pm|prop)/);
-      if ((step.id === 3 || step.id === 4 || step.id === 2) && roundMatch) {
-        const stepNum = roundMatch[1];
-        const roundNum = roundMatch[2];
-        const nextTask = visibleTasks[i + 1];
-        
-        const isNextPartner = stepNum === '2' 
-          ? nextTask?.id === `t${stepNum}-round-${roundNum}-feed` 
-          : nextTask?.id === `t${stepNum}-round-${roundNum}-des`;
+      // Check if this task belongs to a group
+      const groupName = taskGroups[task.id];
+      
+      if (groupName) {
+        // Find all consecutive tasks in the same group
+        const groupTasks = [task];
+        let j = i + 1;
+        while (j < visibleTasks.length && taskGroups[visibleTasks[j].id] === groupName) {
+          groupTasks.push(visibleTasks[j]);
+          j++;
+        }
 
+        // Render the group
         rendered.push(
           <div
-            key={`round-group-${roundNum}`}
+            key={`group-${groupName}-${currentIndex}`}
             className={`mb-4 flex flex-col transition-all duration-300 relative ${draggedIndex === currentIndex ? 'opacity-20 scale-95 blur-[1px]' : 'opacity-100'}`}
             draggable={canDrag}
             onDragStart={() => canDrag && setDraggedIndex(currentIndex)}
@@ -261,22 +266,23 @@ const StepColumn: React.FC<StepColumnProps> = ({
 
             <div className="mb-1 pl-2">
               <span className="text-[12px] md:text-[14px] font-bold bg-white/95 border border-black/10 px-4 py-1.5 rounded-full uppercase tracking-widest text-slate-700 shadow-sm inline-block">
-                {roundNum}차 제안_Ver{roundNum}.0
+                {groupName}
               </span>
             </div>
             <div className="flex flex-col gap-2.5 p-1.5 md:p-2 bg-white/60 border border-white/70 rounded-[1.5rem] shadow-inner relative">
-              <TaskCard {...getTaskProps(task)} />
-              {isNextPartner && <TaskCard {...getTaskProps(nextTask)} />}
+              {groupTasks.map(groupTask => (
+                <TaskCard key={groupTask.id} {...getTaskProps(groupTask)} />
+              ))}
             </div>
 
-            {currentIndex === visibleTasks.length - (isNextPartner ? 2 : 1) && dragOverIndex === visibleTasks.length && draggedIndex !== null && (
+            {currentIndex + groupTasks.length - 1 === visibleTasks.length - 1 && dragOverIndex === visibleTasks.length && draggedIndex !== null && (
               <div className="absolute bottom-[-10px] left-0 w-full h-[6px] bg-black/60 rounded-full z-[100] animate-pulse shadow-[0_0_10px_rgba(0,0,0,0.3)]"></div>
             )}
           </div>
         );
 
-        // +/- 버튼을 마지막 라운드 바로 아래에 매우 가깝게 배치
-        if (task.id === lastRoundPmId && children) {
+        // Add control buttons after last grouped task
+        if (groupTasks.some(t => t.id === lastRoundPmId) && children) {
           rendered.push(
             <div key="round-controls-container" className="flex justify-center -mt-3 mb-5 relative z-20">
               <div className="bg-white/80 backdrop-blur-md p-1.5 rounded-full border border-white shadow-md">
@@ -286,8 +292,9 @@ const StepColumn: React.FC<StepColumnProps> = ({
           );
         }
 
-        i += isNextPartner ? 2 : 1;
+        i += groupTasks.length;
       } else {
+        // Single task (no group)
         rendered.push(
           <div
             key={task.id}
@@ -314,8 +321,8 @@ const StepColumn: React.FC<StepColumnProps> = ({
       }
     }
 
-    // 라운드 그룹이 없는 상태거나 렌더링에 실패한 경우의 폴백
-    const hasRounds = visibleTasks.some(t => t.id.includes('-round-'));
+    // Fallback for round controls if not yet rendered
+    const hasRounds = visibleTasks.some(t => taskGroups[t.id]);
     const renderedButtons = rendered.some(r => r.key === 'round-controls-container');
     if (step.id === 3 && hasRounds && !renderedButtons && children) {
       rendered.push(<div key="round-controls-container-fallback" className="my-1">{children}</div>);

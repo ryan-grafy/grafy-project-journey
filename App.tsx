@@ -2158,7 +2158,7 @@ const App: React.FC = () => {
 
         // Get all tasks across all steps
         const tasksData: any[] = [];
-        let lastStepTitle = "";
+        let lastGroupName = "";
 
         STEPS_STATIC.forEach((step, stepIdx) => {
           // Skip Step 4 (Expedition 2) if hidden
@@ -2179,6 +2179,15 @@ const App: React.FC = () => {
           visibleTasks.forEach((task, taskIdx) => {
             const taskLink = currentProject.task_states?.links?.[task.id];
             const isCompleted = completedTasks.has(task.id);
+            const isClientVisible = currentProject.client_visible_tasks?.includes(task.id) || false;
+
+            // Determine group name based on task ID pattern
+            let groupName = "";
+            const roundMatch = task.id.match(/t([234])-round-(\d+)-(pm|prop)/);
+            if (roundMatch) {
+              const roundNum = roundMatch[2];
+              groupName = `${roundNum}차 제안_Ver${roundNum}.0`;
+            }
 
             // Format todos as checklist with checkmarks
             const todosText =
@@ -2191,10 +2200,16 @@ const App: React.FC = () => {
             // Use "=" if step title is same as previous row
             const displayStepTitle = taskIdx === 0 ? stepTitle : "=";
             const displayIndex = taskIdx === 0 ? `Step ${stepIdx + 1}` : "=";
+            const displayGroup = groupName && groupName === lastGroupName ? "=" : groupName;
+
+            if (groupName) {
+              lastGroupName = groupName;
+            }
 
             tasksData.push({
               Index: displayIndex,
               스텝: displayStepTitle,
+              그룹: displayGroup,
               태스크명: task.title,
               설명: task.description || "",
               담당자:
@@ -2221,6 +2236,7 @@ const App: React.FC = () => {
               링크: taskLink?.url || "",
               링크라벨: taskLink?.label || "",
               할일: todosText,
+              클라이언트공개: isClientVisible ? "O" : "X",
             });
           });
         });
@@ -2360,9 +2376,12 @@ const App: React.FC = () => {
           ...(updatedProjectInfo.task_states?.meta?.step_titles || {}),
         };
         const nextTaskOrder: Record<number, string[]> = {};
+        const nextTaskGroups: Record<string, string> = {}; // taskId -> groupName
+        const nextClientVisibleTasks: string[] = [...(updatedProjectInfo.client_visible_tasks || [])];
 
         let currentStepId: number | null = null;
         let currentStepTitle: string | null = null;
+        let currentGroupName: string | null = null;
 
         tasksData.forEach((row: any) => {
           // Identify step from Index or 스텝 title
@@ -2384,12 +2403,19 @@ const App: React.FC = () => {
             nextStepTitles[currentStepId] = stepVal;
           }
 
+          // Parse group name
+          const groupVal = row["그룹"] || "";
+          if (groupVal && groupVal !== "=") {
+            currentGroupName = groupVal;
+          }
+
           const title = row["태스크명"];
           if (!title) return;
 
           const description = row["설명"] || "";
           const completedDate = row["완료일"] || "00-00-00";
           const isCompleted = row["완료여부"] === "완료";
+          const clientVisible = row["클라이언트공개"] === "O";
 
           // Parse roles
           const rolesStr = row["담당자"] || "";
@@ -2498,6 +2524,23 @@ const App: React.FC = () => {
           if (!nextTaskOrder[currentStepId].includes(taskId)) {
             nextTaskOrder[currentStepId].push(taskId);
           }
+
+          // Track group membership
+          if (currentGroupName) {
+            nextTaskGroups[taskId] = currentGroupName;
+          }
+
+          // Track client visibility
+          if (clientVisible) {
+            if (!nextClientVisibleTasks.includes(taskId)) {
+              nextClientVisibleTasks.push(taskId);
+            }
+          } else {
+            const idx = nextClientVisibleTasks.indexOf(taskId);
+            if (idx > -1) {
+              nextClientVisibleTasks.splice(idx, 1);
+            }
+          }
         });
 
         // Prepare final updated metadata and task states
@@ -2505,6 +2548,7 @@ const App: React.FC = () => {
           ...(updatedProjectInfo.task_states?.meta || {}),
           step_titles: nextStepTitles,
           custom_tasks: nextCustomTasks,
+          task_groups: nextTaskGroups,
         };
 
         // Merge task_order with Excel order
@@ -2534,6 +2578,7 @@ const App: React.FC = () => {
           task_states: finalTaskStates,
           custom_tasks: nextCustomTasks,
           task_order: mergedTaskOrder,
+          client_visible_tasks: nextClientVisibleTasks,
           status: Math.min(100, percent),
           last_updated: new Date().toISOString(),
         };
@@ -2570,6 +2615,7 @@ const App: React.FC = () => {
                 task_states: finalTaskStates,
                 task_order: mergedTaskOrder,
                 custom_tasks: nextCustomTasks,
+                client_visible_tasks: nextClientVisibleTasks,
                 status: updatedProject.status,
                 last_updated: updatedProject.last_updated,
               })
@@ -2864,6 +2910,9 @@ const App: React.FC = () => {
                         onUpdateTask={handleUpdateTask}
                         clientVisibleTasks={
                           new Set(currentProject.client_visible_tasks || [])
+                        }
+                        taskGroups={
+                          currentProject.task_states?.meta?.task_groups || {}
                         }
                       >
                         {step.id === 2 && (
