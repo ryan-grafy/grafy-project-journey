@@ -2404,6 +2404,7 @@ const App: React.FC = () => {
         const nextClientVisibleTasks: string[] = [...(updatedProjectInfo.client_visible_tasks || [])];
         const nextHiddenTemplateTasks: string[] = [];
         const usedTemplateIdsInThisImport = new Set<string>();
+        const processedSteps = new Set<number>(); // Track steps found in Excel to reset them
 
         let currentStepId: number | null = null;
         let currentStepTitle: string | null = null;
@@ -2423,6 +2424,13 @@ const App: React.FC = () => {
 
           if (!currentStepId) return;
 
+          // NEW: Reset this step's tasks if it's the first time we see it in this import
+          if (!processedSteps.has(currentStepId)) {
+            nextCustomTasks[currentStepId] = [];
+            nextTaskOrder[currentStepId] = [];
+            processedSteps.add(currentStepId);
+          }
+
           // Update step title if explicitly changed (not "/")
           if (stepVal && stepVal !== "/") {
             currentStepTitle = stepVal;
@@ -2431,13 +2439,9 @@ const App: React.FC = () => {
 
           // Parse group name
           const groupVal = row["그룹"];
-          // If groupVal is explicitly provided and not "/", update current group.
-          // If it's empty or "/", keep the previous currentGroupName (inherit).
           if (groupVal && groupVal !== "/") {
             currentGroupName = groupVal;
           }
-          // Note: If !groupVal (empty), we intentionally do nothing, creating an inheritance effect.
-          // This ensures that inserting a row without filling the Group column keeps it in the same group.
 
           const title = row["태스크명"];
           if (!title) return;
@@ -2462,7 +2466,7 @@ const App: React.FC = () => {
             })
             .filter((r: Role | null) => r !== null);
 
-          // Parse todos from 할일 field
+          // Parse todos
           const 할일Raw = row["할일"] || "";
           const todos = 할일Raw
             .split("\n")
@@ -2477,44 +2481,13 @@ const App: React.FC = () => {
               };
             });
 
-          // Match task by title within current step
-          if (!nextCustomTasks[currentStepId]) {
-            nextCustomTasks[currentStepId] = [];
-          }
-          if (!nextTaskOrder[currentStepId]) {
-            nextTaskOrder[currentStepId] = [];
-          }
-
-          // Search in static tasks first to see if it's a template task we should customize
+          // Search in static tasks
           const staticStep = STEPS_STATIC.find((s) => s.id === currentStepId);
           const staticTask = staticStep?.tasks?.find((t) => t.title === title);
 
-          const existingCustomIdx = nextCustomTasks[currentStepId].findIndex(
-            (t) => t.title === title,
-          );
-
           let taskId: string;
 
-          if (existingCustomIdx > -1) {
-            // Update existing custom task
-            taskId = nextCustomTasks[currentStepId][existingCustomIdx].id;
-            nextCustomTasks[currentStepId][existingCustomIdx] = {
-              ...nextCustomTasks[currentStepId][existingCustomIdx],
-              description,
-              completed_date: completedDate,
-              todos,
-              roles: roles.length > 0 ? roles : nextCustomTasks[currentStepId][existingCustomIdx].roles
-            };
-
-            // Update completion/links
-            if (isCompleted) newCompletedTasks.add(taskId);
-            else newCompletedTasks.delete(taskId);
-            
-            const linkUrl = row["링크"] || "";
-            const linkLabel = row["링크라벨"] || "";
-            if (linkUrl) newTaskLinks.set(taskId, { url: linkUrl, label: linkLabel });
-          } else if (staticTask) {
-            // It's a template task - customize it
+          if (staticTask) {
             taskId = staticTask.id;
             const newTask = {
               ...staticTask,
@@ -2524,15 +2497,15 @@ const App: React.FC = () => {
               roles: roles.length > 0 ? roles : staticTask.roles
             };
             nextCustomTasks[currentStepId].push(newTask);
-            
-            if (isCompleted) newCompletedTasks.add(staticTask.id);
-            else newCompletedTasks.delete(staticTask.id);
+            if (isCompleted) newCompletedTasks.add(taskId);
+            else newCompletedTasks.delete(taskId);
 
             const linkUrl = row["링크"] || "";
             const linkLabel = row["링크라벨"] || "";
-            if (linkUrl) newTaskLinks.set(staticTask.id, { url: linkUrl, label: linkLabel });
+            if (linkUrl) newTaskLinks.set(taskId, { url: linkUrl, label: linkLabel });
           } else {
-            // New task entirely
+            // Check if it's a known round-based task ID pattern (but matched by title)
+            // For true 1:1 sync, we treat unmatched titles as new custom tasks
             taskId = `custom-${currentStepId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
             const newTask: Task = {
               id: taskId,
@@ -2550,12 +2523,9 @@ const App: React.FC = () => {
             if (linkUrl) newTaskLinks.set(taskId, { url: linkUrl, label: linkLabel });
           }
 
-          // Track task order as it appears in Excel
-          if (!nextTaskOrder[currentStepId].includes(taskId)) {
-            nextTaskOrder[currentStepId].push(taskId);
-          }
+          // Track order as it appears in Excel
+          nextTaskOrder[currentStepId].push(taskId);
 
-          // Track group membership
           if (currentGroupName) {
             nextTaskGroups[taskId] = currentGroupName;
           }
@@ -2566,25 +2536,27 @@ const App: React.FC = () => {
 
           // Track client visibility
           if (clientVisible) {
-            if (!nextClientVisibleTasks.includes(taskId)) {
-              nextClientVisibleTasks.push(taskId);
-            }
+            if (!nextClientVisibleTasks.includes(taskId)) nextClientVisibleTasks.push(taskId);
           } else {
             const idx = nextClientVisibleTasks.indexOf(taskId);
-            if (idx > -1) {
-              nextClientVisibleTasks.splice(idx, 1);
-            }
+            if (idx > -1) nextClientVisibleTasks.splice(idx, 1);
           }
         });
 
-        // Any template tasks NOT used in this import should be hidden to prevent duplicates/ghosts
+        // Comprehensive Hidden Task Check (Static + Rounds 1-10)
         STEPS_STATIC.forEach(step => {
           step.tasks.forEach(t => {
-            if (!usedTemplateIdsInThisImport.has(t.id)) {
-              nextHiddenTemplateTasks.push(t.id);
-            }
+            if (!usedTemplateIdsInThisImport.has(t.id)) nextHiddenTemplateTasks.push(t.id);
           });
         });
+        
+        // Handle all possible round-based IDs to ensure they are hidden if not in Excel
+        for (let r = 1; r <= 10; r++) {
+          [`t2-round-${r}-prop`, `t2-round-${r}-feed`, `t3-round-${r}-pm`, `t3-round-${r}-des`, `t4-round-${r}-pm`, `t4-round-${r}-des`]
+            .forEach(id => {
+              if (!usedTemplateIdsInThisImport.has(id)) nextHiddenTemplateTasks.push(id);
+            });
+        }
 
         // Prepare final updated metadata and task states
         const finalMeta = {
