@@ -69,6 +69,7 @@ const App: React.FC = () => {
   const [roundsNavigation, setRoundsNavigation] = useState<number>(2); // Navigation rounds (Step 2)
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const isDataLoadedRef = React.useRef(false); // Track if initial data load is complete
 
   const [popover, setPopover] = useState<PopoverState>({
     isOpen: false,
@@ -200,7 +201,7 @@ const App: React.FC = () => {
 
               // Fetch Data
               fetchTeamMembers();
-              fetchProjects(true); // Silent background update
+              fetchProjects();
 
               setIsAuthLoading(false);
               setIsInitializing(false);
@@ -469,8 +470,10 @@ const App: React.FC = () => {
    * we do NOT show the full screen loading spinner.
    */
   const fetchProjects = async (isBackground: boolean = false) => {
-    // Only show spinner if it's NOT a background fetch AND we don't have data yet
-    if (!isBackground && projects.length === 0) {
+    // Show spinner ONLY if:
+    // 1. Not explicitly a background request
+    // 2. AND Data hasn't been loaded yet (checked via Ref)
+    if (!isBackground && !isDataLoadedRef.current) {
       setIsProjectLoading(true);
     }
     
@@ -580,6 +583,9 @@ const App: React.FC = () => {
       setProjects(active);
       setDeletedProjects(deleted);
       setTemplates(remoteTemplates); // Set templates separately
+      
+      // Mark data as loaded so subsequent fetches don't trigger spinner
+      isDataLoadedRef.current = true;
     } catch (e) {
       console.error(e);
     }
