@@ -2175,102 +2175,7 @@ const App: React.FC = () => {
           const stepCustomTasks = currentProject.custom_tasks?.[step.id] || [];
           const deletedSet = new Set(currentProject.deleted_tasks || []);
 
-          let allTasks: Task[] = [];
-
-          // Generate dynamic tasks based on step type
-          if (step.id === 2) {
-            const roundCount = currentProject.rounds_navigation_count || 1;
-            for (let r = 1; r <= roundCount; r++) {
-              const propTask = stepCustomTasks.find(
-                (ct) => ct.id === `t2-round-${r}-prop`,
-              ) || {
-                id: `t2-round-${r}-prop`,
-                title: `${r}차 제안`,
-                roles: [Role.PM, Role.DESIGNER],
-                completed_date: "00-00-00",
-              };
-              const feedTask = stepCustomTasks.find(
-                (ct) => ct.id === `t2-round-${r}-feed`,
-              ) || {
-                id: `t2-round-${r}-feed`,
-                title: `${r}차 피드백`,
-                roles: [Role.CLIENT, Role.PM],
-                completed_date: "00-00-00",
-              };
-              allTasks.push(propTask, feedTask);
-            }
-          } else if (step.id === 3) {
-            const roundCount = currentProject.rounds_count || 2;
-            allTasks.push(STEPS_STATIC[2].tasks[0]);
-            for (let r = 1; r <= roundCount; r++) {
-              const pmTask = stepCustomTasks.find(
-                (ct) => ct.id === `t3-round-${r}-pm`,
-              ) || {
-                id: `t3-round-${r}-pm`,
-                title: `${r}차 피드백 수급`,
-                roles: [Role.PM],
-                completed_date: "00-00-00",
-              };
-              const desTask = stepCustomTasks.find(
-                (ct) => ct.id === `t3-round-${r}-des`,
-              ) || {
-                id: `t3-round-${r}-des`,
-                title: `${r}차 수정`,
-                roles: [Role.DESIGNER],
-                completed_date: "00-00-00",
-              };
-              allTasks.push(pmTask, desTask);
-            }
-            allTasks.push(STEPS_STATIC[2].tasks[1]);
-          } else if (step.id === 4) {
-            const roundCount = currentProject.rounds2_count || 2;
-            for (let r = 1; r <= roundCount; r++) {
-              const pmTask = stepCustomTasks.find(
-                (ct) => ct.id === `t4-round-${r}-pm`,
-              ) || {
-                id: `t4-round-${r}-pm`,
-                title: `${r}차 피드백 수급`,
-                roles: [Role.PM],
-                completed_date: "00-00-00",
-              };
-              const desTask = stepCustomTasks.find(
-                (ct) => ct.id === `t4-round-${r}-des`,
-              ) || {
-                id: `t4-round-${r}-des`,
-                title: `${r}차 수정`,
-                roles: [Role.DESIGNER],
-                completed_date: "00-00-00",
-              };
-              allTasks.push(pmTask, desTask);
-            }
-          } else {
-            allTasks = STEPS_STATIC.find((s) => s.id === step.id)?.tasks || [];
-          }
-
-          // Merge custom tasks
-          allTasks = allTasks.map(
-            (t) => stepCustomTasks.find((ct) => ct.id === t.id) || t,
-          );
-
-          // Add pure custom tasks
-          const pureCustoms = stepCustomTasks.filter(
-            (ct) => !allTasks.some((gt) => gt.id === ct.id),
-          );
-          allTasks = [...allTasks, ...pureCustoms];
-
-          // Filter out deleted tasks and apply order
-          const visibleTasks = allTasks.filter((t) => !deletedSet.has(t.id));
-
-          const order = currentProject.task_order?.[step.id];
-          if (order && order.length > 0) {
-            visibleTasks.sort((a, b) => {
-              const idxA = order.indexOf(a.id);
-              const idxB = order.indexOf(b.id);
-              const valA = idxA === -1 ? 999 : idxA;
-              const valB = idxB === -1 ? 999 : idxB;
-              return valA - valB;
-            });
-          }
+          const visibleTasks = getVisibleTasks(step.id, currentProject, rounds);
 
           // Get step title from metadata or use default
           const stepTitle =
@@ -2291,7 +2196,6 @@ const App: React.FC = () => {
 
             tasksData.push({
               스텝: stepTitle,
-              태스크_ID: task.id,
               태스크명: task.title,
               설명: task.description || "",
               담당자:
