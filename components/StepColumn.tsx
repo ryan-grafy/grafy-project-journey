@@ -238,9 +238,11 @@ const StepColumn: React.FC<StepColumnProps> = ({
       const currentIndex = i;
 
       // Check if this task belongs to a group
+      // Priority: 1. Excel-defined group (taskGroups) 2. ID pattern auto-detect
       let groupName = taskGroups[task.id];
+      const hasExplicitGroup = !!groupName;
 
-      // Fallback: Auto-detect standard round group if not defined
+      // Fallback: Auto-detect standard round group ONLY if no explicit group is defined
       if (!groupName) {
         const roundMatch = task.id.match(/t([234])-round-(\d+)-(pm|prop|des|feed)/);
         if (roundMatch) {
@@ -255,15 +257,20 @@ const StepColumn: React.FC<StepColumnProps> = ({
         let j = i + 1;
         while (j < visibleTasks.length) {
           const nextTask = visibleTasks[j];
-          let nextGroupName = taskGroups[nextTask.id];
           
-          if (!nextGroupName) {
+          // For next task, also prioritize Excel-defined group
+          let nextGroupName = taskGroups[nextTask.id];
+          const nextHasExplicitGroup = !!nextGroupName;
+          
+          // Only auto-detect if no explicit group AND current group was also auto-detected
+          if (!nextGroupName && !hasExplicitGroup) {
              const rm = nextTask.id.match(/t([234])-round-(\d+)-(pm|prop|des|feed)/);
              if (rm) {
                  nextGroupName = `${rm[2]}차 제안_Ver${rm[2]}.0`;
              }
           }
 
+          // Match: same group name, OR next has explicit group matching current
           if (nextGroupName === groupName) {
             groupTasks.push(nextTask);
             j++;
