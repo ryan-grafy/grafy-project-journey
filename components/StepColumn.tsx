@@ -238,15 +238,38 @@ const StepColumn: React.FC<StepColumnProps> = ({
       const currentIndex = i;
 
       // Check if this task belongs to a group
-      const groupName = taskGroups[task.id];
+      let groupName = taskGroups[task.id];
+
+      // Fallback: Auto-detect standard round group if not defined
+      if (!groupName) {
+        const roundMatch = task.id.match(/t([234])-round-(\d+)-(pm|prop|des|feed)/);
+        if (roundMatch) {
+          const roundNum = roundMatch[2];
+          groupName = `${roundNum}차 제안_Ver${roundNum}.0`;
+        }
+      }
       
       if (groupName) {
         // Find all consecutive tasks in the same group
         const groupTasks = [task];
         let j = i + 1;
-        while (j < visibleTasks.length && taskGroups[visibleTasks[j].id] === groupName) {
-          groupTasks.push(visibleTasks[j]);
-          j++;
+        while (j < visibleTasks.length) {
+          const nextTask = visibleTasks[j];
+          let nextGroupName = taskGroups[nextTask.id];
+          
+          if (!nextGroupName) {
+             const rm = nextTask.id.match(/t([234])-round-(\d+)-(pm|prop|des|feed)/);
+             if (rm) {
+                 nextGroupName = `${rm[2]}차 제안_Ver${rm[2]}.0`;
+             }
+          }
+
+          if (nextGroupName === groupName) {
+            groupTasks.push(nextTask);
+            j++;
+          } else {
+            break;
+          }
         }
 
         // Render the group
