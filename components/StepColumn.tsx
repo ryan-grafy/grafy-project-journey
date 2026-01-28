@@ -173,7 +173,7 @@ const StepColumn: React.FC<StepColumnProps> = ({
 
   const handleDragOver = (e: React.DragEvent, idx: number) => {
     e.preventDefault();
-    if (isLocked || isLockedProject || draggedIndex === null) return;
+    if (isLockedProject || draggedIndex === null) return;
 
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const threshold = rect.top + rect.height / 2;
@@ -232,7 +232,7 @@ const StepColumn: React.FC<StepColumnProps> = ({
     while (i < visibleTasks.length) {
       const task = visibleTasks[i];
       const isTaskCompleted = completedTasks.has(task.id);
-      const canDrag = !isLocked && !isLockedProject && !isTaskCompleted;
+      const canDrag = !isLockedProject && !isTaskCompleted;
       const currentIndex = i;
 
       const roundMatch = task.id.match(/t([234])-round-(\d+)-(pm|prop)/);
