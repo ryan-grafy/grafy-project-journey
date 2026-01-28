@@ -1,4 +1,4 @@
-name: Deploy to Vercel
+name: Deploy to GitHub Pages
 
 on:
   push:
@@ -22,10 +22,8 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v20
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
