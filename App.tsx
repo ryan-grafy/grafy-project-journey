@@ -2189,11 +2189,11 @@ const App: React.FC = () => {
                 : "";
 
             // Use "=" if step title is same as previous row
-            const displayStepTitle =
-              taskIdx === 0 ? stepTitle : "=";
+            const displayStepTitle = taskIdx === 0 ? stepTitle : "=";
+            const displayIndex = taskIdx === 0 ? `Step ${stepIdx + 1}` : "=";
 
             tasksData.push({
-              Index: `Step ${stepIdx + 1}`,
+              Index: displayIndex,
               스텝: displayStepTitle,
               태스크명: task.title,
               설명: task.description || "",
@@ -2359,6 +2359,7 @@ const App: React.FC = () => {
         const nextStepTitles = {
           ...(updatedProjectInfo.task_states?.meta?.step_titles || {}),
         };
+        const nextTaskOrder: Record<number, string[]> = {};
 
         let currentStepId: number | null = null;
         let currentStepTitle: string | null = null;
@@ -2424,6 +2425,9 @@ const App: React.FC = () => {
           if (!nextCustomTasks[currentStepId]) {
             nextCustomTasks[currentStepId] = [];
           }
+          if (!nextTaskOrder[currentStepId]) {
+            nextTaskOrder[currentStepId] = [];
+          }
 
           // Search in static tasks first to see if it's a template task we should customize
           const staticStep = STEPS_STATIC.find((s) => s.id === currentStepId);
@@ -2433,9 +2437,11 @@ const App: React.FC = () => {
             (t) => t.title === title,
           );
 
+          let taskId: string;
+
           if (existingCustomIdx > -1) {
             // Update existing custom task
-            const taskId = nextCustomTasks[currentStepId][existingCustomIdx].id;
+            taskId = nextCustomTasks[currentStepId][existingCustomIdx].id;
             nextCustomTasks[currentStepId][existingCustomIdx] = {
               ...nextCustomTasks[currentStepId][existingCustomIdx],
               description,
@@ -2453,6 +2459,7 @@ const App: React.FC = () => {
             if (linkUrl) newTaskLinks.set(taskId, { url: linkUrl, label: linkLabel });
           } else if (staticTask) {
             // It's a template task - customize it
+            taskId = staticTask.id;
             const newTask = {
               ...staticTask,
               description,
@@ -2470,9 +2477,9 @@ const App: React.FC = () => {
             if (linkUrl) newTaskLinks.set(staticTask.id, { url: linkUrl, label: linkLabel });
           } else {
             // New task entirely
-            const newId = `custom-${currentStepId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+            taskId = `custom-${currentStepId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
             const newTask: Task = {
-              id: newId,
+              id: taskId,
               title,
               description,
               roles: roles.length > 0 ? roles : [Role.PM],
@@ -2481,10 +2488,15 @@ const App: React.FC = () => {
             };
             nextCustomTasks[currentStepId].push(newTask);
             
-            if (isCompleted) newCompletedTasks.add(newId);
+            if (isCompleted) newCompletedTasks.add(taskId);
             const linkUrl = row["링크"] || "";
             const linkLabel = row["링크라벨"] || "";
-            if (linkUrl) newTaskLinks.set(newId, { url: linkUrl, label: linkLabel });
+            if (linkUrl) newTaskLinks.set(taskId, { url: linkUrl, label: linkLabel });
+          }
+
+          // Track task order as it appears in Excel
+          if (!nextTaskOrder[currentStepId].includes(taskId)) {
+            nextTaskOrder[currentStepId].push(taskId);
           }
         });
 
@@ -2494,6 +2506,13 @@ const App: React.FC = () => {
           step_titles: nextStepTitles,
           custom_tasks: nextCustomTasks,
         };
+
+        // Merge task_order with Excel order
+        const mergedTaskOrder = { ...(updatedProjectInfo.task_order || {}) };
+        Object.keys(nextTaskOrder).forEach((stepIdStr) => {
+          const stepId = parseInt(stepIdStr);
+          mergedTaskOrder[stepId] = nextTaskOrder[stepId];
+        });
 
         const finalTaskStates = {
           ...updatedProjectInfo.task_states,
@@ -2514,6 +2533,7 @@ const App: React.FC = () => {
           ...updatedProjectInfo,
           task_states: finalTaskStates,
           custom_tasks: nextCustomTasks,
+          task_order: mergedTaskOrder,
           status: Math.min(100, percent),
           last_updated: new Date().toISOString(),
         };
@@ -2548,6 +2568,8 @@ const App: React.FC = () => {
                 designer_3_phone: updatedProject.designer_3_phone,
                 designer_3_email: updatedProject.designer_3_email,
                 task_states: finalTaskStates,
+                task_order: mergedTaskOrder,
+                custom_tasks: nextCustomTasks,
                 status: updatedProject.status,
                 last_updated: updatedProject.last_updated,
               })
