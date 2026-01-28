@@ -1042,24 +1042,8 @@ const App: React.FC = () => {
   };
 
   const isLockedStep = (stepId: number): boolean => {
-    if (stepId === 1 || !currentProject) return false;
-
-    // Special handling for Step 5 (Landing) when Expedition 2 is hidden
-    const isExpedition2Hidden =
-      currentProject?.task_states?.meta?.is_expedition2_hidden;
-    if (stepId === 5 && isExpedition2Hidden) {
-      // If Expedition 2 is hidden, check Step 3 (Expedition 1) instead
-      const step3Tasks = getVisibleTasks(3, currentProject, rounds);
-      return !step3Tasks.every((t) => completedTasks.has(t.id));
-    }
-
-    const prevStepId = stepId - 1;
-    const prevVisibleTasks = getVisibleTasks(
-      prevStepId,
-      currentProject,
-      rounds,
-    );
-    return !prevVisibleTasks.every((t) => completedTasks.has(t.id));
+    // 모든 스텝 활성화 (사용자 요청: 회색 섹션도 자유롭게 드래그앤드랍 및 편집 가능하도록 처리)
+    return false;
   };
 
   const handleToggleTask = (taskId: string) => {
