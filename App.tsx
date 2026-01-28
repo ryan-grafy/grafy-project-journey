@@ -1785,6 +1785,11 @@ const App: React.FC = () => {
           const taskLink = currentProject.task_states?.links?.[task.id];
           const isCompleted = completedTasks.has(task.id);
 
+          // Format todos as checklist with checkmarks
+          const todosText = task.todos && task.todos.length > 0
+            ? task.todos.map(t => `${t.isCompleted ? '☑' : '☐'} ${t.text}`).join('\n')
+            : '';
+
           tasksData.push({
             스텝: stepTitle,
             태스크_ID: task.id,
@@ -1803,7 +1808,8 @@ const App: React.FC = () => {
             완료일: task.completed_date || '00-00-00',
             완료여부: isCompleted ? '완료' : '미완료',
             링크: taskLink?.url || '',
-            링크라벨: taskLink?.label || ''
+            링크라벨: taskLink?.label || '',
+            할일: todosText
           });
         });
       });
@@ -1897,48 +1903,65 @@ const App: React.FC = () => {
           const title = row['태스크명'];
           const description = row['설명'] || '';
 
-          if (title) {
-            // Find task in custom tasks or static tasks
-            let foundInCustom = false;
+          // Parse todos from 할일 field
+          const 할일Raw = row['할일'] || '';
+          const todos = 할일Raw
+            .split('\n')
+            .filter(line => line.trim())
+            .map(line => {
+              const isCompleted = line.startsWith('☑');
+              const text = line.replace(/^[☑☐]\s*/, '').trim();
+              return {
+                id: crypto.randomUUID(),
+                text,
+                isCompleted
+              };
+            });
 
-            for (const stepId in nextCustomTasks) {
-              const stepTasks = nextCustomTasks[stepId];
-              const idx = stepTasks.findIndex(t => t.id === taskId);
-              if (idx > -1) {
-                nextCustomTasks[stepId][idx] = {
-                  ...stepTasks[idx],
-                  title,
-                  description,
-                  completed_date: completedDate
-                };
-                foundInCustom = true;
-                break;
-              }
-            }
+              if (title) {
+                // Find task in custom tasks or static tasks
+                let foundInCustom = false;
+
+                for (const stepId in nextCustomTasks) {
+                  const stepTasks = nextCustomTasks[stepId];
+                  const idx = stepTasks.findIndex(t => t.id === taskId);
+                  if (idx > -1) {
+                    nextCustomTasks[stepId][idx] = {
+                      ...stepTasks[idx],
+                      title,
+                      description,
+                      completed_date: completedDate,
+                      todos
+                    };
+                    foundInCustom = true;
+                    break;
+                  }
+                }
 
             // If not found in custom, add to custom tasks
-            if (!foundInCustom) {
-              let stepId = 0;
-              if (taskId.startsWith('t')) {
-                stepId = parseInt(taskId[1]);
-              } else if (taskId.startsWith('custom')) {
-                stepId = parseInt(taskId.split('-')[1]);
-              }
-
-              if (stepId > 0) {
-                if (!nextCustomTasks[stepId]) {
-                  nextCustomTasks[stepId] = [];
+              if (!foundInCustom) {
+                let stepId = 0;
+                if (taskId.startsWith('t')) {
+                  stepId = parseInt(taskId[1]);
+                } else if (taskId.startsWith('custom')) {
+                  stepId = parseInt(taskId.split('-')[1]);
                 }
-                nextCustomTasks[stepId].push({
-                  id: taskId,
-                  title,
-                  description,
-                  roles: [Role.PM],
-                  completed_date: completedDate
-                });
+
+                if (stepId > 0) {
+                  if (!nextCustomTasks[stepId]) {
+                    nextCustomTasks[stepId] = [];
+                  }
+                  nextCustomTasks[stepId].push({
+                    id: taskId,
+                    title,
+                    description,
+                    roles: [Role.PM],
+                    completed_date: completedDate,
+                    todos
+                  });
+                }
               }
             }
-          }
         });
 
         // Update project
