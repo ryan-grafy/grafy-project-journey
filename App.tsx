@@ -2162,8 +2162,9 @@ const App: React.FC = () => {
 
         // Get all tasks across all steps
         const tasksData: any[] = [];
+        let lastStepTitle = "";
 
-        STEPS_STATIC.forEach((step) => {
+        STEPS_STATIC.forEach((step, stepIdx) => {
           // Skip Step 4 (Expedition 2) if hidden
           if (
             step.id === 4 &&
@@ -2172,9 +2173,6 @@ const App: React.FC = () => {
             return;
           }
 
-          const stepCustomTasks = currentProject.custom_tasks?.[step.id] || [];
-          const deletedSet = new Set(currentProject.deleted_tasks || []);
-
           const visibleTasks = getVisibleTasks(step.id, currentProject, rounds);
 
           // Get step title from metadata or use default
@@ -2182,7 +2180,7 @@ const App: React.FC = () => {
             currentProject.task_states?.meta?.step_titles?.[step.id] ||
             step.title;
 
-          visibleTasks.forEach((task) => {
+          visibleTasks.forEach((task, taskIdx) => {
             const taskLink = currentProject.task_states?.links?.[task.id];
             const isCompleted = completedTasks.has(task.id);
 
@@ -2194,8 +2192,13 @@ const App: React.FC = () => {
                     .join("\n")
                 : "";
 
+            // Use "=" if step title is same as previous row
+            const displayStepTitle =
+              taskIdx === 0 ? stepTitle : "=";
+
             tasksData.push({
-              스텝: stepTitle,
+              Index: `Step ${stepIdx + 1}`,
+              스텝: displayStepTitle,
               태스크명: task.title,
               설명: task.description || "",
               담당자:
@@ -2268,6 +2271,74 @@ const App: React.FC = () => {
         const data = await file.arrayBuffer();
         const workbook = XLSX.read(data, { type: "array" });
 
+        // Find info sheet
+        const infoSheetName = workbook.SheetNames.find((name) =>
+          name.includes("정보"),
+        );
+        let updatedProjectInfo = { ...currentProject };
+
+        if (infoSheetName) {
+          const infoSheet = workbook.Sheets[infoSheetName];
+          const infoData = XLSX.utils.sheet_to_json<any>(infoSheet);
+          infoData.forEach((row: any) => {
+            const field = row["필드"];
+            const value = row["값"];
+            if (!field || value === undefined) return;
+
+            switch (field) {
+              case "프로젝트명":
+                updatedProjectInfo.name = value;
+                break;
+              case "시작일":
+                updatedProjectInfo.start_date = value === "-" ? "" : value;
+                break;
+              case "종료일":
+                updatedProjectInfo.end_date = value === "-" ? "" : value;
+                break;
+              case "PM":
+                updatedProjectInfo.pm_name = value === "-" ? "" : value;
+                break;
+              case "PM 전화":
+                updatedProjectInfo.pm_phone = value === "-" ? "" : value;
+                break;
+              case "PM 이메일":
+                updatedProjectInfo.pm_email = value === "-" ? "" : value;
+                break;
+              case "디자이너 A":
+                updatedProjectInfo.designer_name = value === "-" ? "" : value;
+                break;
+              case "디자이너 A 전화":
+                updatedProjectInfo.designer_phone = value === "-" ? "" : value;
+                break;
+              case "디자이너 A 이메일":
+                updatedProjectInfo.designer_email = value === "-" ? "" : value;
+                break;
+              case "디자이너 B":
+                updatedProjectInfo.designer_2_name = value === "-" ? "" : value;
+                break;
+              case "디자이너 B 전화":
+                updatedProjectInfo.designer_2_phone =
+                  value === "-" ? "" : value;
+                break;
+              case "디자이너 B 이메일":
+                updatedProjectInfo.designer_2_email =
+                  value === "-" ? "" : value;
+                break;
+              case "디자이너 C":
+                updatedProjectInfo.designer_3_name = value === "-" ? "" : value;
+                break;
+              case "디자이너 C 전화":
+                updatedProjectInfo.designer_3_phone =
+                  value === "-" ? "" : value;
+                break;
+              case "디자이너 C 이메일":
+                updatedProjectInfo.designer_3_email =
+                  value === "-" ? "" : value;
+                break;
+            }
+          });
+        }
+
         // Get tasks sheet
         const tasksSheetName = workbook.SheetNames.find((name) =>
           name.includes("태스크"),
@@ -2288,136 +2359,199 @@ const App: React.FC = () => {
         // Parse Excel data and update project
         const newCompletedTasks = new Set(completedTasks);
         const newTaskLinks = new Map(taskLinks);
-        const nextCustomTasks = { ...currentProject.custom_tasks };
+        const nextCustomTasks = { ...updatedProjectInfo.custom_tasks };
+        const nextStepTitles = {
+          ...(updatedProjectInfo.task_states?.meta?.step_titles || {}),
+        };
 
-        tasksData.forEach((row) => {
-          const taskId = row["태스크_ID"];
-          if (!taskId) return;
+        let currentStepId: number | null = null;
+        let currentStepTitle: string | null = null;
 
-          // Update completion status
-          const isCompleted = row["완료여부"] === "완료";
-          if (isCompleted) {
-            newCompletedTasks.add(taskId);
-          } else {
-            newCompletedTasks.delete(taskId);
+        tasksData.forEach((row: any) => {
+          // Identify step from Index or 스텝 title
+          const indexVal = row["Index"] || "";
+          const stepVal = row["스텝"] || "";
+
+          if (indexVal.startsWith("Step ")) {
+            const stepNum = parseInt(indexVal.replace("Step ", ""));
+            if (!isNaN(stepNum)) {
+              currentStepId = stepNum;
+            }
           }
 
-          // Update completion date
-          const completedDate = row["완료일"] || "00-00-00";
+          if (!currentStepId) return;
 
-          // Update links
-          const linkUrl = row["링크"] || "";
-          const linkLabel = row["링크라벨"] || "";
-          if (linkUrl) {
-            newTaskLinks.set(taskId, { url: linkUrl, label: linkLabel });
-          } else {
-            newTaskLinks.delete(taskId);
+          // Update step title if explicitly changed (not "=")
+          if (stepVal && stepVal !== "=") {
+            currentStepTitle = stepVal;
+            nextStepTitles[currentStepId] = stepVal;
           }
 
-          // Update task info (title, description)
           const title = row["태스크명"];
+          if (!title) return;
+
           const description = row["설명"] || "";
+          const completedDate = row["완료일"] || "00-00-00";
+          const isCompleted = row["완료여부"] === "완료";
+
+          // Parse roles
+          const rolesStr = row["담당자"] || "";
+          const roles: Role[] = rolesStr
+            .split(",")
+            .map((r: string) => {
+              const cleaned = r.trim();
+              if (cleaned.includes("PM")) return Role.PM;
+              if (cleaned.includes("디자이너")) return Role.DESIGNER;
+              if (cleaned.includes("클라이언트")) return Role.CLIENT;
+              if (cleaned.includes("매니저")) return Role.MANAGER;
+              if (cleaned.includes("개발자")) return Role.DEVELOPER;
+              return null;
+            })
+            .filter((r: Role | null) => r !== null);
 
           // Parse todos from 할일 field
           const 할일Raw = row["할일"] || "";
           const todos = 할일Raw
             .split("\n")
-            .filter((line) => line.trim())
-            .map((line) => {
-              const isCompleted = line.startsWith("☑");
+            .filter((line: string) => line.trim())
+            .map((line: string) => {
+              const isComp = line.startsWith("☑");
               const text = line.replace(/^[☑☐]\s*/, "").trim();
               return {
                 id: crypto.randomUUID(),
                 text,
-                isCompleted,
+                isCompleted: isComp,
               };
             });
 
-          if (title) {
-            // Find task in custom tasks or static tasks
-            let foundInCustom = false;
+          // Match task by title within current step
+          if (!nextCustomTasks[currentStepId]) {
+            nextCustomTasks[currentStepId] = [];
+          }
 
-            for (const stepId in nextCustomTasks) {
-              const stepTasks = nextCustomTasks[stepId];
-              const idx = stepTasks.findIndex((t) => t.id === taskId);
-              if (idx > -1) {
-                nextCustomTasks[stepId][idx] = {
-                  ...stepTasks[idx],
-                  title,
-                  description,
-                  completed_date: completedDate,
-                  todos,
-                };
-                foundInCustom = true;
-                break;
-              }
-            }
+          // Search in static tasks first to see if it's a template task we should customize
+          const staticStep = STEPS_STATIC.find((s) => s.id === currentStepId);
+          const staticTask = staticStep?.tasks?.find((t) => t.title === title);
 
-            // If not found in custom, add to custom tasks
-            if (!foundInCustom) {
-              let stepId = 0;
-              if (taskId.startsWith("t")) {
-                stepId = parseInt(taskId[1]);
-              } else if (taskId.startsWith("custom")) {
-                stepId = parseInt(taskId.split("-")[1]);
-              }
+          const existingCustomIdx = nextCustomTasks[currentStepId].findIndex(
+            (t) => t.title === title,
+          );
 
-              if (stepId > 0) {
-                if (!nextCustomTasks[stepId]) {
-                  nextCustomTasks[stepId] = [];
-                }
-                nextCustomTasks[stepId].push({
-                  id: taskId,
-                  title,
-                  description,
-                  roles: [Role.PM],
-                  completed_date: completedDate,
-                  todos,
-                });
-              }
-            }
+          if (existingCustomIdx > -1) {
+            // Update existing custom task
+            const taskId = nextCustomTasks[currentStepId][existingCustomIdx].id;
+            nextCustomTasks[currentStepId][existingCustomIdx] = {
+              ...nextCustomTasks[currentStepId][existingCustomIdx],
+              description,
+              completed_date: completedDate,
+              todos,
+              roles: roles.length > 0 ? roles : nextCustomTasks[currentStepId][existingCustomIdx].roles
+            };
+
+            // Update completion/links
+            if (isCompleted) newCompletedTasks.add(taskId);
+            else newCompletedTasks.delete(taskId);
+            
+            const linkUrl = row["링크"] || "";
+            const linkLabel = row["링크라벨"] || "";
+            if (linkUrl) newTaskLinks.set(taskId, { url: linkUrl, label: linkLabel });
+          } else if (staticTask) {
+            // It's a template task - customize it
+            const newTask = {
+              ...staticTask,
+              description,
+              completed_date: completedDate,
+              todos,
+              roles: roles.length > 0 ? roles : staticTask.roles
+            };
+            nextCustomTasks[currentStepId].push(newTask);
+            
+            if (isCompleted) newCompletedTasks.add(staticTask.id);
+            else newCompletedTasks.delete(staticTask.id);
+
+            const linkUrl = row["링크"] || "";
+            const linkLabel = row["링크라벨"] || "";
+            if (linkUrl) newTaskLinks.set(staticTask.id, { url: linkUrl, label: linkLabel });
+          } else {
+            // New task entirely
+            const newId = `custom-${currentStepId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+            const newTask: Task = {
+              id: newId,
+              title,
+              description,
+              roles: roles.length > 0 ? roles : [Role.PM],
+              completed_date: completedDate,
+              todos,
+            };
+            nextCustomTasks[currentStepId].push(newTask);
+            
+            if (isCompleted) newCompletedTasks.add(newId);
+            const linkUrl = row["링크"] || "";
+            const linkLabel = row["링크라벨"] || "";
+            if (linkUrl) newTaskLinks.set(newId, { url: linkUrl, label: linkLabel });
           }
         });
 
-        // Update project
-        setCompletedTasks(newCompletedTasks);
-        setTaskLinks(newTaskLinks);
+        // Prepare final updated metadata and task states
+        const finalMeta = {
+          ...(updatedProjectInfo.task_states?.meta || {}),
+          step_titles: nextStepTitles,
+          custom_tasks: nextCustomTasks,
+        };
 
-        // Calculate new progress
-        const total = calculateTotalTasks(currentProject);
-        const percent =
-          total === 0 ? 0 : Math.round((newCompletedTasks.size / total) * 100);
+        const finalTaskStates = {
+          ...updatedProjectInfo.task_states,
+          completed: Array.from(newCompletedTasks),
+          links: Object.fromEntries(newTaskLinks),
+          meta: finalMeta,
+        };
+
+        // Calculate new progress status using the updated structure
+        const total = calculateTotalTasks({
+          ...updatedProjectInfo,
+          custom_tasks: nextCustomTasks,
+          task_states: finalTaskStates,
+        });
+        const percent = total === 0 ? 0 : Math.round((newCompletedTasks.size / total) * 100);
 
         const updatedProject = {
-          ...currentProject,
+          ...updatedProjectInfo,
+          task_states: finalTaskStates,
           custom_tasks: nextCustomTasks,
-          task_states: {
-            completed: Array.from(newCompletedTasks),
-            links: Object.fromEntries(newTaskLinks),
-            meta: {
-              ...currentProject.task_states?.meta,
-              custom_tasks: nextCustomTasks,
-            },
-          },
           status: Math.min(100, percent),
           last_updated: new Date().toISOString(),
         };
 
+        // Apply changes
         setCurrentProject(updatedProject);
-        const nextProjects = projects.map((p) =>
-          p.id === currentProject.id ? updatedProject : p,
+        setCompletedTasks(newCompletedTasks);
+        setTaskLinks(newTaskLinks);
+        
+        saveProjectsLocal(
+          projects.map((p) => (p.id === updatedProject.id ? updatedProject : p)),
         );
-        setProjects(nextProjects);
-        localStorage.setItem("grafy_projects", JSON.stringify(nextProjects));
 
-        // Sync to Supabase
         if (isSupabaseReady && supabase) {
           try {
             await supabase
               .from("projects")
               .update({
-                task_states: updatedProject.task_states,
-                custom_tasks: updatedProject.custom_tasks,
+                name: updatedProject.name,
+                start_date: updatedProject.start_date,
+                end_date: updatedProject.end_date,
+                pm_name: updatedProject.pm_name,
+                pm_phone: updatedProject.pm_phone,
+                pm_email: updatedProject.pm_email,
+                designer_name: updatedProject.designer_name,
+                designer_phone: updatedProject.designer_phone,
+                designer_email: updatedProject.designer_email,
+                designer_2_name: updatedProject.designer_2_name,
+                designer_2_phone: updatedProject.designer_2_phone,
+                designer_2_email: updatedProject.designer_2_email,
+                designer_3_name: updatedProject.designer_3_name,
+                designer_3_phone: updatedProject.designer_3_phone,
+                designer_3_email: updatedProject.designer_3_email,
+                task_states: finalTaskStates,
                 status: updatedProject.status,
                 last_updated: updatedProject.last_updated,
               })
@@ -2427,7 +2561,7 @@ const App: React.FC = () => {
           }
         }
 
-        showToast("엑셀 파일이 성공적으로 임포트되었습니다.");
+        showToast("엑셀 데이터가 성공적으로 반영되었습니다.");
       } catch (error) {
         console.error("Error importing excel:", error);
         showToast("엑셀 임포트 중 오류가 발생했습니다.");
