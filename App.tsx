@@ -2199,10 +2199,10 @@ const App: React.FC = () => {
                     .join("\n")
                 : "";
 
-            // Use "=" if step title is same as previous row
-            const displayStepTitle = taskIdx === 0 ? stepTitle : "=";
-            const displayIndex = taskIdx === 0 ? `Step ${stepIdx + 1}` : "=";
-            const displayGroup = groupName && groupName === lastGroupName ? "=" : groupName;
+            // Use "/" if step title is same as previous row
+            const displayStepTitle = taskIdx === 0 ? stepTitle : "/";
+            const displayIndex = taskIdx === 0 ? `Step ${stepIdx + 1}` : "/";
+            const displayGroup = groupName && groupName === lastGroupName ? "/" : groupName;
 
             if (groupName) {
               lastGroupName = groupName;
@@ -2420,17 +2420,17 @@ const App: React.FC = () => {
 
           if (!currentStepId) return;
 
-          // Update step title if explicitly changed (not "=")
-          if (stepVal && stepVal !== "=") {
+          // Update step title if explicitly changed (not "/")
+          if (stepVal && stepVal !== "/") {
             currentStepTitle = stepVal;
             nextStepTitles[currentStepId] = stepVal;
           }
 
           // Parse group name
           const groupVal = row["그룹"];
-          // If groupVal is explicitly provided and not "=", update current group.
-          // If it's empty or "=", keep the previous currentGroupName (inherit).
-          if (groupVal && groupVal !== "=") {
+          // If groupVal is explicitly provided and not "/", update current group.
+          // If it's empty or "/", keep the previous currentGroupName (inherit).
+          if (groupVal && groupVal !== "/") {
             currentGroupName = groupVal;
           }
           // Note: If !groupVal (empty), we intentionally do nothing, creating an inheritance effect.
