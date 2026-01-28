@@ -2210,6 +2210,7 @@ const App: React.FC = () => {
             }
 
             tasksData.push({
+              시스템_ID: task.id, // Move System_ID to the first column
               Index: displayIndex,
               스텝: displayStepTitle,
               그룹: displayGroup,
@@ -2240,7 +2241,6 @@ const App: React.FC = () => {
               링크라벨: taskLink?.label || "",
               할일: todosText,
               클라이언트공개: isClientVisible ? "O" : "X",
-              시스템_ID: task.id, // Critical for stable round-tripping
             });
           });
         });
@@ -2440,8 +2440,14 @@ const App: React.FC = () => {
 
           // Parse group name
           const groupVal = row["그룹"];
-          if (groupVal && groupVal !== "/") {
-            currentGroupName = groupVal;
+          if (groupVal === "/") {
+             // Keep previous group (Inherit)
+          } else if (groupVal) {
+             // Start new group
+             currentGroupName = groupVal;
+          } else {
+             // Empty cell -> No Group (Reset)
+             currentGroupName = null;
           }
 
           const title = row["태스크명"];
