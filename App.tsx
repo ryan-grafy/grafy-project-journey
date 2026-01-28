@@ -2210,6 +2210,7 @@ const App: React.FC = () => {
             }
 
             tasksData.push({
+              ID: task.id, // HIDDEN ID COLUMN FOR SYNC
               Index: displayIndex,
               스텝: displayStepTitle,
               그룹: displayGroup,
@@ -2446,6 +2447,8 @@ const App: React.FC = () => {
           const title = row["태스크명"];
           if (!title) return;
 
+          let taskId = row["ID"] || ""; // GET ID FROM EXCEL
+
           const description = row["설명"] || "";
           const completedDate = row["완료일"] || "00-00-00";
           const isCompleted = row["완료여부"] === "완료";
@@ -2481,20 +2484,20 @@ const App: React.FC = () => {
               };
             });
 
-          // Search in static tasks
+          // Search in static tasks by ID instead of title
           const staticStep = STEPS_STATIC.find((s) => s.id === currentStepId);
-          const staticTask = staticStep?.tasks?.find((t) => t.title === title);
+          const staticTask = staticStep?.tasks?.find((t) => t.id === taskId);
 
-          let taskId: string;
-
-          if (staticTask) {
-            taskId = staticTask.id;
+          if (staticTask || (taskId && !taskId.startsWith('custom-'))) {
+            // It's a template task or has a specific template ID
+            taskId = taskId || staticTask?.id || ""; 
             const newTask = {
-              ...staticTask,
+              ...(staticTask || { id: taskId, title: "", roles: [Role.PM] }),
+              title,
               description,
               completed_date: completedDate,
               todos,
-              roles: roles.length > 0 ? roles : staticTask.roles
+              roles: roles.length > 0 ? roles : (staticTask?.roles || [Role.PM])
             };
             nextCustomTasks[currentStepId].push(newTask);
             if (isCompleted) newCompletedTasks.add(taskId);
@@ -2504,9 +2507,10 @@ const App: React.FC = () => {
             const linkLabel = row["링크라벨"] || "";
             if (linkUrl) newTaskLinks.set(taskId, { url: linkUrl, label: linkLabel });
           } else {
-            // Check if it's a known round-based task ID pattern (but matched by title)
-            // For true 1:1 sync, we treat unmatched titles as new custom tasks
-            taskId = `custom-${currentStepId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+            // New task or matched custom task
+            if (!taskId) {
+               taskId = `custom-${currentStepId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+            }
             const newTask: Task = {
               id: taskId,
               title,
