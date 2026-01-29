@@ -2440,8 +2440,14 @@ const App: React.FC = () => {
 
           // Parse group name
           const groupVal = row["그룹"];
-          if (groupVal && groupVal !== "/") {
+          if (groupVal === "/") {
+            // "/" means inherit previous group (do nothing)
+          } else if (groupVal && groupVal.trim() !== "") {
+            // New group name specified
             currentGroupName = groupVal;
+          } else {
+            // Empty cell = break group
+            currentGroupName = null;
           }
 
           const title = row["태스크명"];
