@@ -1,4 +1,3 @@
-
 import { Role, Step } from './types';
 
 export interface TeamMember {

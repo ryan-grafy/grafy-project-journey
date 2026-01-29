@@ -903,8 +903,8 @@ const App: React.FC = () => {
     let allVisibleTasks: Task[] = [];
 
     if (stepId === 2) {
-      const roundCount = project.rounds_navigation_count || 1;
-      const roundTasks = Array.from({ length: roundCount }).flatMap(
+      const actualRoundCount = roundCount;
+      const roundTasks = Array.from({ length: actualRoundCount }).flatMap(
         (_, rIdx) => {
           const propId = `t2-round-${rIdx + 1}-prop`;
           const feedId = `t2-round-${rIdx + 1}-feed`;
@@ -986,8 +986,8 @@ const App: React.FC = () => {
           stepCustomTasks.find((t) => t.id === "t3-final") || finalTask,
         );
     } else if (stepId === 4) {
-      const roundCount2 = project.rounds2_count || 2;
-      const roundTasks = Array.from({ length: roundCount2 }).flatMap(
+      const actualRoundCount = roundCount;
+      const roundTasks = Array.from({ length: actualRoundCount }).flatMap(
         (_, rIdx) => {
           const pmId = `t4-round-${rIdx + 1}-pm`;
           const desId = `t4-round-${rIdx + 1}-des`;
@@ -1205,9 +1205,28 @@ const App: React.FC = () => {
   ) => {
     const currentLinks = nextLinks || taskLinks;
     syncTasks(project, nextCompleted, currentLinks); // Save to local backup
-    const total = calculateTotalTasks(project);
-    const percent =
-      total === 0 ? 0 : Math.round((nextCompleted.size / total) * 100);
+    
+    // Calculate total visible tasks across all active steps
+    let allVisibleIds: string[] = [];
+    STEPS_STATIC.forEach((step) => {
+      const isExp2Hidden = project.task_states?.meta?.is_expedition2_hidden;
+      if (step.id === 4 && isExp2Hidden) return;
+
+      const r_nav = project.rounds_navigation_count || 1;
+      const r_exp1 = project.rounds_count || 2;
+      const r_exp2 = project.rounds2_count || 2;
+      
+      let rc = r_nav;
+      if (step.id === 3) rc = r_exp1;
+      if (step.id === 4) rc = r_exp2;
+
+      const visible = getVisibleTasks(step.id, project, rc);
+      visible.forEach(t => allVisibleIds.push(t.id));
+    });
+
+    const total = allVisibleIds.length;
+    const completedVisible = allVisibleIds.filter(id => nextCompleted.has(id)).length;
+    const percent = total === 0 ? 0 : Math.round((completedVisible / total) * 100);
     const task_states = {
       completed: Array.from(nextCompleted),
       links: Object.fromEntries(currentLinks),
@@ -1261,38 +1280,20 @@ const App: React.FC = () => {
 
   const calculateTotalTasks = (project: Project) => {
     let count = 0;
-    const deletedSet = new Set(project.deleted_tasks || []);
     STEPS_STATIC.forEach((step) => {
-      if (step.id === 2) {
-        const roundCount = project.rounds_navigation_count || 1;
-        for (let r = 1; r <= roundCount; r++) {
-          if (!deletedSet.has(`t2-round-${r}-prop`)) count += 1;
-          if (!deletedSet.has(`t2-round-${r}-feed`)) count += 1;
-        }
-      } else if (step.id === 3) {
-        if (!deletedSet.has("t3-base-1")) count += 1;
-        if (!deletedSet.has("t3-final")) count += 1;
-        const roundCount = project.rounds_count || 2;
-        for (let r = 1; r <= roundCount; r++) {
-          if (!deletedSet.has(`t3-round-${r}-pm`)) count += 1;
-          if (!deletedSet.has(`t3-round-${r}-des`)) count += 1;
-        }
-      } else if (step.id === 4) {
-        const roundCount2 = project.rounds2_count || 2;
-        for (let r = 1; r <= roundCount2; r++) {
-          if (!deletedSet.has(`t4-round-${r}-pm`)) count += 1;
-          if (!deletedSet.has(`t4-round-${r}-des`)) count += 1;
-        }
-      } else {
-        step.tasks.forEach((t) => {
-          if (!deletedSet.has(t.id)) count += 1;
-        });
-      }
-      if (project.custom_tasks?.[step.id]) {
-        count += project.custom_tasks[step.id].filter(
-          (t) => !t.id.startsWith("t"),
-        ).length;
-      }
+      const isExp2Hidden = project.task_states?.meta?.is_expedition2_hidden;
+      if (step.id === 4 && isExp2Hidden) return;
+
+      const r_nav = project.rounds_navigation_count || 1;
+      const r_exp1 = project.rounds_count || 2;
+      const r_exp2 = project.rounds2_count || 2;
+      
+      let rc = r_nav;
+      if (step.id === 3) rc = r_exp1;
+      if (step.id === 4) rc = r_exp2;
+
+      const visible = getVisibleTasks(step.id, project, rc);
+      count += visible.length;
     });
     return count;
   };
@@ -2594,12 +2595,19 @@ const App: React.FC = () => {
         };
 
         // Calculate new progress status using the updated structure
-        const total = calculateTotalTasks({
-          ...updatedProjectInfo,
-          custom_tasks: nextCustomTasks,
-          task_states: finalTaskStates,
+        let allVisibleIds: string[] = [];
+        STEPS_STATIC.forEach((step) => {
+          const isExp2Hidden = finalMeta.is_expedition2_hidden;
+          if (step.id === 4 && isExp2Hidden) return;
+          let rc = finalMeta.rounds_navigation_count || 1;
+          if (step.id === 3) rc = finalMeta.rounds_count || 2;
+          if (step.id === 4) rc = finalMeta.rounds2_count || 2;
+          const visible = getVisibleTasks(step.id, { ...updatedProjectInfo, custom_tasks: nextCustomTasks, task_states: finalTaskStates }, rc);
+          visible.forEach(t => allVisibleIds.push(t.id));
         });
-        const percent = total === 0 ? 0 : Math.round((newCompletedTasks.size / total) * 100);
+        const total = allVisibleIds.length;
+        const completedVisible = allVisibleIds.filter(id => newCompletedTasks.has(id)).length;
+        const percent = total === 0 ? 0 : Math.round((completedVisible / total) * 100);
 
         const updatedProject = {
           ...updatedProjectInfo,
@@ -2615,6 +2623,11 @@ const App: React.FC = () => {
         setCurrentProject(updatedProject);
         setCompletedTasks(newCompletedTasks);
         setTaskLinks(newTaskLinks);
+
+        // SYNC STATE: Crucial for real-time UI reflect
+        setRounds(finalMeta.rounds_count || 2);
+        setRounds2(finalMeta.rounds2_count || 2);
+        setRoundsNavigation(finalMeta.rounds_navigation_count || 1);
         
         saveProjectsLocal(
           projects.map((p) => (p.id === updatedProject.id ? updatedProject : p)),
@@ -2823,8 +2836,13 @@ const App: React.FC = () => {
                       currentProject?.task_states?.meta?.is_expedition2_hidden;
                     return !(step.id === 4 && isHidden);
                   }).map((step, index) => {
+                    // CONSISTENCY FIX: Deriving correct round count from project metadata
+                    const stepRC = step.id === 3 ? (currentProject?.rounds_count || 2) : 
+                                 step.id === 4 ? (currentProject?.rounds2_count || 2) : 
+                                 step.id === 2 ? (currentProject?.rounds_navigation_count || 1) : 0;
+                    
                     const allVisibleTasks = currentProject
-                      ? getVisibleTasks(step.id, currentProject, rounds)
+                      ? getVisibleTasks(step.id, currentProject, stepRC)
                       : [];
                     const locked = isLockedStep(step.id);
                     const savedTitle =
