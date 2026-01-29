@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Role, Task } from '../types';
 import FileDropzone from './FileDropzone';
-
 import TodoList from './TodoList';
 
 interface TaskCardProps {
@@ -17,13 +16,13 @@ interface TaskCardProps {
   onDelete?: (taskId: string) => void;
   onToast: (msg: string) => void;
   isLockedProject?: boolean;
-  projectId: string; // New
+  projectId: string;
   isSnapshotMode?: boolean;
-  isSelectedForSnapshot?: boolean;
-  onSnapshotSelect?: () => void;
-  isClientView?: boolean;
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void;
   isClientVisible?: boolean;
+  isSelected?: boolean;
+  onSnapshotSelect?: () => void;
+  isClientView?: boolean;
 }
 
 const roleStyles: Record<Role, { style: string; icon: string }> = {
@@ -50,7 +49,7 @@ const accentColors: Record<number, string> = {
 
 const TaskCard: React.FC<TaskCardProps> = ({
   task, isCompleted, isLockedStep, stepId, linkUrl, linkLabel, onToggle, onContextMenu, onEditContextMenu, onDelete, onToast, isLockedProject, projectId,
-  isSnapshotMode, isSelectedForSnapshot, onSnapshotSelect, isClientView, onUpdateTask, isClientVisible
+  isSnapshotMode, isSelected, onSnapshotSelect, isClientView, onUpdateTask, isClientVisible
 }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
@@ -82,12 +81,10 @@ const TaskCard: React.FC<TaskCardProps> = ({
   };
 
   const handleToggleClick = (e: React.MouseEvent) => {
-    // 팝업이 떠 있는 상태에서 태스크 클릭 시 팝업이 닫힐 수 있도록 stopPropagation을 제거합니다.
     if (isSnapshotMode) {
       onSnapshotSelect?.();
       return;
     }
-
     if (isLockedProject) {
       onToast("잠긴 프로젝트는 수정할 수 없습니다.");
       return;
@@ -118,13 +115,22 @@ const TaskCard: React.FC<TaskCardProps> = ({
   };
 
   const pointColor = accentColors[stepId] || 'bg-black';
-  const roleInfo = roleStyles[task.role] || roleStyles[Role.PM];
 
   return (
     <div
       onClick={handleToggleClick}
       onContextMenu={handleRightClickInfo}
-      className={`relative flex flex-col p-4 mb-2 bg-white border rounded-2xl cursor-pointer transition-all duration-300 min-h-[100px] group overflow-hidden ${isCompleted ? 'bg-white border-black/10 opacity-80 shadow-inner' : 'border-black/25 hover:border-black/50 hover:-translate-y-1 hover:shadow-xl shadow-sm'} ${isLockedStep && !isSnapshotMode ? 'grayscale-[0.5]' : ''} ${isSnapshotMode && isSelectedForSnapshot && !isClientView ? '!border-emerald-500 !border-4 !ring-2 !ring-emerald-200 z-50' : ''}`}
+      className={`relative flex flex-col p-4 mb-2 bg-white border border-black/25 rounded-xl cursor-pointer min-h-[100px] group overflow-hidden transition-colors duration-200 ${isCompleted ? '' : 'hover:border-black/50 hover:-translate-y-1'} ${
+        isSelected && !isClientView
+          ? isSnapshotMode
+            ? '!border-emerald-400 !border-[3px] ring-4 ring-emerald-50 z-50 shadow-[0_4px_20px_rgba(52,211,153,0.3)]'
+            : '!border-blue-500 !border-[2.5px] z-50 ring-4 ring-blue-50'
+          : ''
+      }`}
+      style={{
+        filter: isLockedStep && !isSnapshotMode ? 'grayscale(0.5)' : 'grayscale(0)',
+        transition: 'filter 200ms ease-in-out, transform 200ms ease-in-out'
+      }}
     >
       <div className="absolute top-3 right-3 flex items-center gap-2 z-20">
         {isClientVisible && !isClientView && (
@@ -134,13 +140,13 @@ const TaskCard: React.FC<TaskCardProps> = ({
         )}
         {isCompleted ? (
           <div className="flex items-center gap-2 w-7 h-7 justify-center">
-            <i className="fa-solid fa-circle-check text-emerald-500 text-[28px] shadow-sm rounded-full bg-white"></i>
+            <i className="fa-solid fa-circle-check text-emerald-500 text-[28px] bg-white"></i>
           </div>
         ) : (
           !isLockedProject && (
             <button
               onClick={handleDeleteClick}
-              className={`w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-sm border ${isConfirmingDelete ? 'bg-red-500 border-red-600 text-white animate-pulse' : 'bg-white border-slate-200 text-slate-400 hover:border-red-400 hover:text-red-500'}`}
+              className={`w-7 h-7 rounded-full flex items-center justify-center transition-all border ${isConfirmingDelete ? 'bg-red-500 border-red-600 text-white animate-pulse' : 'bg-white border-slate-200 text-slate-400 hover:border-red-400 hover:text-red-500'}`}
               title={isConfirmingDelete ? "정말 삭제할까요?" : "태스크 삭제"}
             >
               <i className={`fa-solid ${isConfirmingDelete ? 'fa-times' : 'fa-minus'} text-[10px]`}></i>
@@ -155,24 +161,22 @@ const TaskCard: React.FC<TaskCardProps> = ({
             task.roles.map(r => {
               const rInfo = roleStyles[r] || roleStyles[Role.PM];
               return (
-                <span key={r} className={`text-[10px] font-black px-2 py-1 rounded-lg w-fit flex items-center gap-2 uppercase tracking-widest ${rInfo.style}`}>
+                <span key={r} className={`text-[10px] font-bold px-2 py-1 rounded-md w-fit flex items-center gap-2 uppercase tracking-widest ${rInfo.style}`}>
                   <i className={`fa-solid ${rInfo.icon} text-[10px]`}></i>
                   {roleLabels[r]}
                 </span>
               );
             })
           ) : (
-            // Fallback for migration safety or empty
-            <span className={`text-[10px] font-black px-2 py-1 rounded-lg w-fit flex items-center gap-2 uppercase tracking-widest ${roleStyles[Role.PM].style}`}>
+            <span key="pm-fallback" className={`text-[10px] font-bold px-2 py-1 rounded-md w-fit flex items-center gap-2 uppercase tracking-widest ${roleStyles[Role.PM].style}`}>
               <i className={`fa-solid ${roleStyles[Role.PM].icon} text-[10px]`}></i>
               {roleLabels[Role.PM]}
             </span>
           )}
         </div>
         <h4 className="font-bold text-lg mb-1 leading-tight tracking-tight text-black">{task.title}</h4>
-        {task.description && <p className="text-[12.5px] leading-snug font-bold text-slate-500 line-clamp-3 break-all whitespace-normal">{task.description}</p>}
+        {task.description && <p className="text-[12.5px] leading-snug font-semibold text-slate-500 line-clamp-3 break-all whitespace-normal">{task.description}</p>}
 
-        {/* Todo List Component Integration */}
         {onUpdateTask && !isClientView && (
            <TodoList 
              todos={task.todos || []} 
@@ -181,9 +185,9 @@ const TaskCard: React.FC<TaskCardProps> = ({
            />
         )}
 
-        <div className="mt-1.5 inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2 py-1 rounded-full">
+        <div className="mt-1.5 inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2 py-1 rounded-md">
           <i className="fa-solid fa-calendar-check text-slate-400 text-[9px]"></i>
-          <span className="text-[10px] font-black text-slate-700">
+          <span className="text-[10px] font-bold text-slate-700">
             마감: {formatShortDate(task.completed_date || '00-00-00')}
           </span>
         </div>
@@ -201,7 +205,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
               e.stopPropagation();
               linkUrl ? window.open(linkUrl, '_blank') : onToast("우클릭하여 링크를 설정해주세요.");
             }}
-            className={`w-full inline-flex justify-center items-center gap-1.5 px-3 py-2.5 rounded-xl text-[13px] font-black border transition-all ${linkUrl ? `${pointColor} text-white border-transparent hover:brightness-90 shadow-md` : 'bg-white text-slate-600 border-slate-200 hover:border-black hover:text-black'} overflow-hidden`}
+            className={`w-full inline-flex justify-center items-center gap-1.5 px-3 py-2.5 rounded-lg text-[13px] font-bold border transition-all ${linkUrl ? `${pointColor} text-white border-transparent hover:brightness-90` : 'bg-white text-slate-600 border-slate-200 hover:border-black hover:text-black'} overflow-hidden`}
           >
             <span className="truncate max-w-full">{linkUrl ? (linkLabel || "자료 확인") : "우클릭 링크 지정"}</span>
           </button>
@@ -211,4 +215,4 @@ const TaskCard: React.FC<TaskCardProps> = ({
   );
 };
 
-export default TaskCard;
+export default React.memo(TaskCard);

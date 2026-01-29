@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Navbar from "./components/Navbar.tsx";
 import StepColumn from "./components/StepColumn.tsx";
 import UrlPopover from "./components/UrlPopover.tsx";
@@ -96,15 +96,13 @@ const App: React.FC = () => {
     x: 0,
     y: 0,
   });
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [confirmHideExpedition2, setConfirmHideExpedition2] = useState(false); // Expedition 2 숨기기 확인 상태
 
   // --- SAFEGUARDS ---
   // Force Welcome if Guest is on List
   useEffect(() => {
     if (currentView === "list" && user.userId === "guest") {
-      console.warn(
-        "Detected Guest state on List view. Forcing Welcome screen.",
-      );
       setCurrentView("welcome");
     }
   }, [currentView, user.userId]);
@@ -113,8 +111,9 @@ const App: React.FC = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (isInitializing) {
-        console.warn("Initialization timed out (5s). Forcing completion.");
+      if (isInitializing) {
         setIsInitializing(false);
+      }
       }
     }, 5000);
     return () => clearTimeout(timer);
@@ -123,7 +122,6 @@ const App: React.FC = () => {
   // Listen for browser history changes (Back/Forward)
   useEffect(() => {
     const handlePopState = () => {
-      console.log("Browser navigation detected (popstate)");
       setLocationKey((k) => k + 1);
     };
     window.addEventListener("popstate", handlePopState);
@@ -137,7 +135,6 @@ const App: React.FC = () => {
 
     const initAuth = async () => {
       if (!isSupabaseReady || !supabase) {
-        console.warn("Supabase not ready.");
         if (mounted) setIsInitializing(false);
         return;
       }
@@ -147,7 +144,6 @@ const App: React.FC = () => {
       if (path.startsWith("/share/")) {
         const pid = path.split("/share/")[1];
         if (pid) {
-          console.log("Shared link detected:", pid);
           setSharedProjectId(pid);
           setCurrentView("share");
           setIsInitializing(false);
@@ -155,12 +151,10 @@ const App: React.FC = () => {
         }
       }
 
-      console.log("Initializing Auth...");
 
       // 2. Auth State Change Listener (Priority for maintaining session)
       const { data } = supabase.auth.onAuthStateChange(
         async (event, session) => {
-          console.log("Auth Event:", event);
           if (!mounted) return;
 
           // FIX: Prevent view reset on token refresh
@@ -205,7 +199,6 @@ const App: React.FC = () => {
             }
           } else if (event === "SIGNED_OUT") {
             if (mounted) {
-              console.log("User Signed Out -> Welcome");
               setCurrentView("welcome");
               setUser({
                 id: "guest",
@@ -232,7 +225,6 @@ const App: React.FC = () => {
             // Double check
             supabase.auth.getSession().then(({ data }) => {
               if (!data.session) {
-                console.log("No session found after timeout. Showing Welcome.");
                 setCurrentView("welcome");
                 setIsInitializing(false);
               }
@@ -254,7 +246,6 @@ const App: React.FC = () => {
           });
         }
       } catch (e) {
-        console.error("Storage init error", e);
       }
     };
 
@@ -280,7 +271,6 @@ const App: React.FC = () => {
       if (targetProject) {
         // Only trigger if the project actually changed (avoids infinite loops/redundant sets)
         if (currentProject?.id !== targetProject.id || currentView !== "detail") {
-          console.log("Syncing state to URL Project:", targetProject.id);
           // Manually apply state without pushState (since we're already handling a URL change)
           setCurrentProject(targetProject);
           setRounds(targetProject.rounds_count || 2);
@@ -291,7 +281,6 @@ const App: React.FC = () => {
           setActiveRole(Role.ALL);
         }
       } else {
-        console.warn("Project in URL not found:", projectIdParam);
         if (currentView !== "list") {
           setCurrentView("list");
           setCurrentProject(null);
@@ -301,7 +290,6 @@ const App: React.FC = () => {
       // If no project param, ensure we are in the correct view
       // This handles the "Back" button from detail to list
       if (currentView === "detail") {
-        console.log("No project param in URL. Switching to list view.");
         setCurrentView("list");
         setCurrentProject(null);
       }
@@ -342,7 +330,7 @@ const App: React.FC = () => {
         )
           return true;
       } catch (e) {
-        console.error("Error parsing local team data", e);
+        // Error parsing
       }
     }
 
@@ -356,7 +344,6 @@ const App: React.FC = () => {
           .limit(1);
         if (data && data.length > 0) return true;
       } catch (e) {
-        console.error("Error checking supabase authorization", e);
       }
     }
 
@@ -364,11 +351,8 @@ const App: React.FC = () => {
   };
 
   const handleGoogleLogin = async () => {
-    setIsAuthLoading(true);
-    console.log("Initiating Google OAuth Login...");
     try {
       const result: any = await signInWithGoogle();
-      console.log("signInWithGoogle result:", result);
 
       const sessionUser = result?.data?.session?.user;
 
@@ -376,7 +360,6 @@ const App: React.FC = () => {
         // AUTHORIZATION CHECK
         const isAuthorized = await checkEmailAuthorization(sessionUser.email);
         if (!isAuthorized) {
-          console.warn("Unauthorized user login:", sessionUser.email);
           await handleLogout();
           showToast("허가되지 않은 계정입니다. 접근이 거부되었습니다.");
           return;
@@ -397,13 +380,8 @@ const App: React.FC = () => {
         fetchProjects();
         showToast("성공적으로 로그인되었습니다.");
       } else if (result?.data?.url) {
-        console.log(
-          "Redirect URL received, window should redirect to:",
-          result.data.url,
-        );
       }
     } catch (error) {
-      console.error("Login component error:", error);
       showToast("로그인 중 오류가 발생했습니다.");
     } finally {
       // If we didn't return early due to auth check, stop loading
@@ -444,7 +422,6 @@ const App: React.FC = () => {
         setTeamMembers(initial);
       }
     } catch (e) {
-      console.error(e);
       const initial = INITIAL_TEAM_MEMBERS.map((m, i) => ({
         ...m,
         id: `team-${i}`,
@@ -592,7 +569,6 @@ const App: React.FC = () => {
       // Mark data as loaded so subsequent fetches don't trigger spinner
       isDataLoadedRef.current = true;
     } catch (e) {
-      console.error(e);
     }
     setIsProjectLoading(false);
   };
@@ -617,7 +593,6 @@ const App: React.FC = () => {
           await syncProjectToSupabase(recentProject);
         }
       } catch (e) {
-        console.error("Supabase sync error:", e);
       }
     }
   };
@@ -660,14 +635,9 @@ const App: React.FC = () => {
 
       const { error } = await supabase.from("projects").upsert(updateData);
       if (error) {
-        console.error("Supabase upsert error:", error);
+       // ERROR
       } else {
-        console.log(
-          "[Sync] Project synced to Supabase:",
-          project.id,
-          "Updated:",
-          project.last_updated,
-        );
+       // SUCCESS
       }
     }
   };
@@ -892,7 +862,7 @@ const App: React.FC = () => {
     showToast("프로젝트 정보 저장 완료");
   };
 
-  const getVisibleTasks = (
+  const getVisibleTasks = useCallback((
     stepId: number,
     project: Project,
     roundCount: number,
@@ -1028,6 +998,8 @@ const App: React.FC = () => {
       allVisibleTasks = [...allVisibleTasks, ...onlyCustoms];
     }
 
+
+
     const order = project.task_order?.[stepId];
     if (order && order.length > 0) {
       allVisibleTasks.sort((a, b) => {
@@ -1039,9 +1011,9 @@ const App: React.FC = () => {
       });
     }
     return allVisibleTasks;
-  };
+  }, []);
 
-  const isLockedStep = (stepId: number): boolean => {
+  const isLockedStep = useCallback((stepId: number): boolean => {
     if (stepId === 1 || !currentProject) return false;
 
     // Special handling for Step 5 (Landing) when Expedition 2 is hidden
@@ -1060,7 +1032,21 @@ const App: React.FC = () => {
       rounds,
     );
     return !prevVisibleTasks.every((t) => completedTasks.has(t.id));
-  };
+  }, [currentProject, completedTasks, rounds, getVisibleTasks]);
+
+  const findTaskInProject = useCallback((taskId: string): Task | null => {
+    if (!currentProject) return null;
+    const nextCustomTasks = currentProject.custom_tasks || {};
+    for (const stepId in nextCustomTasks) {
+      const found = nextCustomTasks[stepId].find((t) => t.id === taskId);
+      if (found) return found;
+    }
+    for (const step of STEPS_STATIC) {
+      const found = step.tasks.find((t) => t.id === taskId);
+      if (found) return found;
+    }
+    return null;
+  }, [currentProject]);
 
   const handleToggleTask = (taskId: string) => {
     if (!currentProject || currentProject.is_locked) return;
@@ -1098,7 +1084,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDeleteTask = (taskId: string) => {
+  const handleDeleteTask = useCallback((taskId: string) => {
     if (!currentProject || currentProject.is_locked) return;
     const nextCustomTasks = { ...(currentProject.custom_tasks || {}) };
     const nextTaskOrder = { ...(currentProject.task_order || {}) };
@@ -1142,21 +1128,9 @@ const App: React.FC = () => {
       updateProjectProgress(nextCompleted, updatedProject);
       showToast("태스크가 삭제되었습니다.");
     }
-  };
+  }, [currentProject, completedTasks, projects]);
 
-  const findTaskInProject = (taskId: string): Task | null => {
-    if (!currentProject) return null;
-    const nextCustomTasks = currentProject.custom_tasks || {};
-    for (const stepId in nextCustomTasks) {
-      const found = nextCustomTasks[stepId].find((t) => t.id === taskId);
-      if (found) return found;
-    }
-    for (const step of STEPS_STATIC) {
-      const found = step.tasks.find((t) => t.id === taskId);
-      if (found) return found;
-    }
-    return null;
-  };
+
 
   const handleAutoSetTaskDate = (
     taskId: string,
@@ -1197,16 +1171,15 @@ const App: React.FC = () => {
     updateProjectProgress(nextCompleted, updatedProject);
   };
 
-  const updateProjectProgress = async (
+  const updateProjectProgress = useCallback(async (
     nextCompleted: Set<string>,
     project: Project,
     nextLinks?: Map<string, { url: string; label: string }>,
   ) => {
     const currentLinks = nextLinks || taskLinks;
-    syncTasks(project, nextCompleted, currentLinks); // Save to local backup
-    const total = calculateTotalTasks(project);
+    const totalObj = calculateTotalTasks(project, nextCompleted);
     const percent =
-      total === 0 ? 0 : Math.round((nextCompleted.size / total) * 100);
+      totalObj.total === 0 ? 0 : Math.round((totalObj.completed / totalObj.total) * 100);
     const task_states = {
       completed: Array.from(nextCompleted),
       links: Object.fromEntries(currentLinks),
@@ -1221,6 +1194,7 @@ const App: React.FC = () => {
         deleted_tasks: project.deleted_tasks,
         is_expedition2_hidden: project.task_states?.meta?.is_expedition2_hidden,
         step_titles: project.task_states?.meta?.step_titles,
+        task_groups: project.task_states?.meta?.task_groups,
         template_name:
           project.template_name || project.task_states?.meta?.template_name,
       },
@@ -1253,48 +1227,55 @@ const App: React.FC = () => {
           })
           .eq("id", updatedProject.id);
       } catch (err) {
-        console.error("Failed to sync project progress to Supabase:", err);
       }
     }
-  };
+  }, [isSupabaseReady, supabase, projects, taskLinks]);
 
-  const calculateTotalTasks = (project: Project) => {
-    let count = 0;
-    const deletedSet = new Set(project.deleted_tasks || []);
+  const calculateTotalTasks = useCallback((
+    project: Project,
+    overrideCompleted?: Set<string>,
+    overrideCustomTasks?: any
+  ) => {
+    let total = 0;
+    let completed = 0;
+    const completedSet =
+      overrideCompleted || new Set(project.task_states?.completed || []);
+    
+    // Create a temporary project object for getVisibleTasks to use
+    const tempProject = {
+      ...project,
+      custom_tasks: overrideCustomTasks || project.custom_tasks || {},
+    };
+
     STEPS_STATIC.forEach((step) => {
-      if (step.id === 2) {
-        const roundCount = project.rounds_navigation_count || 1;
-        for (let r = 1; r <= roundCount; r++) {
-          if (!deletedSet.has(`t2-round-${r}-prop`)) count += 1;
-          if (!deletedSet.has(`t2-round-${r}-feed`)) count += 1;
-        }
-      } else if (step.id === 3) {
-        if (!deletedSet.has("t3-base-1")) count += 1;
-        if (!deletedSet.has("t3-final")) count += 1;
-        const roundCount = project.rounds_count || 2;
-        for (let r = 1; r <= roundCount; r++) {
-          if (!deletedSet.has(`t3-round-${r}-pm`)) count += 1;
-          if (!deletedSet.has(`t3-round-${r}-des`)) count += 1;
-        }
-      } else if (step.id === 4) {
-        const roundCount2 = project.rounds2_count || 2;
-        for (let r = 1; r <= roundCount2; r++) {
-          if (!deletedSet.has(`t4-round-${r}-pm`)) count += 1;
-          if (!deletedSet.has(`t4-round-${r}-des`)) count += 1;
-        }
-      } else {
-        step.tasks.forEach((t) => {
-          if (!deletedSet.has(t.id)) count += 1;
-        });
+      // Step 4 hidden check
+      if (
+        step.id === 4 &&
+        tempProject.task_states?.meta?.is_expedition2_hidden
+      ) {
+        return;
       }
-      if (project.custom_tasks?.[step.id]) {
-        count += project.custom_tasks[step.id].filter(
-          (t) => !t.id.startsWith("t"),
-        ).length;
-      }
+
+      // Step 2, 3, 4 have rounds-based tasks
+      const roundCount =
+        step.id === 2
+          ? tempProject.rounds_navigation_count || 1
+          : step.id === 3
+          ? tempProject.rounds_count || 2
+          : tempProject.rounds2_count || 2;
+
+      const visibleTasks = getVisibleTasks(step.id, tempProject, roundCount);
+      
+      visibleTasks.forEach((task) => {
+        total += 1;
+        if (completedSet.has(task.id)) {
+          completed += 1;
+        }
+      });
     });
-    return count;
-  };
+
+    return { total, completed };
+  }, [getVisibleTasks]);
 
   const handleUpdateRounds = async (newRounds: number) => {
     if (!currentProject || currentProject.is_locked) return;
@@ -1321,10 +1302,6 @@ const App: React.FC = () => {
 
   const handleAddCustomTask = (stepId: number) => {
     if (!currentProject || currentProject.is_locked) return;
-    if (isLockedStep(stepId)) {
-      showToast("이전 스텝 완료가 필요합니다.");
-      return;
-    }
     const nextCustomTasks = { ...(currentProject.custom_tasks || {}) };
     const newTask: Task = {
       id: `custom-${stepId}-${Date.now()}`,
@@ -1334,12 +1311,15 @@ const App: React.FC = () => {
       hasFile: true,
       completed_date: "00-00-00",
     };
+    
+    // 1. Add to custom tasks
     nextCustomTasks[stepId] = [...(nextCustomTasks[stepId] || []), newTask];
+
+    // 2. Determine new task order (FORCE APPEND AT THE END OF VISIBLE LIST)
+    const currentVisibleTasks = getVisibleTasks(stepId, { ...currentProject, custom_tasks: nextCustomTasks }, rounds);
     const nextTaskOrder = { ...(currentProject.task_order || {}) };
-    const currentOrder =
-      nextTaskOrder[stepId] ||
-      getVisibleTasks(stepId, currentProject, rounds).map((t) => t.id);
-    nextTaskOrder[stepId] = [...currentOrder, newTask.id];
+    nextTaskOrder[stepId] = currentVisibleTasks.map(t => t.id);
+
     const updatedProject = {
       ...currentProject,
       custom_tasks: nextCustomTasks,
@@ -1359,13 +1339,155 @@ const App: React.FC = () => {
     showToast("태스크가 추가되었습니다.");
   };
 
+  const handleUpdateGroupTitle = async (stepId: number, groupId: string, newTitle: string) => {
+    if (!currentProject) return;
+    const nextMeta = { ...(currentProject.task_states?.meta || {}) };
+    const stepGroups = [...(nextMeta.task_groups?.[stepId] || [])];
+    const gIdx = stepGroups.findIndex(g => g.id === groupId);
+    if (gIdx > -1) {
+      stepGroups[gIdx] = { ...stepGroups[gIdx], title: newTitle };
+      nextMeta.task_groups = { ...nextMeta.task_groups, [stepId]: stepGroups };
+      
+      const updatedProject = {
+        ...currentProject,
+        task_states: { ...currentProject.task_states, meta: nextMeta }
+      };
+      setCurrentProject(updatedProject);
+      await syncProjectToSupabase(updatedProject);
+    }
+  };
+
+  const handleGroupTasks = async () => {
+    if (!currentProject || selectedTaskIds.size < 2) {
+      if (selectedTaskIds.size === 1) showToast("두 개 이상의 태스크를 선택해야 그룹화할 수 있습니다.");
+      return;
+    }
+
+    // Identify which step these tasks belong to (must be in the same step)
+    let targetStepId: number | null = null;
+    const selectedArray = Array.from(selectedTaskIds);
+    
+    // Simple heuristic: check all steps' current visible tasks
+    for (const step of STEPS_STATIC) {
+      const vTasks = getVisibleTasks(step.id, currentProject, rounds);
+      const visibleIds = vTasks.map(t => t.id);
+      if (selectedArray.every((id: string) => visibleIds.includes(id))) {
+        targetStepId = step.id;
+        break;
+      }
+    }
+
+    if (!targetStepId) {
+      showToast("동일한 스텝 내의 태스크들만 그룹화할 수 있습니다.");
+      return;
+    }
+
+    const nextMeta = { ...(currentProject.task_states?.meta || {}) };
+    const nextGroups = { ...(nextMeta.task_groups || {}) };
+    if (!nextGroups[targetStepId]) nextGroups[targetStepId] = [];
+
+    // Check if any selected task is already in another group
+    const alreadyInGroup = selectedArray.some(taskId => 
+      nextGroups[targetStepId!].some((g: any) => (g.taskIds || []).includes(taskId))
+    );
+
+    if (alreadyInGroup) {
+      showToast("이미 그룹에 포함된 태스크가 있습니다. 이전 그룹을 해제하고 다시 시도해 주세요.");
+      return;
+    }
+
+    const newGroupId = `group-${Date.now()}`;
+    nextGroups[targetStepId].push({
+      id: newGroupId,
+      title: "새 폴더",
+      taskIds: selectedArray
+    });
+
+    nextMeta.task_groups = nextGroups;
+    const updatedProject = {
+      ...currentProject,
+      task_states: { ...currentProject.task_states, meta: nextMeta }
+    };
+    
+    setCurrentProject(updatedProject);
+    setSelectedTaskIds(new Set()); // Reset selection
+    await syncProjectToSupabase(updatedProject);
+    showToast("그룹 폴더가 생성되었습니다. (Ctrl+G)");
+  };
+
+  const handleUngroupTasks = async () => {
+    if (!currentProject || selectedTaskIds.size === 0) return;
+
+    const nextMeta = { ...(currentProject.task_states?.meta || {}) };
+    const nextGroups = { ...(nextMeta.task_groups || {}) };
+    let changed = false;
+
+    Object.keys(nextGroups).forEach(stepId => {
+      const sId = parseInt(stepId);
+      nextGroups[sId] = nextGroups[sId].filter((group: any) => {
+        // If any selected task is in this group, disband it
+        const hasMatch = (group.taskIds || []).some((id: string) => selectedTaskIds.has(id));
+        if (hasMatch) changed = true;
+        return !hasMatch;
+      });
+    });
+
+    if (changed) {
+      nextMeta.task_groups = nextGroups;
+      const updatedProject = {
+        ...currentProject,
+        task_states: { ...currentProject.task_states, meta: nextMeta }
+      };
+      setCurrentProject(updatedProject);
+      setSelectedTaskIds(new Set());
+      await syncProjectToSupabase(updatedProject);
+      showToast("그룹이 해제되었습니다.");
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleUngroupTasks();
+        } else {
+          handleGroupTasks();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentProject, selectedTaskIds]);
+
+  const handleTaskToggleSelect = (taskId: string, multi: boolean = false) => {
+    setSelectedTaskIds(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        if (!multi) next.delete(taskId);
+      } else {
+        if (!multi) next.clear();
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
+  const handleTaskBulkSelect = (taskIds: string[]) => {
+    setSelectedTaskIds(prev => {
+      const next = new Set(prev);
+      taskIds.forEach(id => next.add(id));
+      return next;
+    });
+  };
+
   const handleReorderTasks = async (
     stepId: number,
     fromIdx: number,
     toIdx: number,
   ) => {
     if (!currentProject || currentProject.is_locked) return;
-    const allVisibleTasks = getVisibleTasks(stepId, currentProject, rounds);
+    const allVisibleTasks = getVisibleTasks(stepId, currentProject, rounds) as Task[];
     if (stepId === 3 || stepId === 2) {
       const grouped: (Task | Task[])[] = [];
       let i = 0;
@@ -1485,7 +1607,6 @@ const App: React.FC = () => {
     }
 
     if (stepId === 0) {
-      console.error("Cannot determine step for task", taskId);
       return;
     }
 
@@ -1861,7 +1982,6 @@ const App: React.FC = () => {
         await supabase.from("projects").insert(projectToSave);
       }
     } catch (e) {
-      console.error("New project save error:", e);
       showToast("프로젝트 저장 중 오류가 발생했으나 로컬에는 저장되었습니다.");
     }
 
@@ -1923,14 +2043,12 @@ const App: React.FC = () => {
         .insert(templateFullData as any);
 
       if (error) {
-        console.error("Template save error object:", error);
         throw new Error(error.message || "Unknown Supabase error");
       }
 
       showToast("템플릿이 저장되었습니다.");
       fetchProjects(true); // Refresh templates silently
     } catch (e: any) {
-      console.error("Template Save Exception:", e);
       showToast(`템플릿 저장 실패: ${e.message}`);
     }
   };
@@ -1981,7 +2099,6 @@ const App: React.FC = () => {
           : "프로젝트가 업데이트되었습니다.",
       );
     } catch (e: any) {
-      console.error("Project update error:", e);
       showToast(`업데이트 실패: ${e.message}`);
     }
   };
@@ -2065,6 +2182,7 @@ const App: React.FC = () => {
         .eq("id", updated.id);
     }
     setIsSnapshotMode(false);
+    setSnapshotSelectedTasks(new Set());
     showToast("클라이언트 뷰 설정이 저장되었습니다.");
   };
 
@@ -2158,8 +2276,6 @@ const App: React.FC = () => {
 
         // Get all tasks across all steps
         const tasksData: any[] = [];
-        let lastGroupName = "";
-        const exportTaskGroups: Record<string, string> = {}; // Track groups for export
 
         STEPS_STATIC.forEach((step, stepIdx) => {
           // Skip Step 4 (Expedition 2) if hidden
@@ -2177,19 +2293,28 @@ const App: React.FC = () => {
             currentProject.task_states?.meta?.step_titles?.[step.id] ||
             step.title;
 
-          visibleTasks.forEach((task, taskIdx) => {
+          // Reorder tasks to match UI representation (Groups first, then ungrouped)
+          const currentStepGroups = currentProject.task_states?.meta?.task_groups?.[step.id] || [];
+          const groupedTaskIds = new Set<string>();
+          const orderedTasks: Task[] = [];
+
+          // 1. Add grouped tasks in order of groups
+          currentStepGroups.forEach((group: any) => {
+            const groupTasks = visibleTasks.filter(t => group.taskIds.includes(t.id));
+            groupTasks.forEach(t => {
+              orderedTasks.push(t);
+              groupedTaskIds.add(t.id);
+            });
+          });
+
+          // 2. Add remaining ungrouped tasks
+          const ungroupedTasks = visibleTasks.filter(t => !groupedTaskIds.has(t.id));
+          orderedTasks.push(...ungroupedTasks);
+
+          orderedTasks.forEach((task, taskIdx) => {
             const taskLink = currentProject.task_states?.links?.[task.id];
             const isCompleted = completedTasks.has(task.id);
             const isClientVisible = currentProject.client_visible_tasks?.includes(task.id) || false;
-
-            // Determine group name based on task ID pattern
-            let groupName = "";
-            const roundMatch = task.id.match(/t([234])-round-(\d+)-(pm|prop|des|feed)/);
-            if (roundMatch) {
-              const roundNum = roundMatch[2];
-              groupName = `${roundNum}차 제안_Ver${roundNum}.0`;
-              exportTaskGroups[task.id] = groupName;
-            }
 
             // Format todos as checklist with checkmarks
             const todosText =
@@ -2199,19 +2324,21 @@ const App: React.FC = () => {
                     .join("\n")
                 : "";
 
-            // Use "=" if step title is same as previous row
             const displayStepTitle = taskIdx === 0 ? stepTitle : "=";
             const displayIndex = taskIdx === 0 ? `Step ${stepIdx + 1}` : "=";
-            const displayGroup = groupName && groupName === lastGroupName ? "=" : groupName;
+            
+            // Find current group for this task
+            const taskGroup = currentStepGroups.find((g: any) => g.taskIds.includes(task.id));
+            const groupName = taskGroup ? taskGroup.title : "";
 
-            if (groupName) {
-              lastGroupName = groupName;
-            }
+            // Group name display logic: Show full group name on every row to ensure 1:1 mapping (No "=")
+            const displayGroupName = groupName || "";
+            // Was: if (taskIdx > 0 && groupName) ... check prev ... set "="
 
             tasksData.push({
               Index: displayIndex,
               스텝: displayStepTitle,
-              그룹: displayGroup,
+              그룹: displayGroupName,
               태스크명: task.title,
               설명: task.description || "",
               담당자:
@@ -2243,10 +2370,9 @@ const App: React.FC = () => {
           });
         });
 
-        // Save group metadata to project
+        // Prepare updated metadata
         const updatedMeta = {
           ...(currentProject.task_states?.meta || {}),
-          task_groups: exportTaskGroups,
         };
         const updatedTaskStates = {
           ...currentProject.task_states,
@@ -2399,42 +2525,54 @@ const App: React.FC = () => {
           ...(updatedProjectInfo.task_states?.meta?.step_titles || {}),
         };
         const nextTaskOrder: Record<number, string[]> = {};
-        const nextTaskGroups: Record<string, string> = {}; // taskId -> groupName
         const nextClientVisibleTasks: string[] = [...(updatedProjectInfo.client_visible_tasks || [])];
 
         let currentStepId: number | null = null;
         let currentStepTitle: string | null = null;
-        let currentGroupName: string | null = null;
+        const nextTaskGroups: Record<number, any[]> = {}; // Will be rebuilt from Excel
+        const processedSteps = new Set<number>(); // Track which steps we've cleared/initialized
+        const processedRowTaskIds = new Set<string>(); // Track which tasks have been mapped to a row
+
+
+        let lastGroupName: string | null = null; // Track last group name
+        let currentGroup: any | null = null; // Track current group being built
 
         tasksData.forEach((row: any) => {
           // Identify step from Index or 스텝 title
           const indexVal = row["Index"] || "";
           const stepVal = row["스텝"] || "";
+          const rawGroupName = row["그룹"];
+          const groupName = rawGroupName ? String(rawGroupName).trim() : undefined;
 
           if (indexVal.startsWith("Step ")) {
             const stepNum = parseInt(indexVal.replace("Step ", ""));
             if (!isNaN(stepNum)) {
               currentStepId = stepNum;
+              
+              // ⭐ RESET LOGIC: If this is the first time parsing this step in this file,
+              // wipe its order and groups so Excel becomes the Source of Truth.
+              if (!processedSteps.has(currentStepId)) {
+                nextTaskOrder[currentStepId] = [];
+                nextTaskGroups[currentStepId] = [];
+                processedSteps.add(currentStepId);
+                
+                // Reset group tracking for new step
+                lastGroupName = null;
+                currentGroup = null;
+              }
             }
           }
 
           if (!currentStepId) return;
+
+          // Note: nextTaskOrder[currentStepId] is created above if needed
+
 
           // Update step title if explicitly changed (not "=")
           if (stepVal && stepVal !== "=") {
             currentStepTitle = stepVal;
             nextStepTitles[currentStepId] = stepVal;
           }
-
-          // Parse group name
-          const groupVal = row["그룹"];
-          // If groupVal is explicitly provided and not "=", update current group.
-          // If it's empty or "=", keep the previous currentGroupName (inherit).
-          if (groupVal && groupVal !== "=") {
-            currentGroupName = groupVal;
-          }
-          // Note: If !groupVal (empty), we intentionally do nothing, creating an inheritance effect.
-          // This ensures that inserting a row without filling the Group column keeps it in the same group.
 
           const title = row["태스크명"];
           if (!title) return;
@@ -2479,29 +2617,36 @@ const App: React.FC = () => {
             nextCustomTasks[currentStepId] = [];
           }
           if (!nextTaskOrder[currentStepId]) {
-            nextTaskOrder[currentStepId] = [];
+            nextTaskOrder[currentStepId] = nextCustomTasks[currentStepId].map(t => t.id);
           }
 
-          // Search in static tasks first to see if it's a template task we should customize
+          // Search in existing custom tasks first
+          // 🔥 CRITICAL FIX: Only match tasks that haven't been touched yet in this import!
+          // This allows multiple tasks with same name to be mapped 1:1 to Excel rows.
+          const availableCustomTaskIdx = nextCustomTasks[currentStepId].findIndex(
+            (t) => t.title === title && !processedRowTaskIds.has(t.id)
+          );
+
+          // Search in static tasks
           const staticStep = STEPS_STATIC.find((s) => s.id === currentStepId);
           const staticTask = staticStep?.tasks?.find((t) => t.title === title);
-
-          const existingCustomIdx = nextCustomTasks[currentStepId].findIndex(
-            (t) => t.title === title,
-          );
+          // Check if static task is available (not converted/used yet)
+          const isStaticAvailable = staticTask && !processedRowTaskIds.has(staticTask.id);
 
           let taskId: string;
 
-          if (existingCustomIdx > -1) {
+          if (availableCustomTaskIdx > -1) {
             // Update existing custom task
-            taskId = nextCustomTasks[currentStepId][existingCustomIdx].id;
-            nextCustomTasks[currentStepId][existingCustomIdx] = {
-              ...nextCustomTasks[currentStepId][existingCustomIdx],
+            taskId = nextCustomTasks[currentStepId][availableCustomTaskIdx].id;
+            nextCustomTasks[currentStepId][availableCustomTaskIdx] = {
+              ...nextCustomTasks[currentStepId][availableCustomTaskIdx],
               description,
               completed_date: completedDate,
               todos,
-              roles: roles.length > 0 ? roles : nextCustomTasks[currentStepId][existingCustomIdx].roles
+              roles: roles.length > 0 ? roles : nextCustomTasks[currentStepId][availableCustomTaskIdx].roles
             };
+            
+            processedRowTaskIds.add(taskId);
 
             // Update completion/links
             if (isCompleted) newCompletedTasks.add(taskId);
@@ -2510,26 +2655,27 @@ const App: React.FC = () => {
             const linkUrl = row["링크"] || "";
             const linkLabel = row["링크라벨"] || "";
             if (linkUrl) newTaskLinks.set(taskId, { url: linkUrl, label: linkLabel });
-          } else if (staticTask) {
-            // It's a template task - customize it
-            taskId = staticTask.id;
-            const newTask = {
-              ...staticTask,
-              description,
-              completed_date: completedDate,
-              todos,
-              roles: roles.length > 0 ? roles : staticTask.roles
-            };
-            nextCustomTasks[currentStepId].push(newTask);
-            
-            if (isCompleted) newCompletedTasks.add(staticTask.id);
-            else newCompletedTasks.delete(staticTask.id);
-
-            const linkUrl = row["링크"] || "";
-            const linkLabel = row["링크라벨"] || "";
-            if (linkUrl) newTaskLinks.set(staticTask.id, { url: linkUrl, label: linkLabel });
+          } else if (isStaticAvailable && staticTask) { // TS Guard
+             // It's a template task - customize it
+             taskId = staticTask.id;
+             const newTask = {
+               ...staticTask,
+               description,
+               completed_date: completedDate,
+               todos,
+               roles: roles.length > 0 ? roles : staticTask.roles
+             };
+             nextCustomTasks[currentStepId].push(newTask);
+             processedRowTaskIds.add(taskId);
+             
+             if (isCompleted) newCompletedTasks.add(staticTask.id);
+             else newCompletedTasks.delete(staticTask.id);
+ 
+             const linkUrl = row["링크"] || "";
+             const linkLabel = row["링크라벨"] || "";
+             if (linkUrl) newTaskLinks.set(staticTask.id, { url: linkUrl, label: linkLabel });
           } else {
-            // New task entirely
+            // New task entirely - create with unique ID
             taskId = `custom-${currentStepId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
             const newTask: Task = {
               id: taskId,
@@ -2540,6 +2686,7 @@ const App: React.FC = () => {
               todos,
             };
             nextCustomTasks[currentStepId].push(newTask);
+            processedRowTaskIds.add(taskId);
             
             if (isCompleted) newCompletedTasks.add(taskId);
             const linkUrl = row["링크"] || "";
@@ -2547,14 +2694,43 @@ const App: React.FC = () => {
             if (linkUrl) newTaskLinks.set(taskId, { url: linkUrl, label: linkLabel });
           }
 
-          // Track task order as it appears in Excel
-          if (!nextTaskOrder[currentStepId].includes(taskId)) {
-            nextTaskOrder[currentStepId].push(taskId);
+          // 🔥 CRITICAL: Always add to task_order in Excel row order
+          // Remove from current position if exists (shouldn't happen with new logic but safe to keep), then add to end
+          const currentOrderIdx = nextTaskOrder[currentStepId].indexOf(taskId);
+          if (currentOrderIdx > -1) {
+            nextTaskOrder[currentStepId].splice(currentOrderIdx, 1);
           }
+          nextTaskOrder[currentStepId].push(taskId);
 
-          // Track group membership
-          if (currentGroupName) {
-            nextTaskGroups[taskId] = currentGroupName;
+          // 🔥 NEW GROUP LOGIC: Handle consecutive group names
+          // We support "=" validly in import as "same as previous" for backward compatibility,
+          // OR if the name is identical to the currently running group.
+          const effectiveGroupName = groupName === "=" ? lastGroupName : groupName;
+
+          if (effectiveGroupName) {
+            // Check if this is a continuation of the previous group
+            if (lastGroupName === effectiveGroupName && currentGroup) {
+              // Continue adding to the current group
+              if (!currentGroup.taskIds.includes(taskId)) {
+                currentGroup.taskIds.push(taskId);
+              }
+            } else {
+              // Start a new group - allow DUPLICATE names if separated (per user request)
+              currentGroup = {
+                id: `group-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                title: effectiveGroupName,
+                taskIds: [taskId]
+              };
+              // Initialize array if not exists (though protected by processedSteps logic above)
+              if (!nextTaskGroups[currentStepId]) nextTaskGroups[currentStepId] = [];
+              
+              nextTaskGroups[currentStepId].push(currentGroup);
+              lastGroupName = effectiveGroupName;
+            }
+          } else {
+            // No group - reset tracking
+            lastGroupName = null;
+            currentGroup = null;
           }
 
           // Track client visibility
@@ -2570,6 +2746,28 @@ const App: React.FC = () => {
           }
         });
 
+        // 🔥 GHOST TASK FIX: Identify static tasks that were NOT in the Excel import and mark them as deleted
+        // This ensures purely what is in the Excel file is shown.
+        if (currentStepId && processedSteps.has(currentStepId)) {
+             const staticStep = STEPS_STATIC.find((s) => s.id === currentStepId);
+             if (staticStep && staticStep.tasks) {
+                 staticStep.tasks.forEach(st => {
+                     // If this static task ID was NOT processed (mapped to a row), delete it
+                     if (!processedRowTaskIds.has(st.id)) {
+                         // Add to deleted set
+                         const deletedSet = new Set(updatedProjectInfo.deleted_tasks || []);
+                         deletedSet.add(st.id);
+                         updatedProjectInfo.deleted_tasks = Array.from(deletedSet);
+                     } else {
+                         // If it WAS processed, ensure it is NOT in deleted
+                         if (updatedProjectInfo.deleted_tasks) {
+                             updatedProjectInfo.deleted_tasks = updatedProjectInfo.deleted_tasks.filter((d: string) => d !== st.id);
+                         }
+                     }
+                 });
+             }
+        }
+
         // Prepare final updated metadata and task states
         const finalMeta = {
           ...(updatedProjectInfo.task_states?.meta || {}),
@@ -2578,10 +2776,11 @@ const App: React.FC = () => {
           task_groups: nextTaskGroups,
         };
 
-        // Merge task_order with Excel order
+        // Merge task_order with Excel order (EXCEL IS SOURCE OF TRUTH)
         const mergedTaskOrder = { ...(updatedProjectInfo.task_order || {}) };
         Object.keys(nextTaskOrder).forEach((stepIdStr) => {
           const stepId = parseInt(stepIdStr);
+          // Overwrite with exact order from Excel for this step
           mergedTaskOrder[stepId] = nextTaskOrder[stepId];
         });
 
@@ -2592,13 +2791,13 @@ const App: React.FC = () => {
           meta: finalMeta,
         };
 
-        // Calculate new progress status using the updated structure
-        const total = calculateTotalTasks({
-          ...updatedProjectInfo,
-          custom_tasks: nextCustomTasks,
-          task_states: finalTaskStates,
-        });
-        const percent = total === 0 ? 0 : Math.round((newCompletedTasks.size / total) * 100);
+        // Calculate new progress status using the updated structure (USE REAL COMPLETED COUNT, NOT SET SIZE)
+        const totalObj = calculateTotalTasks(
+          updatedProjectInfo,
+          newCompletedTasks as Set<string>,
+          nextCustomTasks
+        );
+        const percent = totalObj.total === 0 ? 0 : Math.round((totalObj.completed / totalObj.total) * 100);
 
         const updatedProject = {
           ...updatedProjectInfo,
@@ -2665,7 +2864,7 @@ const App: React.FC = () => {
   const status = currentProject?.status || 0;
 
   return (
-    <div className="min-h-screen pb-20 bg-[#e3e7ed] selection:bg-black selection:text-white">
+    <div className="min-h-screen pb-20 bg-[#f1f3f6] selection:bg-black selection:text-white">
       {isSnapshotMode && (
         <div className="fixed top-[72px] left-0 w-full z-30 bg-black text-white px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-3 shadow-md animate-in slide-in-from-top-2">
           <div className="flex items-center gap-3">
@@ -2676,7 +2875,10 @@ const App: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setIsSnapshotMode(false)}
+              onClick={() => {
+                setIsSnapshotMode(false);
+                setSnapshotSelectedTasks(new Set(currentProject?.client_visible_tasks || []));
+              }}
               className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 hover:bg-white/20 transition-colors"
             >
               취소
@@ -2783,13 +2985,13 @@ const App: React.FC = () => {
             onExportToExcel={handleExportToExcel}
             onImportFromExcel={handleImportFromExcel}
           />
-          <main className="w-full px-4 md:px-6 py-10 max-w-[2100px] mx-auto">
-            <div className="max-w-[2100px] mx-auto">
+          <main className="w-full px-4 md:px-6 py-10 max-w-[2200px] mx-auto">
+            <div className="max-w-full mx-auto">
               {/* Progress Section */}
-              <div className="bg-white p-6 md:p-8 rounded-[1.25rem] md:rounded-[1.5rem] mb-6 md:mb-10 flex flex-col md:flex-row items-center gap-6 md:gap-10 border border-slate-200 shadow-sm relative overflow-visible">
+              <div className="bg-white p-6 md:p-8 rounded-[12px] md:rounded-[16px] mb-6 md:mb-10 flex flex-col md:flex-row items-center gap-6 md:gap-10 border border-slate-200 shadow-sm relative overflow-visible w-full">
                 <div className="shrink-0 relative z-10 w-full md:w-auto text-center md:text-left">
-                  <span className="text-[18px] md:text-[24px] font-bold text-black leading-none uppercase tracking-tighter">
-                    PROJECT JOURNEY
+                  <span className="text-[18px] md:text-[24px] font-semibold text-black leading-none tracking-tighter">
+                    Project Journey
                   </span>
                 </div>
                 <div className="flex-1 h-3.5 md:h-4 bg-slate-100 rounded-full p-0 relative z-10 border border-slate-200 shadow-inner flex items-center overflow-visible w-full">
@@ -2816,7 +3018,7 @@ const App: React.FC = () => {
 
               {/* Steps Layout */}
               <div className="overflow-x-auto pb-8 no-scrollbar scroll-smooth">
-                <div className="flex gap-2 md:gap-4 min-w-max md:min-w-0 md:w-full px-0">
+                <div className="flex items-start gap-2 md:gap-4 w-full px-0 container-full-steps">
                   {STEPS_STATIC.filter((step) => {
                     const isHidden =
                       currentProject?.task_states?.meta?.is_expedition2_hidden;
@@ -2938,84 +3140,14 @@ const App: React.FC = () => {
                         clientVisibleTasks={
                           new Set(currentProject.client_visible_tasks || [])
                         }
-                        taskGroups={
-                          currentProject.task_states?.meta?.task_groups || {}
-                        }
+                        selectedTaskIds={selectedTaskIds}
+                        onTaskToggleSelect={handleTaskToggleSelect}
+                        onTaskBulkSelect={handleTaskBulkSelect}
+                        onClearSelection={() => setSelectedTaskIds(new Set())}
+                        groups={currentProject.task_states?.meta?.task_groups?.[step.id] || []}
+                        onUpdateGroupTitle={handleUpdateGroupTitle}
                       >
-                        {step.id === 2 && (
-                          <div className="flex justify-center gap-2 md:gap-3 py-1">
-                            <button
-                              onClick={() =>
-                                roundsNavigation > 2 &&
-                                handleUpdateRoundsNavigation(
-                                  roundsNavigation - 1,
-                                )
-                              }
-                              className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-white border border-slate-300 shadow-lg transition-all flex items-center justify-center text-black font-bold active:scale-90 ${currentProject?.is_locked || roundsNavigation <= 2 ? "opacity-50 cursor-not-allowed" : "hover:border-black"}`}
-                              disabled={
-                                currentProject?.is_locked ||
-                                roundsNavigation <= 2
-                              }
-                            >
-                              <i className="fa-solid fa-minus"></i>
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleUpdateRoundsNavigation(
-                                  roundsNavigation + 1,
-                                )
-                              }
-                              className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-black text-white shadow-lg transition-all flex items-center justify-center text-sm active:scale-90 ${currentProject?.is_locked ? "opacity-50 cursor-not-allowed" : ""}`}
-                              disabled={currentProject?.is_locked}
-                            >
-                              <i className="fa-solid fa-plus"></i>
-                            </button>
-                          </div>
-                        )}
-                        {step.id === 3 && (
-                          <div className="flex justify-center gap-2 md:gap-3 py-1">
-                            <button
-                              onClick={() =>
-                                rounds > 2 && handleUpdateRounds(rounds - 1)
-                              }
-                              className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-white border border-slate-300 shadow-lg transition-all flex items-center justify-center text-black font-bold active:scale-90 ${currentProject?.is_locked || rounds <= 2 ? "opacity-50 cursor-not-allowed" : "hover:border-black"}`}
-                              disabled={
-                                currentProject?.is_locked || rounds <= 2
-                              }
-                            >
-                              <i className="fa-solid fa-minus"></i>
-                            </button>
-                            <button
-                              onClick={() => handleUpdateRounds(rounds + 1)}
-                              className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-black text-white shadow-lg transition-all flex items-center justify-center text-sm active:scale-90 ${currentProject?.is_locked ? "opacity-50 cursor-not-allowed" : ""}`}
-                              disabled={currentProject?.is_locked}
-                            >
-                              <i className="fa-solid fa-plus"></i>
-                            </button>
-                          </div>
-                        )}
-                        {step.id === 4 && (
-                          <div className="flex justify-center gap-2 md:gap-3 py-1">
-                            <button
-                              onClick={() =>
-                                rounds2 > 2 && handleUpdateRounds2(rounds2 - 1)
-                              }
-                              className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-white border border-slate-300 shadow-lg transition-all flex items-center justify-center text-black font-bold active:scale-90 ${currentProject?.is_locked || rounds2 <= 2 ? "opacity-50 cursor-not-allowed" : "hover:border-black"}`}
-                              disabled={
-                                currentProject?.is_locked || rounds2 <= 2
-                              }
-                            >
-                              <i className="fa-solid fa-minus"></i>
-                            </button>
-                            <button
-                              onClick={() => handleUpdateRounds2(rounds2 + 1)}
-                              className={`w-10 h-10 md:w-12 md:h-12 rounded-full bg-black text-white shadow-lg transition-all flex items-center justify-center text-sm active:scale-90 ${currentProject?.is_locked ? "opacity-50 cursor-not-allowed" : ""}`}
-                              disabled={currentProject?.is_locked}
-                            >
-                              <i className="fa-solid fa-plus"></i>
-                            </button>
-                          </div>
-                        )}
+
                       </StepColumn>
                     );
                   })}
@@ -3055,14 +3187,14 @@ const App: React.FC = () => {
       {toastMsg && (
         <div
           className={`fixed bottom-6 md:bottom-10 left-1/2 -translate-x-1/2 text-white px-8 md:px-12 py-4 md:py-6 rounded-full text-sm md:text-[18px] font-bold z-[9999] shadow-2xl animate-in fade-in slide-in-from-bottom-10 duration-500 flex items-center gap-3 md:gap-4 ${
-            toastMsg.includes("이전 스텝")
+            toastMsg.includes("이전 스텝") || toastMsg.includes("해제하고")
               ? "bg-red-500"
               : toastMsg.includes("저장 완료")
                 ? "bg-[#05D686]"
                 : "bg-black"
           }`}
         >
-          {toastMsg.includes("이전 스텝") ? (
+          {toastMsg.includes("이전 스텝") || toastMsg.includes("해제하고") ? (
             <i className="fa-solid fa-circle-xmark text-white"></i>
           ) : toastMsg.includes("저장 완료") ? (
             <i className="fa-solid fa-circle-check text-white"></i>
@@ -3070,6 +3202,15 @@ const App: React.FC = () => {
             <i className="fa-solid fa-circle-info text-white"></i>
           )}
           {toastMsg}
+        </div>
+      )}
+
+      {isInitializing && (
+        <div className="min-h-screen flex items-center justify-center bg-[#f1f3f6]">
+          <div className="flex flex-col items-center gap-4">
+            <i className="fa-solid fa-plane text-4xl text-black animate-airplane-pulse"></i>
+            <p className="text-black font-bold">탑승 수속 중...</p>
+          </div>
         </div>
       )}
 

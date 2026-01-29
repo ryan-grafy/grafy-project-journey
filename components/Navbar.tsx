@@ -155,7 +155,7 @@ const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <nav ref={navRef} className="w-full bg-white border-b border-slate-200 py-3 md:py-4 sticky top-0 z-40 shadow-sm">
-      <div className="max-w-[2100px] mx-auto px-4 md:px-6 flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-center">
+      <div className="max-w-[2200px] mx-auto px-4 md:px-6 flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-center">
 
         {/* Left Side: Title & Info */}
         <div className="flex flex-col md:flex-row md:items-center gap-4 lg:gap-8 flex-1 min-w-0">
@@ -169,11 +169,11 @@ const Navbar: React.FC<NavbarProps> = ({
                 onBlur={() => { setIsEditingTitle(false); onUpdateInfo({ name: localProjectName }); }}
                 placeholder="프로젝트명을 입력하세요"
                 onKeyDown={(e) => e.key === 'Enter' && (titleInputRef.current?.blur())}
-                className="text-[22px] md:text-[26px] font-black text-black border-b-2 border-black outline-none bg-transparent w-full md:w-auto min-w-[200px]"
+                className="text-[22px] md:text-[26px] font-bold text-black border-b-2 border-black outline-none bg-transparent w-full md:w-auto min-w-[200px]"
               />
             ) : (
                 <div className="flex items-center gap-2">
-                    <span onClick={() => !project.is_locked && setIsEditingTitle(true)} className={`text-[22px] md:text-[26px] font-black text-black truncate max-w-[200px] md:max-w-none ${!project.is_locked ? 'cursor-pointer hover:opacity-70' : ''}`}>
+                    <span onClick={() => !project.is_locked && setIsEditingTitle(true)} className={`text-[22px] md:text-[26px] font-bold text-black truncate max-w-[200px] md:max-w-none ${!project.is_locked ? 'cursor-pointer hover:opacity-70' : ''}`}>
                         {project.name}
                     </span>
                     {(project.template_name || project.task_states?.meta?.template_name) && (
@@ -189,11 +189,11 @@ const Navbar: React.FC<NavbarProps> = ({
 
         <div className="hidden lg:flex items-center gap-3.5 border-l border-slate-200 pl-4 shrink-0 lg:mr-4">
           <div className="flex flex-col">
-            <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">시작일</span>
+            <span className="text-[10.5px] font-semibold text-slate-400 uppercase tracking-widest leading-none mb-1">시작일</span>
             {isEditingDate && !project.is_locked ? (
-              <input ref={dateInputRef} type="text" maxLength={6} placeholder="YYMMDD" value={localDate.replace(/-/g, '')} onChange={(e) => handleDateChange(e.target.value)} onBlur={() => { setIsEditingDate(false); onUpdateInfo({ start_date: localDate }); }} className="text-[14px] font-bold text-black border-b border-black outline-none bg-transparent w-14" />
+              <input ref={dateInputRef} type="text" maxLength={6} placeholder="YYMMDD" value={localDate.replace(/-/g, '')} onChange={(e) => handleDateChange(e.target.value)} onBlur={() => { setIsEditingDate(false); onUpdateInfo({ start_date: localDate }); }} className="text-[14px] font-semibold text-black border-b border-black outline-none bg-transparent w-14" />
             ) : (
-              <span onClick={() => !project.is_locked && setIsEditingDate(true)} className={`text-[14px] font-bold text-black ${!project.is_locked ? 'cursor-pointer hover:opacity-70 underline decoration-black/20 underline-offset-4' : ''}`}>
+              <span onClick={() => !project.is_locked && setIsEditingDate(true)} className={`text-[14px] font-semibold text-black ${!project.is_locked ? 'cursor-pointer hover:opacity-70 underline decoration-black/20 underline-offset-4' : ''}`}>
                 {project.start_date || '-'}
               </span>
             )}
@@ -223,9 +223,9 @@ const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right Side: Roles & Actions */}
         <div className="flex flex-col md:flex-row md:items-center gap-4 lg:gap-6 shrink-0 h-auto md:h-[42px]">
-          <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200 overflow-x-auto no-scrollbar max-w-full md:max-w-none h-full">
+          <div className="bg-slate-100 p-1 rounded-lg flex items-center gap-1 border border-slate-200 overflow-x-auto no-scrollbar max-w-full md:max-w-none h-full">
             {roles.map((r) => (
-              <button key={r.value} onClick={(e) => { e.stopPropagation(); onRoleChange(r.value); }} className={`px-2.5 py-1 md:px-3 md:py-1.5 h-full flex items-center rounded-lg text-[10.5px] md:text-[12.5px] font-bold transition-all whitespace-nowrap ${activeRole === r.value ? 'bg-black text-white shadow-md' : 'text-slate-500 hover:text-black'}`}>
+              <button key={r.value} onClick={(e) => { e.stopPropagation(); onRoleChange(r.value); }} className={`px-2.5 py-1 md:px-3 md:py-1.5 h-full flex items-center rounded-md text-[10.5px] md:text-[12.5px] font-semibold transition-all whitespace-nowrap ${activeRole === r.value ? 'bg-black text-white shadow-md' : 'text-slate-500 hover:text-black'}`}>
                 {r.label}
               </button>
             ))}
