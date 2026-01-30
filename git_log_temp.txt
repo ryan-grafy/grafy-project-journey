@@ -1,0 +1,20 @@
+e02046c | 2026-01-29 06:06:22 | fix: move System_ID to first column and treat empty group cell as break
+1755e1e | 2026-01-29 06:05:19 | fix: introduce System_ID column in Excel to ensuring stable task updates
+f857d59 | 2026-01-29 05:45:51 | feat: implement persistent ID normalization and restore missing functions
+cbc8d8e | 2026-01-29 05:42:06 | feat: standardize all task IDs to id-xxxx format across templates and app logic
+b7a97d5 | 2026-01-29 05:35:54 | style: shorten custom task IDs to id-xxxx format
+dc9baa4 | 2026-01-29 05:27:19 | fix: enforce ID-based Excel sync to prevent task duplication and grouping issues
+97fd0d4 | 2026-01-29 05:21:53 | fix: achieve 100 percent sync between Excel and App by resetting steps on import
+acf9d06 | 2026-01-29 05:14:35 | fix: implement aggressive ID reorganization and Excel-sync logic
+8657bc7 | 2026-01-29 05:06:00 | fix: prioritize Excel group metadata over ID pattern auto-detection
+06da92c | 2026-01-29 04:57:15 | refactor: change Excel grouping symbol from '=' to '/' to avoid formulas
+daf7805 | 2026-01-29 04:53:06 | fix: inherit group name when Excel column is empty
+c074006 | 2026-01-29 04:50:33 | fix: restore auto-grouping for legacy tasks
+a4b11a8 | 2026-01-29 04:41:54 | fix: auto-generate and save task groups on export, support all round task types
+5134613 | 2026-01-29 04:28:59 | feat: dynamic Excel group system with client visibility column
+ef9db6d | 2026-01-29 04:17:36 | feat: sync Excel task order and improve Index column display
+a144d81 | 2026-01-29 04:00:39 | feat: allow task dragging in locked steps
+8920681 | 2026-01-29 03:55:46 | feat: unlock all steps to allow drag and drop and editing everywhere
+edce348 | 2026-01-29 03:49:44 | feat: enhance excel export/import with dynamic task addition and metadata sync
+b348b42 | 2026-01-29 03:33:00 | fix: clean up excel export order and remove task IDs
+162e6ab | 2026-01-29 03:19:35 | feat: improve navigation and list UI styles
