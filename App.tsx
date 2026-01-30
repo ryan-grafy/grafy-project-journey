@@ -2293,23 +2293,37 @@ const App: React.FC = () => {
             currentProject.task_states?.meta?.step_titles?.[step.id] ||
             step.title;
 
-          // Reorder tasks to match UI representation (Groups first, then ungrouped)
+          // Reorder tasks to match UI representation (Preserving relative order of groups and single tasks)
           const currentStepGroups = currentProject.task_states?.meta?.task_groups?.[step.id] || [];
-          const groupedTaskIds = new Set<string>();
           const orderedTasks: Task[] = [];
+          const processedTaskIds = new Set<string>();
 
-          // 1. Add grouped tasks in order of groups
-          currentStepGroups.forEach((group: any) => {
-            const groupTasks = visibleTasks.filter(t => group.taskIds.includes(t.id));
-            groupTasks.forEach(t => {
-              orderedTasks.push(t);
-              groupedTaskIds.add(t.id);
-            });
-          });
+          let i = 0;
+          while (i < visibleTasks.length) {
+            const task = visibleTasks[i];
+            const taskGroup = currentStepGroups.find((g: any) => (g.taskIds || []).includes(task.id));
 
-          // 2. Add remaining ungrouped tasks
-          const ungroupedTasks = visibleTasks.filter(t => !groupedTaskIds.has(t.id));
-          orderedTasks.push(...ungroupedTasks);
+            if (taskGroup) {
+              const groupTasks = visibleTasks.filter((t) => (taskGroup.taskIds || []).includes(t.id));
+              const isFirstVisibleInGroup = groupTasks[0]?.id === task.id;
+
+              if (isFirstVisibleInGroup) {
+                groupTasks.forEach(t => {
+                  orderedTasks.push(t);
+                  processedTaskIds.add(t.id);
+                });
+                i += groupTasks.length;
+              } else {
+                i++;
+              }
+            } else {
+              if (!processedTaskIds.has(task.id)) {
+                orderedTasks.push(task);
+                processedTaskIds.add(task.id);
+              }
+              i++;
+            }
+          }
 
           orderedTasks.forEach((task, taskIdx) => {
             const taskLink = currentProject.task_states?.links?.[task.id];

@@ -271,29 +271,46 @@ const StepColumn: React.FC<StepColumnProps> = ({
   const renderTasks = () => {
     const rendered = [];
 
+    const currentStepGroups = groups;
+    const groupedTaskIds = new Set<string>();
+    currentStepGroups.forEach(g => (g.taskIds || []).forEach(id => groupedTaskIds.add(id)));
+
     let i = 0;
     while (i < visibleTasks.length) {
       const task = visibleTasks[i];
-      const canDrag = !isLockedProject; // ✅ Allow all tasks to drag, including completed
+      const canDrag = !isLockedProject;
       const currentIndex = i;
 
       // Check if task belongs to a group
-      const taskGroup = groups.find((g) => g.taskIds.includes(task.id));
+      const taskGroup = currentStepGroups.find((g) => (g.taskIds || []).includes(task.id));
 
       if (taskGroup) {
-        // Render group with all its tasks
-        const isFirstInGroup = taskGroup.taskIds[0] === task.id;
+        // Find if this is the first task of the group in visibleTasks
+        const groupTasks = visibleTasks.filter((t) =>
+          (taskGroup.taskIds || []).includes(t.id),
+        );
+        const isFirstVisibleInGroup = groupTasks[0]?.id === task.id;
 
-        if (isFirstInGroup) {
-          const groupTasks = visibleTasks.filter((t) =>
-            taskGroup.taskIds.includes(t.id),
-          );
-
+        if (isFirstVisibleInGroup) {
+          const groupStartIndex = currentIndex;
+          
           rendered.push(
             <div
               key={`group-${taskGroup.id}-${currentIndex}`}
-              className="mb-6 p-4 rounded-[20px] bg-black/5 border border-black/10 transition-all hover:bg-black/10 group/folder relative"
+              draggable={canDrag}
+              onDragStart={() => canDrag && setDraggedIndex(groupStartIndex)}
+              onDragEnd={() => {
+                setDraggedIndex(null);
+                setDragOverIndex(null);
+              }}
+              onDragOver={(e) => handleDragOver(e, groupStartIndex)}
+              className={`mb-6 p-4 rounded-[20px] bg-black/5 border border-black/10 transition-all hover:bg-black/10 group/folder relative ${
+                draggedIndex === groupStartIndex ? "opacity-20 scale-95 blur-[2px]" : "opacity-100"
+              }`}
             >
+              {dragOverIndex === groupStartIndex && draggedIndex !== null && (
+                <div className="absolute top-[-10px] left-0 w-full h-[6px] bg-black/60 rounded-full z-[100] animate-pulse shadow-[0_0_10px_rgba(0,0,0,0.3)]"></div>
+              )}
               <div className="relative z-10">
                 <div className="flex items-center mb-5 px-2">
                   {editingGroupId === taskGroup.id ? (
@@ -326,45 +343,27 @@ const StepColumn: React.FC<StepColumnProps> = ({
                   )}
                 </div>
                 <div className="flex flex-col gap-3">
-                  {groupTasks.map((groupTask) => {
-                    // ✅ Use actual index from visibleTasks for correct DnD
-                    const taskIdx = visibleTasks.indexOf(groupTask);
-                    return (
-                      <div
-                        key={groupTask.id}
-                        className="relative flex flex-col"
-                        onDragOver={(e) => handleDragOver(e, taskIdx)}
-                      >
-                        {dragOverIndex === taskIdx && draggedIndex !== null && (
-                          <div className="absolute top-[-10px] left-0 w-full h-[6px] bg-black/60 rounded-full z-[100] animate-pulse shadow-[0_0_10px_rgba(0,0,0,0.3)]"></div>
-                        )}
-                        <div
-                          ref={(el) => (taskRefs.current[groupTask.id] = el)}
-                          draggable={canDrag}
-                          onDragStart={() => canDrag && setDraggedIndex(taskIdx)}
-                          onDragEnd={() => {
-                            setDraggedIndex(null);
-                            setDragOverIndex(null);
-                          }}
-                          className={`task-card-container transition-all duration-300 ${draggedIndex === taskIdx ? "opacity-20 scale-95 blur-[2px]" : "opacity-100"}`}
-                        >
-                          <TaskCard {...getTaskProps(groupTask)} />
-                        </div>
-                        {taskIdx === visibleTasks.length - 1 &&
-                          dragOverIndex === visibleTasks.length &&
-                          draggedIndex !== null && (
-                            <div className="absolute bottom-[-10px] left-0 w-full h-[6px] bg-black/60 rounded-full z-[100] animate-pulse shadow-[0_0_10px_rgba(0,0,0,0.3)]"></div>
-                          )}
-                      </div>
-                    );
-                  })}
+                  {groupTasks.map((groupTask) => (
+                    <div
+                      key={groupTask.id}
+                      ref={(el) => (taskRefs.current[groupTask.id] = el)}
+                      className="task-card-container"
+                    >
+                      <TaskCard {...getTaskProps(groupTask)} />
+                    </div>
+                  ))}
                 </div>
               </div>
+              {groupStartIndex === visibleTasks.length - groupTasks.length &&
+                dragOverIndex === visibleTasks.length &&
+                draggedIndex !== null && (
+                  <div className="absolute bottom-[-10px] left-0 w-full h-[6px] bg-black/60 rounded-full z-[100] animate-pulse shadow-[0_0_10px_rgba(0,0,0,0.3)]"></div>
+                )}
             </div>,
           );
-
           i += groupTasks.length;
         } else {
+          // This should ideally not happen if groups are contiguous in visibleTasks
           i++;
         }
       } else {
@@ -386,7 +385,9 @@ const StepColumn: React.FC<StepColumnProps> = ({
                 setDraggedIndex(null);
                 setDragOverIndex(null);
               }}
-              className={`task-card-container transition-all duration-300 ${draggedIndex === currentIndex ? "opacity-20 scale-95 blur-[2px]" : "opacity-100"}`}
+              className={`task-card-container transition-all duration-300 ${
+                draggedIndex === currentIndex ? "opacity-20 scale-95 blur-[2px]" : "opacity-100"
+              }`}
             >
               <TaskCard {...getTaskProps(task)} />
             </div>
