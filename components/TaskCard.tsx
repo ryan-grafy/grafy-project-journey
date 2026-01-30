@@ -174,8 +174,8 @@ const TaskCard: React.FC<TaskCardProps> = ({
             </span>
           )}
         </div>
-        <h4 className="font-bold text-lg mb-1 leading-tight tracking-tight text-black">{task.title}</h4>
-        {task.description && <p className="text-[12.5px] leading-snug font-semibold text-slate-500 line-clamp-3 break-all whitespace-normal">{task.description}</p>}
+        <h4 className="font-bold text-base md:text-lg mb-1 leading-tight tracking-tight text-black line-clamp-2 md:line-clamp-none">{task.title}</h4>
+        {task.description && <p className="text-[12px] md:text-[13px] leading-snug font-semibold text-slate-500 line-clamp-3 md:line-clamp-4 break-all whitespace-normal">{task.description}</p>}
 
         {onUpdateTask && !isClientView && (
            <TodoList 

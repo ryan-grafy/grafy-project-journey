@@ -1,0 +1,60 @@
+1206a00|Merge branch 'master' of https://github.com/ryan-grafy/grafy-project-journey|22 minutes ago
+67e2cad|⭐⭐⭐ Fix DnD: Enable completed task drag & Fix 2-slot jump bug|25 minutes ago
+17faa09|fix: break group on empty cell instead of inheriting previous group|11 hours ago
+dc9baa4|fix: enforce ID-based Excel sync to prevent task duplication and grouping issues|20 hours ago
+97fd0d4|fix: achieve 100 percent sync between Excel and App by resetting steps on import|20 hours ago
+acf9d06|fix: implement aggressive ID reorganization and Excel-sync logic|20 hours ago
+8657bc7|fix: prioritize Excel group metadata over ID pattern auto-detection|20 hours ago
+06da92c|refactor: change Excel grouping symbol from '=' to '/' to avoid formulas|20 hours ago
+daf7805|fix: inherit group name when Excel column is empty|20 hours ago
+c074006|fix: restore auto-grouping for legacy tasks|21 hours ago
+a4b11a8|fix: auto-generate and save task groups on export, support all round task types|21 hours ago
+5134613|feat: dynamic Excel group system with client visibility column|21 hours ago
+ef9db6d|feat: sync Excel task order and improve Index column display|21 hours ago
+a144d81|feat: allow task dragging in locked steps|21 hours ago
+8920681|feat: unlock all steps to allow drag and drop and editing everywhere|21 hours ago
+edce348|feat: enhance excel export/import with dynamic task addition and metadata sync|22 hours ago
+b348b42|fix: clean up excel export order and remove task IDs|22 hours ago
+162e6ab|feat: improve navigation and list UI styles|22 hours ago
+7c9b8c7|fix: refine loading spinner logic with useRef|22 hours ago
+6aa1edd|fix: silent loading on tab switch|23 hours ago
+74bd261|force redeploy: ver 0.8|23 hours ago
+cb388de|2501280235|35 hours ago
+8efc675|feat: 엑셀 익스포트/임포트에 할일 체크리스트 추가|2 days ago
+7a4ef2e|feat: 브라우저 뒤로 가기 버튼 지원|2 days ago
+31fb538|test: GitHub Actions Vercel deployment|2 days ago
+87b0fcf|ci: Add GitHub Actions workflow for Vercel deployment|2 days ago
+3a53e47|feat: Add Excel import/export functionality|2 days ago
+06d2523|chore: GitHub Pages to Vercel deployment|2 days ago
+48117bd|chore: Remove Vercel workflow, add GitHub Pages deployment|2 days ago
+d0590a0|chore: Add Vercel GitHub Actions deployment workflow|2 days ago
+05b72fa|feat: 엑셀 익스포트/임포트 기능 추가 및 UI 개선|2 days ago
+2830f81|Fix: Resolve remaining merge conflicts in TaskCard.tsx|2 days ago
+95af062|Merge branch 'origin/main' into master|2 days ago
+0623aac|Feat: Implement Google Tasks-like Todo List|2 days ago
+2420675|fix: task link sync bug and client view link visibility|7 days ago
+c4c8a42|fix: dynamic auth redirect URL|7 days ago
+7f74e1f|feat: real-time worker sync and step visibility/locking fixes|7 days ago
+e28784c|Fix: Hardcode Supabase config for Vercel|8 days ago
+335511c|Fix: improve auth redirect logic and sync branches|8 days ago
+47992ce|Fix: UI refinements, template badges, and Vercel auth stability|8 days ago
+215160f|fix: restore is_expedition2_hidden state from template|8 days ago
+37aef28|fix: restore all project state from template including rounds and deleted tasks|8 days ago
+effddf2|fix: remove step sequential lock constraint and fix lint errors|8 days ago
+9628e46|fix: remove template_name from supabase insert payload and move to meta|8 days ago
+4a52d48|fix: drive task_order from template when creating project|8 days ago
+3cc7ebb|fix: move TemplateSaveModal to root level to fix rendering issue|8 days ago
+96e2a40|feat: replace template save prompt with modal|8 days ago
+ec4f45e|feat: implement soft delete and fix template save|8 days ago
+fc01dbe|Fix Project List UI and Add Expedition 2 Toggle Feature|8 days ago
+9b6c2c9|Fix editing interaction, add URL persistence, simplify menus|8 days ago
+7945072|Refine Project List UI: Green dates, Link wrapping, Sort tabs, Navigation rounds|8 days ago
+e1dab03|Fix tab switch view reset bug|9 days ago
+efc25f2|Add Korean response rule|9 days ago
+220b955|Fix: Force Google Account Chooser & Restrict Login to Authorized Users|11 days ago
+6d513f8|Fix infinite loading in SharedProjectView and decouple auth logic|11 days ago
+7ada4eb|Fix login hang with safeguard timeout and guest state protection|11 days ago
+766dcdf|Force update App.tsx to ensure shared view routing exists|11 days ago
+d75654e|Fix login persistence and add SharedProjectView|11 days ago
+456ac9e|Improve auth session handling and add loading state|11 days ago
+614c564|Fix layout issues in Project List and Navbar|11 days ago

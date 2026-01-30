@@ -123,7 +123,8 @@ const StepColumn: React.FC<StepColumnProps> = ({
     if (
       target.closest(".task-card-container") ||
       target.closest("button") ||
-      target.closest("input")
+      target.closest("input") ||
+      target.closest(".group-frame")
     )
       return;
 
@@ -304,7 +305,7 @@ const StepColumn: React.FC<StepColumnProps> = ({
                 setDragOverIndex(null);
               }}
               onDragOver={(e) => handleDragOver(e, groupStartIndex)}
-              className={`mb-6 p-4 rounded-[20px] bg-black/5 border border-black/10 transition-all hover:bg-black/10 group/folder relative ${
+              className={`mb-6 p-4 rounded-[20px] bg-black/5 border border-black/10 transition-all hover:bg-black/10 group/folder group-frame relative ${
                 draggedIndex === groupStartIndex ? "opacity-20 scale-95 blur-[2px]" : "opacity-100"
               }`}
             >
@@ -415,7 +416,7 @@ const StepColumn: React.FC<StepColumnProps> = ({
   return (
     <div
       ref={columnRef}
-      className={`flex flex-col flex-1 min-w-[300px] rounded-[20px] border ${borderColor} ${bgColor} p-4 md:p-6 transition-all duration-500 relative select-none h-fit ${isLocked ? "opacity-65 grayscale brightness-95" : ""}`}
+      className={`flex flex-col flex-none w-[90vw] md:w-auto md:flex-1 md:min-w-[350px] max-w-[95vw] md:max-w-none rounded-[24px] md:rounded-[32px] border ${borderColor} ${bgColor} p-4 md:p-8 transition-all duration-500 relative select-none h-fit snap-center md:snap-align-none ${isLocked ? "opacity-65 grayscale brightness-95" : ""}`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -427,16 +428,17 @@ const StepColumn: React.FC<StepColumnProps> = ({
       }}
       onDrop={(e) => handleDrop(e, dragOverIndex ?? visibleTasks.length)}
     >
-      <div className="flex items-center justify-between mb-8 px-2">
+      <div className="flex items-center justify-between mb-6 md:mb-10 px-2 lg:px-4">
          {/* ... Header content ... */}
           <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-black text-white text-[13px] font-bold">
+          <div className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full bg-black text-white text-[13px] md:text-[15px] font-bold shrink-0">
             {displayIndex || step.id}
           </div>
           {isEditingTitle ? (
             <input
               ref={titleInputRef}
-              className="bg-transparent border-b border-black text-[22px] font-bold outline-none w-40"
+              autoFocus
+              className="bg-transparent border-b border-black text-[20px] md:text-[24px] font-bold outline-none w-32 md:w-48"
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
               onBlur={() => {
@@ -448,11 +450,15 @@ const StepColumn: React.FC<StepColumnProps> = ({
                   onUpdateTitle?.(editTitle);
                   setIsEditingTitle(false);
                 }
+                if (e.key === "Escape") {
+                  setEditTitle(step.title);
+                  setIsEditingTitle(false);
+                }
               }}
             />
           ) : (
             <h3
-              className="text-[22px] font-bold text-black tracking-tighter cursor-pointer"
+              className="text-[20px] md:text-[24px] font-bold text-black tracking-tighter cursor-pointer line-clamp-1"
               onClick={() => !isClientView && setIsEditingTitle(true)}
             >
               {step.title}
@@ -464,9 +470,9 @@ const StepColumn: React.FC<StepColumnProps> = ({
           {!isClientView && (
             <button
               onClick={onAddTask}
-              className="w-10 h-10 rounded-full bg-white/50 border border-black/5 flex items-center justify-center hover:bg-black hover:text-white transition-all shadow-sm active:scale-95"
+              className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/50 border border-black/5 flex items-center justify-center hover:bg-black hover:text-white transition-all shadow-sm active:scale-95"
             >
-              <i className="fa-solid fa-plus text-xs"></i>
+              <i className="fa-solid fa-plus text-xs md:text-sm"></i>
             </button>
           )}
         </div>

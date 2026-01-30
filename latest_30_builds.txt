@@ -1,0 +1,30 @@
+1206a00 | Merge branch 'master' of https://github.com/ryan-grafy/grafy-project-journey | 11 hours ago
+67e2cad | ⭐⭐⭐ Fix DnD: Enable completed task drag & Fix 2-slot jump bug | 11 hours ago
+17faa09 | fix: break group on empty cell instead of inheriting previous group | 21 hours ago
+dc9baa4 | fix: enforce ID-based Excel sync to prevent task duplication and grouping issues | 30 hours ago
+97fd0d4 | fix: achieve 100 percent sync between Excel and App by resetting steps on import | 31 hours ago
+acf9d06 | fix: implement aggressive ID reorganization and Excel-sync logic | 31 hours ago
+8657bc7 | fix: prioritize Excel group metadata over ID pattern auto-detection | 31 hours ago
+06da92c | refactor: change Excel grouping symbol from '=' to '/' to avoid formulas | 31 hours ago
+daf7805 | fix: inherit group name when Excel column is empty | 31 hours ago
+c074006 | fix: restore auto-grouping for legacy tasks | 31 hours ago
+a4b11a8 | fix: auto-generate and save task groups on export, support all round task types | 31 hours ago
+5134613 | feat: dynamic Excel group system with client visibility column | 31 hours ago
+ef9db6d | feat: sync Excel task order and improve Index column display | 32 hours ago
+a144d81 | feat: allow task dragging in locked steps | 32 hours ago
+8920681 | feat: unlock all steps to allow drag and drop and editing everywhere | 32 hours ago
+edce348 | feat: enhance excel export/import with dynamic task addition and metadata sync | 32 hours ago
+b348b42 | fix: clean up excel export order and remove task IDs | 32 hours ago
+162e6ab | feat: improve navigation and list UI styles | 33 hours ago
+7c9b8c7 | fix: refine loading spinner logic with useRef | 33 hours ago
+6aa1edd | fix: silent loading on tab switch | 33 hours ago
+74bd261 | force redeploy: ver 0.8 | 33 hours ago
+cb388de | 2501280235 | 2 days ago
+8efc675 | feat: 엑셀 익스포트/임포트에 할일 체크리스트 추가 | 2 days ago
+7a4ef2e | feat: 브라우저 뒤로 가기 버튼 지원 | 2 days ago
+31fb538 | test: GitHub Actions Vercel deployment | 2 days ago
+87b0fcf | ci: Add GitHub Actions workflow for Vercel deployment | 2 days ago
+3a53e47 | feat: Add Excel import/export functionality | 2 days ago
+06d2523 | chore: GitHub Pages to Vercel deployment | 2 days ago
+48117bd | chore: Remove Vercel workflow, add GitHub Pages deployment | 2 days ago
+d0590a0 | chore: Add Vercel GitHub Actions deployment workflow | 2 days ago

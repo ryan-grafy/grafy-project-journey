@@ -871,89 +871,216 @@ const App: React.FC = () => {
     const deletedSet = new Set(project.deleted_tasks || []);
     let allVisibleTasks: Task[] = [];
 
+    // 🔥 Helper functions for dynamic round task generation
+    const createStep2RoundTask = (taskId: string): Task | null => {
+      const match = taskId.match(/^t2-round-(\d+)-(prop|feed)$/);
+      if (!match) return null;
+      
+      const roundNum = parseInt(match[1]);
+      const type = match[2];
+      
+      if (type === 'prop') {
+        return {
+          id: taskId,
+          roles: [Role.PM, Role.DESIGNER],
+          title: `${roundNum}차 제안_버벌 아이덴티티 / 브랜드네임, 슬로건 등 도출_Ver${roundNum}.0`,
+          description: "시장 조사, 기획, 디자인 원칙, 전체적인 비주얼아이덴티티 도출을 위한 맥락 등의 디자인 소스를 제작",
+          completed_date: "00-00-00",
+        };
+      } else {  // feed
+        return {
+          id: taskId,
+          roles: [Role.CLIENT, Role.PM],
+          title: `${roundNum}차 제안에 대한 피드백`,
+          description: "( 초기 스냅샷 금지 ) 피드백을 확인할 수 있습니다",
+          completed_date: "00-00-00",
+        };
+      }
+    };
+
+    const createStep3RoundTask = (taskId: string): Task | null => {
+      const match = taskId.match(/^t3-round-(\d+)-(pm|des)$/);
+      if (!match) return null;
+      
+      const roundNum = parseInt(match[1]);
+      const type = match[2];
+      
+      if (type === 'pm') {
+        return {
+          id: taskId,
+          roles: [Role.PM],
+          title: `${roundNum}차 피드백 수급`,
+          completed_date: "00-00-00",
+        };
+      } else {  // des
+        return {
+          id: taskId,
+          roles: [Role.DESIGNER],
+          title: `${roundNum}차 수정 및 업데이트`,
+          completed_date: "00-00-00",
+        };
+      }
+    };
+
+    // 🔥 NEW LOGIC: Step 2/3 now use task_order as Step 1/4/5 do
     if (stepId === 2) {
-      const roundCount = project.rounds_navigation_count || 1;
-      const roundTasks = Array.from({ length: roundCount }).flatMap(
-        (_, rIdx) => {
-          const propId = `t2-round-${rIdx + 1}-prop`;
-          const feedId = `t2-round-${rIdx + 1}-feed`;
-          const rTs = [];
-          if (!deletedSet.has(propId)) {
-            rTs.push(
-              stepCustomTasks.find((ct) => ct.id === propId) || {
-                id: propId,
-                roles: [Role.PM, Role.DESIGNER],
-                title: `${rIdx + 1}차 제안_버벌 아이덴티티 / 브랜드네임, 슬로건 등 도출_Ver${rIdx + 1}.0`,
-                description:
-                  "시장 조사, 기획, 디자인 원칙, 전체적인 비주얼아이덴티티 도출을 위한 맥락 등의 디자인 소스를 제작",
-                completed_date: "00-00-00",
-              },
-            );
-          }
-          if (!deletedSet.has(feedId)) {
-            rTs.push(
-              stepCustomTasks.find((ct) => ct.id === feedId) || {
-                id: feedId,
-                roles: [Role.CLIENT, Role.PM],
-                title: `${rIdx + 1}차 제안에 대한 피드백`,
-                description:
-                  "( 초기 스냅샷 금지 ) 1차 피드백을 확인할 수 있습니다",
-                completed_date: "00-00-00",
-              },
-            );
-          }
-          return rTs;
-        },
-      );
-      const onlyCustoms = stepCustomTasks.filter(
-        (ct) => !ct.id.includes("-round-"),
-      );
-      allVisibleTasks = [...roundTasks, ...onlyCustoms];
+      const order = project.task_order?.[stepId];
+      
+      if (order && order.length > 0) {
+        // ✅ task_order 우선 방식 (Step 1/4/5와 동일)
+        allVisibleTasks = order
+          .map(taskId => {
+            // 1. custom_tasks에서 찾기
+            let task = stepCustomTasks.find(ct => ct.id === taskId);
+            if (task && !deletedSet.has(taskId)) return task;
+            
+            // 2. 라운드 태스크 동적 생성
+            if (taskId.match(/^t2-round-\d+-(prop|feed)$/)) {
+              if (!deletedSet.has(taskId)) {
+                return createStep2RoundTask(taskId);
+              }
+            }
+            
+            return null;
+          })
+          .filter((t): t is Task => t !== null);
+        
+        // task_order에 없는 custom tasks 추가 (맨 뒤)
+        const tasksInOrder = new Set(order);
+        const extraCustoms = stepCustomTasks.filter(
+          ct => !tasksInOrder.has(ct.id) && !deletedSet.has(ct.id)
+        );
+        allVisibleTasks = [...allVisibleTasks, ...extraCustoms];
+        
+      } else {
+        // Fallback: task_order가 없을 때 (초기 프로젝트)
+        const navRoundCount = project.rounds_navigation_count || 1;
+        const roundTasks = Array.from({ length: navRoundCount }).flatMap(
+          (_, rIdx) => {
+            const propId = `t2-round-${rIdx + 1}-prop`;
+            const feedId = `t2-round-${rIdx + 1}-feed`;
+            const rTs = [];
+            if (!deletedSet.has(propId)) {
+              rTs.push(
+                stepCustomTasks.find((ct) => ct.id === propId) || {
+                  id: propId,
+                  roles: [Role.PM, Role.DESIGNER],
+                  title: `${rIdx + 1}차 제안_버벌 아이덴티티 / 브랜드네임, 슬로건 등 도출_Ver${rIdx + 1}.0`,
+                  description:
+                    "시장 조사, 기획, 디자인 원칙, 전체적인 비주얼아이덴티티 도출을 위한 맥락 등의 디자인 소스를 제작",
+                  completed_date: "00-00-00",
+                },
+              );
+            }
+            if (!deletedSet.has(feedId)) {
+              rTs.push(
+                stepCustomTasks.find((ct) => ct.id === feedId) || {
+                  id: feedId,
+                  roles: [Role.CLIENT, Role.PM],
+                  title: `${rIdx + 1}차 제안에 대한 피드백`,
+                  description:
+                    "( 초기 스냅샷 금지 ) 1차 피드백을 확인할 수 있습니다",
+                  completed_date: "00-00-00",
+                },
+              );
+            }
+            return rTs;
+          },
+        );
+        const onlyCustoms = stepCustomTasks.filter(
+          (ct) => !ct.id.includes("-round-"),
+        );
+        allVisibleTasks = [...roundTasks, ...onlyCustoms];
+      }
     } else if (stepId === 3) {
-      const baseTask = STEPS_STATIC[2].tasks[0];
-      const finalTask = STEPS_STATIC[2].tasks[1];
-      const roundTasks = Array.from({ length: roundCount }).flatMap(
-        (_, rIdx) => {
-          const pmId = `t3-round-${rIdx + 1}-pm`;
-          const desId = `t3-round-${rIdx + 1}-des`;
-          const rTs = [];
-          if (!deletedSet.has(pmId))
-            rTs.push(
-              stepCustomTasks.find((ct) => ct.id === pmId) || {
-                id: pmId,
-                role: Role.PM,
-                title: `${rIdx + 1}차 피드백 수급`,
-                completed_date: "00-00-00",
-              },
-            );
-          if (!deletedSet.has(desId))
-            rTs.push(
-              stepCustomTasks.find((ct) => ct.id === desId) || {
-                id: desId,
-                role: Role.DESIGNER,
-                title: `${rIdx + 1}차 수정 및 업데이트`,
-                completed_date: "00-00-00",
-              },
-            );
-          return rTs;
-        },
-      );
-
-      const onlyCustoms = stepCustomTasks.filter(
-        (ct) =>
-          !["t3-base-1", "t3-final"].includes(ct.id) &&
-          !ct.id.includes("-round-"),
-      );
-
-      if (!deletedSet.has("t3-base-1"))
-        allVisibleTasks.push(
-          stepCustomTasks.find((t) => t.id === "t3-base-1") || baseTask,
+      const order = project.task_order?.[stepId];
+      
+      if (order && order.length > 0) {
+        // ✅ task_order 우선 방식
+        allVisibleTasks = order
+          .map(taskId => {
+            // 1. custom_tasks에서 찾기
+            let task = stepCustomTasks.find(ct => ct.id === taskId);
+            if (task && !deletedSet.has(taskId)) return task;
+            
+            // 2. 라운드 태스크 동적 생성
+            if (taskId.match(/^t3-round-\d+-(pm|des)$/)) {
+              if (!deletedSet.has(taskId)) {
+                return createStep3RoundTask(taskId);
+              }
+            }
+            
+            // 3. Static tasks (t3-base-1, t3-final)
+            if (taskId === 't3-base-1' && !deletedSet.has(taskId)) {
+              const baseTask = STEPS_STATIC[2].tasks[0];
+              return stepCustomTasks.find(t => t.id === 't3-base-1') || baseTask;
+            }
+            if (taskId === 't3-final' && !deletedSet.has(taskId)) {
+              const finalTask = STEPS_STATIC[2].tasks[1];
+              return stepCustomTasks.find(t => t.id === 't3-final') || finalTask;
+            }
+            
+            return null;
+          })
+          .filter((t): t is Task => t !== null);
+        
+        // task_order에 없는 custom tasks 추가
+        const tasksInOrder = new Set(order);
+        const extraCustoms = stepCustomTasks.filter(
+          ct => !tasksInOrder.has(ct.id) && !deletedSet.has(ct.id) &&
+               !['t3-base-1', 't3-final'].includes(ct.id) &&
+               !ct.id.includes('-round-')
         );
-      allVisibleTasks = [...allVisibleTasks, ...roundTasks, ...onlyCustoms];
-      if (!deletedSet.has("t3-final"))
-        allVisibleTasks.push(
-          stepCustomTasks.find((t) => t.id === "t3-final") || finalTask,
+        allVisibleTasks = [...allVisibleTasks, ...extraCustoms];
+        
+      } else {
+        // Fallback: task_order가 없을 때
+        const navRoundCount = project.rounds_navigation_count || 1;
+        const baseTask = STEPS_STATIC[2].tasks[0];
+        const finalTask = STEPS_STATIC[2].tasks[1];
+        const roundTasks = Array.from({ length: navRoundCount }).flatMap(
+          (_, rIdx) => {
+            const pmId = `t3-round-${rIdx + 1}-pm`;
+            const desId = `t3-round-${rIdx + 1}-des`;
+            const rTs = [];
+            if (!deletedSet.has(pmId))
+              rTs.push(
+                stepCustomTasks.find((ct) => ct.id === pmId) || {
+                  id: pmId,
+                  role: Role.PM,
+                  title: `${rIdx + 1}차 피드백 수급`,
+                  completed_date: "00-00-00",
+                },
+              );
+            if (!deletedSet.has(desId))
+              rTs.push(
+                stepCustomTasks.find((ct) => ct.id === desId) || {
+                  id: desId,
+                  role: Role.DESIGNER,
+                  title: `${rIdx + 1}차 수정 및 업데이트`,
+                  completed_date: "00-00-00",
+                },
+              );
+            return rTs;
+          },
         );
+
+        const onlyCustoms = stepCustomTasks.filter(
+          (ct) =>
+            !["t3-base-1", "t3-final"].includes(ct.id) &&
+            !ct.id.includes("-round-"),
+        );
+
+        if (!deletedSet.has("t3-base-1"))
+          allVisibleTasks.push(
+            stepCustomTasks.find((t) => t.id === "t3-base-1") || baseTask,
+          );
+        allVisibleTasks = [...allVisibleTasks, ...roundTasks, ...onlyCustoms];
+        if (!deletedSet.has("t3-final"))
+          allVisibleTasks.push(
+            stepCustomTasks.find((t) => t.id === "t3-final") || finalTask,
+          );
+      }
     } else if (stepId === 4) {
       const roundCount2 = project.rounds2_count || 2;
       const roundTasks = Array.from({ length: roundCount2 }).flatMap(
@@ -997,7 +1124,6 @@ const App: React.FC = () => {
       );
       allVisibleTasks = [...allVisibleTasks, ...onlyCustoms];
     }
-
 
 
     const order = project.task_order?.[stepId];
@@ -1487,78 +1613,87 @@ const App: React.FC = () => {
     toIdx: number,
   ) => {
     if (!currentProject || currentProject.is_locked) return;
+    
+    // 1. Get all tasks in current order
     const allVisibleTasks = getVisibleTasks(stepId, currentProject, rounds) as Task[];
-    if (stepId === 3 || stepId === 2) {
-      const grouped: (Task | Task[])[] = [];
-      let i = 0;
-      while (i < allVisibleTasks.length) {
-        const task = allVisibleTasks[i];
-        // Regex to match t3-round-X-pm OR t2-round-X-prop
-        const isRoundStart = task.id.match(/t[23]-round-\d+-(pm|prop)/);
-
-        if (isRoundStart) {
-          const next = allVisibleTasks[i + 1];
-          // Check if next is the partner: pm->des OR prop->feed
-          const partnerSuffix = task.id.includes("-pm") ? "-des" : "-feed";
-          const currentSuffix = task.id.includes("-pm") ? "-pm" : "-prop";
-
-          if (
-            next &&
-            next.id === task.id.replace(currentSuffix, partnerSuffix)
-          ) {
-            grouped.push([task, next]);
-            i += 2;
-          } else {
-            grouped.push(task);
-            i++;
-          }
-        } else {
-          grouped.push(task);
-          i++;
+    const result = Array.from(allVisibleTasks);
+    
+    // 2. Identify logical blocks (folders or round pairs)
+    const nextMeta = currentProject.task_states?.meta || {};
+    const taskGroups = nextMeta.task_groups?.[stepId] || [];
+    
+    const logicalItems: (Task | Task[])[] = [];
+    let i = 0;
+    while (i < result.length) {
+      const task = result[i];
+      
+      // A. Check if it's a folder/group
+      const group = taskGroups.find((g: any) => (g.taskIds || []).includes(task.id));
+      if (group) {
+        const groupTasks = result.filter(t => (group.taskIds || []).includes(t.id));
+        // Identify if this task is the start of this group in the current result array
+        if (groupTasks.length > 0 && groupTasks[0].id === task.id) {
+          logicalItems.push(groupTasks);
+          i += groupTasks.length;
+          continue;
         }
       }
-      const findGroupIdx = (taskIdx: number) => {
-        let currentIdx = 0;
-        for (let gIdx = 0; gIdx < grouped.length; gIdx++) {
-          const g = grouped[gIdx];
-          const len = Array.isArray(g) ? g.length : 1;
-          if (taskIdx >= currentIdx && taskIdx < currentIdx + len) return gIdx;
-          currentIdx += len;
+      
+      // B. Check if it's a round pair (Step 2 or 3)
+      if (stepId === 2 || stepId === 3) {
+        const isRoundStart = task.id.match(/t[23]-round-\d+-(pm|prop)/);
+        if (isRoundStart) {
+          const next = result[i + 1];
+          const partnerSuffix = task.id.includes("-pm") ? "-des" : "-feed";
+          const currentSuffix = task.id.includes("-pm") ? "-pm" : "-prop";
+          if (next && next.id === task.id.replace(currentSuffix, partnerSuffix)) {
+            logicalItems.push([task, next]);
+            i += 2;
+            continue;
+          }
         }
-        return grouped.length - 1;
-      };
-      const groupFromIdx = findGroupIdx(fromIdx);
-      const groupToIdx = findGroupIdx(toIdx);
-      const [removed] = grouped.splice(groupFromIdx, 1);
-      grouped.splice(groupToIdx, 0, removed);
-      const flattened = grouped.flat();
-      const nextTaskOrder = { ...(currentProject.task_order || {}) };
-      nextTaskOrder[stepId] = flattened.map((t) => t.id);
-      const updatedProject = {
-        ...currentProject,
-        task_order: nextTaskOrder,
-        last_updated: new Date().toISOString(),
-      };
-      setCurrentProject(updatedProject);
-
-      const nextProjects = projects.map((p) =>
-        p.id === currentProject.id ? updatedProject : p,
-      );
-      setProjects(nextProjects);
-      localStorage.setItem("grafy_projects", JSON.stringify(nextProjects));
-      await syncProjectToSupabase(updatedProject);
-      return;
+      }
+      
+      // C. Plain task
+      logicalItems.push(task);
+      i++;
     }
-    const result = Array.from(allVisibleTasks);
-    const [removed] = result.splice(fromIdx, 1);
-    result.splice(toIdx, 0, removed);
+
+    // 3. Find logical indices for from/to
+    const findLogicalIdx = (taskIdx: number) => {
+      let currentIdx = 0;
+      for (let j = 0; j < logicalItems.length; j++) {
+        const item = logicalItems[j];
+        const len = Array.isArray(item) ? item.length : 1;
+        if (taskIdx >= currentIdx && taskIdx < currentIdx + len) return j;
+        currentIdx += len;
+      }
+      return logicalItems.length; // Target is past the last item (drop at bottom)
+    };
+
+    const fromLogicalIdx = findLogicalIdx(fromIdx);
+    const toLogicalIdx = findLogicalIdx(toIdx);
+
+    if (fromLogicalIdx >= logicalItems.length) return;
+
+    // 4. Perform the move
+    const [removed] = logicalItems.splice(fromLogicalIdx, 1);
+    // If moving down, the removal shifts items up, but we want to drop at the target's logical position in the NEW list
+    // Splice handles this naturally
+    logicalItems.splice(toLogicalIdx, 0, removed);
+    
+    // 5. Update task_order
+    const flattened = logicalItems.flat();
     const nextTaskOrder = { ...(currentProject.task_order || {}) };
-    nextTaskOrder[stepId] = result.map((t) => t.id);
+    nextTaskOrder[stepId] = flattened.map((t) => t.id);
+    
     const updatedProject = {
       ...currentProject,
       task_order: nextTaskOrder,
       last_updated: new Date().toISOString(),
     };
+    
+    // 6. Persist
     setCurrentProject(updatedProject);
     const nextProjects = projects.map((p) =>
       p.id === currentProject.id ? updatedProject : p,
@@ -2551,212 +2686,293 @@ const App: React.FC = () => {
         let lastGroupName: string | null = null; // Track last group name
         let currentGroup: any | null = null; // Track current group being built
 
-        tasksData.forEach((row: any) => {
-          // Identify step from Index or 스텝 title
-          const indexVal = row["Index"] || "";
-          const stepVal = row["스텝"] || "";
-          const rawGroupName = row["그룹"];
-          const groupName = rawGroupName ? String(rawGroupName).trim() : undefined;
+        tasksData.forEach((row: any, rowIndex: number) => {
+          try {
+            // Identify step from Index or 스텝 title
+            const indexVal = row["Index"] || "";
+            const stepVal = row["스텝"] || "";
+            const rawGroupName = row["그룹"];
+            const groupName = rawGroupName ? String(rawGroupName).trim() : undefined;
 
-          if (indexVal.startsWith("Step ")) {
-            const stepNum = parseInt(indexVal.replace("Step ", ""));
-            if (!isNaN(stepNum)) {
-              currentStepId = stepNum;
-              
-              // ⭐ RESET LOGIC: If this is the first time parsing this step in this file,
-              // wipe its order and groups so Excel becomes the Source of Truth.
-              if (!processedSteps.has(currentStepId)) {
-                nextTaskOrder[currentStepId] = [];
-                nextTaskGroups[currentStepId] = [];
-                processedSteps.add(currentStepId);
+            if (indexVal.startsWith("Step ")) {
+              const stepNum = parseInt(indexVal.replace("Step ", ""));
+              if (!isNaN(stepNum)) {
+                currentStepId = stepNum;
                 
-                // Reset group tracking for new step
-                lastGroupName = null;
-                currentGroup = null;
+                // ⭐ RESET LOGIC: If this is the first time parsing this step in this file,
+                // wipe its order, groups, AND custom_tasks so Excel becomes the Source of Truth.
+                if (!processedSteps.has(currentStepId)) {
+                  nextCustomTasks[currentStepId] = [];  // ✅ FIX: Clear existing tasks for this step!
+                  nextTaskOrder[currentStepId] = [];
+                  nextTaskGroups[currentStepId] = [];
+                  processedSteps.add(currentStepId);
+                  
+                  // Reset group tracking for new step
+                  lastGroupName = null;
+                  currentGroup = null;
+                }
               }
             }
-          }
 
-          if (!currentStepId) return;
+            if (!currentStepId) return;
 
-          // Note: nextTaskOrder[currentStepId] is created above if needed
+            // Note: nextTaskOrder[currentStepId] is created above if needed
 
 
-          // Update step title if explicitly changed (not "=")
-          if (stepVal && stepVal !== "=") {
-            currentStepTitle = stepVal;
-            nextStepTitles[currentStepId] = stepVal;
-          }
+            // Update step title if explicitly changed (not "=")
+            if (stepVal && stepVal !== "=") {
+              currentStepTitle = stepVal;
+              nextStepTitles[currentStepId] = stepVal;
+            }
 
-          const title = row["태스크명"];
-          if (!title) return;
+            // 🔥 LENIENT PARSING: Only require task name, provide safe defaults for everything else
+            const titleRaw = row["태스크명"];
+            if (!titleRaw || String(titleRaw).trim() === "") return; // Skip completely empty rows
+            const title = String(titleRaw).trim();  // ✅ FIX: Convert to string (handles numbers like "1")
 
-          const description = row["설명"] || "";
-          const completedDate = row["완료일"] || "00-00-00";
-          const isCompleted = row["완료여부"] === "완료";
-          const clientVisible = row["클라이언트공개"] === "O";
+            const description = row["설명"] ? String(row["설명"]).trim() : "";
+            const completedDate = row["완료일"] ? String(row["완료일"]).trim() : "00-00-00";
+            const isCompleted = String(row["완료여부"] || "").trim() === "완료";
+            const clientVisible = String(row["클라이언트공개"] || "").trim().toUpperCase() === "O";
 
-          // Parse roles
-          const rolesStr = row["담당자"] || "";
-          const roles: Role[] = rolesStr
-            .split(",")
-            .map((r: string) => {
-              const cleaned = r.trim();
-              if (cleaned.includes("PM")) return Role.PM;
-              if (cleaned.includes("디자이너")) return Role.DESIGNER;
-              if (cleaned.includes("클라이언트")) return Role.CLIENT;
-              if (cleaned.includes("매니저")) return Role.MANAGER;
-              if (cleaned.includes("개발자")) return Role.DEVELOPER;
-              return null;
-            })
-            .filter((r: Role | null) => r !== null);
+            // Parse roles with safe defaults
+            const rolesStr = String(row["담당자"] || "").trim();
+            const roles: Role[] = rolesStr
+              ? rolesStr.split(",")
+                  .map((r: string) => {
+                    const cleaned = r.trim();
+                    if (cleaned.includes("PM")) return Role.PM;
+                    if (cleaned.includes("디자이너")) return Role.DESIGNER;
+                    if (cleaned.includes("클라이언트")) return Role.CLIENT;
+                    if (cleaned.includes("매니저")) return Role.MANAGER;
+                    if (cleaned.includes("개발자")) return Role.DEVELOPER;
+                    return null;
+                  })
+                  .filter((r: Role | null) => r !== null)
+              : []; // Default to empty array if no roles specified
 
-          // Parse todos from 할일 field
-          const 할일Raw = row["할일"] || "";
-          const todos = 할일Raw
-            .split("\n")
-            .filter((line: string) => line.trim())
-            .map((line: string) => {
-              const isComp = line.startsWith("☑");
-              const text = line.replace(/^[☑☐]\s*/, "").trim();
-              return {
-                id: crypto.randomUUID(),
-                text,
-                isCompleted: isComp,
+            // Parse todos from 할일 field (safe default: empty array)
+            const 할일Raw = String(row["할일"] || "").trim();
+            const todos = 할일Raw
+              ? 할일Raw.split("\n")
+                  .filter((line: string) => line.trim())
+                  .map((line: string) => {
+                    const isComp = line.startsWith("☑");
+                    const text = line.replace(/^[☑☐]\s*/, "").trim();
+                    return {
+                      id: crypto.randomUUID(),
+                      text,
+                      isCompleted: isComp,
+                    };
+                  })
+              : []; // Default to empty todos if field is empty
+
+            // Match task by title within current step
+            if (!nextCustomTasks[currentStepId]) {
+              nextCustomTasks[currentStepId] = [];
+            }
+            if (!nextTaskOrder[currentStepId]) {
+              nextTaskOrder[currentStepId] = nextCustomTasks[currentStepId].map(t => t.id);
+            }
+
+            let taskId: string;
+
+            // 🔥 NEW STRATEGY: Title-based matching FIRST (all steps)
+            // This ensures that if title matches exactly, we update the existing task
+            const exactTitleMatch = nextCustomTasks[currentStepId].find(
+              (t) => t.title === title && !processedRowTaskIds.has(t.id)
+            );
+
+            if (exactTitleMatch) {
+              // ✅ PRIORITY 1: Exact title match found - UPDATE IT
+              taskId = exactTitleMatch.id;
+              const taskIdx = nextCustomTasks[currentStepId].findIndex(t => t.id === taskId);
+              nextCustomTasks[currentStepId][taskIdx] = {
+                ...nextCustomTasks[currentStepId][taskIdx],
+                title,  // Keep title (or update if changed, though we matched by title)
+                description,
+                completed_date: completedDate,
+                todos,
+                roles: roles.length > 0 ? roles : nextCustomTasks[currentStepId][taskIdx].roles
               };
-            });
+              processedRowTaskIds.add(taskId);
 
-          // Match task by title within current step
-          if (!nextCustomTasks[currentStepId]) {
-            nextCustomTasks[currentStepId] = [];
-          }
-          if (!nextTaskOrder[currentStepId]) {
-            nextTaskOrder[currentStepId] = nextCustomTasks[currentStepId].map(t => t.id);
-          }
+              // Update completion/links
+              if (isCompleted) newCompletedTasks.add(taskId);
+              else newCompletedTasks.delete(taskId);
+              
+              const linkUrl = row["링크"] || "";
+              const linkLabel = row["링크라벨"] || "";
+              if (linkUrl) newTaskLinks.set(taskId, { url: linkUrl, label: linkLabel });
 
-          // Search in existing custom tasks first
-          // 🔥 CRITICAL FIX: Only match tasks that haven't been touched yet in this import!
-          // This allows multiple tasks with same name to be mapped 1:1 to Excel rows.
-          const availableCustomTaskIdx = nextCustomTasks[currentStepId].findIndex(
-            (t) => t.title === title && !processedRowTaskIds.has(t.id)
-          );
+            } else {
+              // No exact title match - try pattern matching for Step 2/3 round tasks
+              let expectedDynamicId: string | null = null;
+              
+              if (currentStepId === 2) {
+                // 🔥 More lenient pattern: just "1차", "2차"... + keywords
+                const roundMatch = title.match(/^(\d+)차/);
+                if (roundMatch) {
+                  const roundNum = roundMatch[1];
+                  if (title.includes("제안") && !title.includes("피드백")) {
+                    expectedDynamicId = `t2-round-${roundNum}-prop`;
+                  } else if (title.includes("피드백")) {
+                    expectedDynamicId = `t2-round-${roundNum}-feed`;
+                  }
+                }
+              } else if (currentStepId === 3) {
+                const roundMatch = title.match(/^(\d+)차/);
+                if (roundMatch) {
+                  const roundNum = roundMatch[1];
+                  if (title.includes("피드백") || title.includes("수급")) {
+                    expectedDynamicId = `t3-round-${roundNum}-pm`;
+                  } else if (title.includes("수정") || title.includes("업데이트")) {
+                    expectedDynamicId = `t3-round-${roundNum}-des`;
+                  }
+                }
+              }
 
-          // Search in static tasks
-          const staticStep = STEPS_STATIC.find((s) => s.id === currentStepId);
-          const staticTask = staticStep?.tasks?.find((t) => t.title === title);
-          // Check if static task is available (not converted/used yet)
-          const isStaticAvailable = staticTask && !processedRowTaskIds.has(staticTask.id);
+              if (expectedDynamicId) {
+                // ✅ PRIORITY 2: Pattern-based ID match for round tasks
+                const existingIdx = nextCustomTasks[currentStepId].findIndex(
+                  (t) => t.id === expectedDynamicId && !processedRowTaskIds.has(t.id)
+                );
 
-          let taskId: string;
+                if (existingIdx > -1) {
+                  // Update existing round task
+                  taskId = expectedDynamicId;
+                  nextCustomTasks[currentStepId][existingIdx] = {
+                    ...nextCustomTasks[currentStepId][existingIdx],
+                    title,  // Update title (user might have changed it)
+                    description,
+                    completed_date: completedDate,
+                    todos,
+                    roles: roles.length > 0 ? roles : nextCustomTasks[currentStepId][existingIdx].roles
+                  };
+                } else {
+                  // Create new round task with expected ID
+                  taskId = expectedDynamicId;
+                  const newTask: Task = {
+                    id: taskId,
+                    title,
+                    description,
+                    roles: roles.length > 0 ? roles : (currentStepId === 2 ? [Role.PM, Role.DESIGNER] : [Role.PM]),
+                    completed_date: completedDate,
+                    todos,
+                  };
+                  nextCustomTasks[currentStepId].push(newTask);
+                }
+                processedRowTaskIds.add(taskId);
 
-          if (availableCustomTaskIdx > -1) {
-            // Update existing custom task
-            taskId = nextCustomTasks[currentStepId][availableCustomTaskIdx].id;
-            nextCustomTasks[currentStepId][availableCustomTaskIdx] = {
-              ...nextCustomTasks[currentStepId][availableCustomTaskIdx],
-              description,
-              completed_date: completedDate,
-              todos,
-              roles: roles.length > 0 ? roles : nextCustomTasks[currentStepId][availableCustomTaskIdx].roles
-            };
-            
-            processedRowTaskIds.add(taskId);
+                // Update completion/links
+                if (isCompleted) newCompletedTasks.add(taskId);
+                else newCompletedTasks.delete(taskId);
+                
+                const linkUrl = row["링크"] || "";
+                const linkLabel = row["링크라벨"] || "";
+                if (linkUrl) newTaskLinks.set(taskId, { url: linkUrl, label: linkLabel });
 
-            // Update completion/links
-            if (isCompleted) newCompletedTasks.add(taskId);
-            else newCompletedTasks.delete(taskId);
-            
-            const linkUrl = row["링크"] || "";
-            const linkLabel = row["링크라벨"] || "";
-            if (linkUrl) newTaskLinks.set(taskId, { url: linkUrl, label: linkLabel });
-          } else if (isStaticAvailable && staticTask) { // TS Guard
-             // It's a template task - customize it
-             taskId = staticTask.id;
-             const newTask = {
-               ...staticTask,
-               description,
-               completed_date: completedDate,
-               todos,
-               roles: roles.length > 0 ? roles : staticTask.roles
-             };
-             nextCustomTasks[currentStepId].push(newTask);
-             processedRowTaskIds.add(taskId);
-             
-             if (isCompleted) newCompletedTasks.add(staticTask.id);
-             else newCompletedTasks.delete(staticTask.id);
- 
-             const linkUrl = row["링크"] || "";
-             const linkLabel = row["링크라벨"] || "";
-             if (linkUrl) newTaskLinks.set(staticTask.id, { url: linkUrl, label: linkLabel });
-          } else {
-            // New task entirely - create with unique ID
-            taskId = `custom-${currentStepId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-            const newTask: Task = {
-              id: taskId,
-              title,
-              description,
-              roles: roles.length > 0 ? roles : [Role.PM],
-              completed_date: completedDate,
-              todos,
-            };
-            nextCustomTasks[currentStepId].push(newTask);
-            processedRowTaskIds.add(taskId);
-            
-            if (isCompleted) newCompletedTasks.add(taskId);
-            const linkUrl = row["링크"] || "";
-            const linkLabel = row["링크라벨"] || "";
-            if (linkUrl) newTaskLinks.set(taskId, { url: linkUrl, label: linkLabel });
-          }
+              } else {
+                // ✅ PRIORITY 3: Static task matching
+                const staticStep = STEPS_STATIC.find((s) => s.id === currentStepId);
+                const staticTask = staticStep?.tasks?.find((t) => t.title === title);
+                const isStaticAvailable = staticTask && !processedRowTaskIds.has(staticTask.id);
 
-          // 🔥 CRITICAL: Always add to task_order in Excel row order
-          // Remove from current position if exists (shouldn't happen with new logic but safe to keep), then add to end
-          const currentOrderIdx = nextTaskOrder[currentStepId].indexOf(taskId);
-          if (currentOrderIdx > -1) {
-            nextTaskOrder[currentStepId].splice(currentOrderIdx, 1);
-          }
-          nextTaskOrder[currentStepId].push(taskId);
+                if (isStaticAvailable && staticTask) {
+                  // It's a template task - customize it
+                  taskId = staticTask.id;
+                  const newTask = {
+                    ...staticTask,
+                    title,  // Keep or update title
+                    description,
+                    completed_date: completedDate,
+                    todos,
+                    roles: roles.length > 0 ? roles : staticTask.roles
+                  };
+                  nextCustomTasks[currentStepId].push(newTask);
+                  processedRowTaskIds.add(taskId);
+                  
+                  if (isCompleted) newCompletedTasks.add(staticTask.id);
+                  else newCompletedTasks.delete(staticTask.id);
+      
+                  const linkUrl = row["링크"] || "";
+                  const linkLabel = row["링크라벨"] || "";
+                  if (linkUrl) newTaskLinks.set(staticTask.id, { url: linkUrl, label: linkLabel });
+                } else {
+                  // ✅ PRIORITY 4: New custom task entirely
+                  taskId = `custom-${currentStepId}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+                  const newTask: Task = {
+                    id: taskId,
+                    title,
+                    description,
+                    roles: roles.length > 0 ? roles : [Role.PM],
+                    completed_date: completedDate,
+                    todos,
+                  };
+                  nextCustomTasks[currentStepId].push(newTask);
+                  processedRowTaskIds.add(taskId);
+                  
+                  if (isCompleted) newCompletedTasks.add(taskId);
+                  const linkUrl = row["링크"] || "";
+                  const linkLabel = row["링크라벨"] || "";
+                  if (linkUrl) newTaskLinks.set(taskId, { url: linkUrl, label: linkLabel });
+                }
+              }
+            }
 
-          // 🔥 NEW GROUP LOGIC: Handle consecutive group names
-          // We support "=" validly in import as "same as previous" for backward compatibility,
-          // OR if the name is identical to the currently running group.
-          const effectiveGroupName = groupName === "=" ? lastGroupName : groupName;
+            // 🔥 CRITICAL: Always add to task_order in Excel row order
+            // Remove from current position if exists (shouldn't happen with new logic but safe to keep), then add to end
+            const currentOrderIdx = nextTaskOrder[currentStepId].indexOf(taskId);
+            if (currentOrderIdx > -1) {
+              nextTaskOrder[currentStepId].splice(currentOrderIdx, 1);
+            }
+            nextTaskOrder[currentStepId].push(taskId);
 
-          if (effectiveGroupName) {
-            // Check if this is a continuation of the previous group
-            if (lastGroupName === effectiveGroupName && currentGroup) {
-              // Continue adding to the current group
-              if (!currentGroup.taskIds.includes(taskId)) {
-                currentGroup.taskIds.push(taskId);
+            // 🔥 NEW GROUP LOGIC: Handle consecutive group names
+            // We support "=" validly in import as "same as previous" for backward compatibility,
+            // OR if the name is identical to the currently running group.
+            const effectiveGroupName = groupName === "=" ? lastGroupName : groupName;
+
+            if (effectiveGroupName) {
+              // Check if this is a continuation of the previous group
+              if (lastGroupName === effectiveGroupName && currentGroup) {
+                // Continue adding to the current group
+                if (!currentGroup.taskIds.includes(taskId)) {
+                  currentGroup.taskIds.push(taskId);
+                }
+              } else {
+                // Start a new group - allow DUPLICATE names if separated (per user request)
+                currentGroup = {
+                  id: `group-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                  title: effectiveGroupName,
+                  taskIds: [taskId]
+                };
+                // Initialize array if not exists (though protected by processedSteps logic above)
+                if (!nextTaskGroups[currentStepId]) nextTaskGroups[currentStepId] = [];
+                
+                nextTaskGroups[currentStepId].push(currentGroup);
+                lastGroupName = effectiveGroupName;
               }
             } else {
-              // Start a new group - allow DUPLICATE names if separated (per user request)
-              currentGroup = {
-                id: `group-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                title: effectiveGroupName,
-                taskIds: [taskId]
-              };
-              // Initialize array if not exists (though protected by processedSteps logic above)
-              if (!nextTaskGroups[currentStepId]) nextTaskGroups[currentStepId] = [];
-              
-              nextTaskGroups[currentStepId].push(currentGroup);
-              lastGroupName = effectiveGroupName;
+              // No group - reset tracking
+              lastGroupName = null;
+              currentGroup = null;
             }
-          } else {
-            // No group - reset tracking
-            lastGroupName = null;
-            currentGroup = null;
-          }
 
-          // Track client visibility
-          if (clientVisible) {
-            if (!nextClientVisibleTasks.includes(taskId)) {
-              nextClientVisibleTasks.push(taskId);
+            // Track client visibility
+            if (clientVisible) {
+              if (!nextClientVisibleTasks.includes(taskId)) {
+                nextClientVisibleTasks.push(taskId);
+              }
+            } else {
+              const idx = nextClientVisibleTasks.indexOf(taskId);
+              if (idx > -1) {
+                nextClientVisibleTasks.splice(idx, 1);
+              }
             }
-          } else {
-            const idx = nextClientVisibleTasks.indexOf(taskId);
-            if (idx > -1) {
-              nextClientVisibleTasks.splice(idx, 1);
-            }
+          } catch (error) {
+            console.error(`Excel import error at row ${rowIndex + 2}:`, error);
+            // Continue processing next rows even if this one fails
           }
         });
 
@@ -2822,6 +3038,13 @@ const App: React.FC = () => {
           status: Math.min(100, percent),
           last_updated: new Date().toISOString(),
         };
+
+        // 🔍 DEBUG: Log task_order and custom_tasks for Step 2/3
+        console.log('[EXCEL IMPORT DEBUG] Import complete');
+        console.log('[EXCEL IMPORT DEBUG] Step 2 task_order:', mergedTaskOrder[2]);
+        console.log('[EXCEL IMPORT DEBUG] Step 3 task_order:', mergedTaskOrder[3]);
+        console.log('[EXCEL IMPORT DEBUG] Step 2 custom_tasks IDs:', nextCustomTasks[2]?.map(t => t.id));
+        console.log('[EXCEL IMPORT DEBUG] Step 3 custom_tasks IDs:', nextCustomTasks[3]?.map(t => t.id));
 
         // Apply changes
         setCurrentProject(updatedProject);
@@ -3031,8 +3254,8 @@ const App: React.FC = () => {
               </div>
 
               {/* Steps Layout */}
-              <div className="overflow-x-auto pb-8 no-scrollbar scroll-smooth">
-                <div className="flex items-start gap-2 md:gap-4 w-full px-0 container-full-steps">
+              <div className="overflow-x-auto pb-12 no-scrollbar scroll-smooth snap-x snap-mandatory md:snap-none px-4 md:px-0">
+                <div className="flex items-start gap-4 md:gap-6 w-full container-full-steps">
                   {STEPS_STATIC.filter((step) => {
                     const isHidden =
                       currentProject?.task_states?.meta?.is_expedition2_hidden;
