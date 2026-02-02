@@ -1,95 +1,195 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import GlassInput from './ui/GlassInput';
+import { GoogleIcon, UserIcon, LockIcon, ArrowRightIcon } from './ui/Icons';
 
 interface WelcomeScreenProps {
-    onLogin: () => void;
-    isLoading?: boolean;
+  onLogin: () => void;
+  isLoading?: boolean;
 }
 
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, isLoading }) => {
-    return (
-        <div className="min-h-screen bg-[#e3e7ed] flex items-center justify-center p-4">
-            <div className="max-w-[1200px] w-full grid grid-cols-1 lg:grid-cols-2 bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-200">
+  const [userId, setUserId] = useState('');
+  const [password, setPassword] = useState('');
+  const [autoLogin, setAutoLogin] = useState(false);
+  const [error, setError] = useState('');
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-                {/* Left Side: Visuals */}
-                <div className="hidden lg:flex flex-col justify-between p-12 bg-black text-white relative overflow-hidden">
-                    <div className="relative z-10">
-                        <h2 className="text-sm font-black tracking-[0.3em] uppercase opacity-50 mb-4">Grafy Design Studio</h2>
-                        <h1 className="text-6xl font-black tracking-tighter leading-none mb-8">
-                            PROJECT<br />JOURNEY
-                        </h1>
-                        <p className="text-xl text-slate-400 font-medium max-w-sm leading-relaxed">
-                            프로젝트의 시작부터 비행기 이착륙까지,<br />
-                            모든 여정을 한곳에서 관리하세요.
-                        </p>
-                    </div>
+  const handleAuth = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('이 서비스는 Google 로그인을 권장합니다. 아래 Google 버튼을 이용해 주세요.');
+  };
 
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-4 mb-8">
-                            <div className="flex -space-x-4">
-                                {[1, 2, 3, 4].map(i => (
-                                    <div key={i} className="w-12 h-12 rounded-full border-4 border-black bg-slate-800 overflow-hidden">
-                                        <img src={`https://ui-avatars.com/api/?name=User+${i}&background=random`} alt="User" />
-                                    </div>
-                                ))}
-                            </div>
-                            <p className="text-sm font-bold text-slate-400">
-                                120+ 팀원이 함께 비행 중
-                            </p>
-                        </div>
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                            © 2026 GRAFY PROJECT AIRPORT v1.0
-                        </p>
-                    </div>
+  const videoUrl = "https://pub-72641fd7f7434e30ad221762f61a610f.r2.dev/grafy/IMG_0688.webm";
 
-                    {/* Background Decoration */}
-                    <div className="absolute top-[-100px] right-[-100px] w-80 h-80 bg-slate-800/30 rounded-full blur-[100px]"></div>
-                    <div className="absolute bottom-[-50px] left-[-50px] w-64 h-64 bg-slate-700/20 rounded-full blur-[80px]"></div>
-                </div>
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = 0.7;
+    }
+    
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    
+    return () => {
+      document.body.style.overflow = originalStyle;
+      document.documentElement.style.overflow = originalStyle;
+    };
+  }, []);
 
-                {/* Right Side: Login */}
-                <div className="flex flex-col items-center justify-center p-8 md:p-16 lg:p-24 bg-white">
-                    <div className="text-center mb-12">
-                        <div className="inline-flex items-center justify-center w-20 h-20 rounded-[2rem] bg-slate-100 mb-8 border border-slate-200 shadow-inner">
-                            <i className="fa-solid fa-plane-departure text-3xl text-black"></i>
-                        </div>
-                        <h3 className="text-3xl font-black text-black tracking-tighter mb-4">반갑습니다!</h3>
-                        <p className="text-slate-500 font-bold">서비스 이용을 위해 로그인이 필요합니다.</p>
-                    </div>
+  return (
+    <div className="relative w-full h-screen overflow-hidden flex items-center justify-center bg-black">
+      <div className="absolute inset-0 overflow-hidden">
+        <video
+          ref={videoRef}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="w-full h-full object-cover opacity-100 transition-opacity duration-1000"
+        >
+          <source src={videoUrl} type="video/webm" />
+        </video>
+      </div>
 
-                    <div className="w-full max-w-sm space-y-4">
-                        <button
-                            onClick={onLogin}
-                            disabled={isLoading}
-                            className="w-full h-16 bg-white border-2 border-slate-200 rounded-2xl flex items-center justify-center gap-4 hover:border-black hover:bg-slate-50 transition-all active:scale-95 shadow-lg group disabled:opacity-50"
-                        >
-                            {isLoading ? (
-                                <div className="flex items-center gap-3">
-                                    <i className="fa-solid fa-circle-notch fa-spin text-xl text-black"></i>
-                                    <span className="text-[17px] font-black text-black">로그인 창으로 이동 중...</span>
-                                </div>
-                            ) : (
-                                <>
-                                    <img src="https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png" alt="Google" className="w-6 h-6" />
-                                    <span className="text-[17px] font-black text-black">Google 계정으로 계속하기</span>
-                                </>
-                            )}
-                        </button>
+      <div className="absolute inset-0 bg-gradient-to-r from-black/25 via-black/5 to-transparent backdrop-blur-[1px]" />
 
-                        <p className="text-center text-[13px] text-slate-400 font-bold px-4">
-                            로그인하면 <span className="text-black underline">이용약관</span> 및 <span className="text-black underline">개인정보처리방침</span>에 동의하게 됩니다.
-                        </p>
-                    </div>
+      <div 
+        className="absolute inset-0 opacity-[0.12] pointer-events-none z-[11]"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2.0' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
+        }}
+      />
 
-                    <div className="mt-20 pt-8 border-t border-slate-100 w-full text-center">
-                        <p className="text-[14px] font-bold text-slate-500 mb-2">이미 계정이 없으신가요?</p>
-                        <button className="text-[14px] font-black text-black hover:underline">
-                            팀 관리자에게 계정 요청하기
-                        </button>
-                    </div>
+      <div className="relative z-20 w-full max-w-[1920px] mx-auto px-8 md:px-16 lg:px-24 grid grid-cols-1 lg:grid-cols-2 gap-12 items-stretch pt-16 lg:pt-24">
+         <div className="flex flex-col justify-between order-2 lg:order-1">
+           <div className="flex flex-col">
+              <h1 
+                className="text-7xl md:text-8xl lg:text-[8.8rem] text-white tracking-tighter drop-shadow-2xl font-medium"
+                style={{ 
+                  fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", 
+                  fontWeight: 500,
+                  lineHeight: '0.85' 
+                }}
+              >
+                We<br />
+                Make It<br />
+                Valuable.
+              </h1>
+              <p className="mt-8 text-lg md:text-xl text-white max-w-lg font-light leading-[1.4]">
+                Project Journey begins here.<br />
+                Experience the seamless<br />
+                workflow with GRAFY.
+              </p>
+           </div>
+           
+           <div className="flex items-center pb-2">
+             <svg width="160" height="21" viewBox="0 0 200 26" fill="none" xmlns="http://www.w3.org/2000/svg" className="hover:opacity-80 transition-opacity drop-shadow-lg">
+                <g clipPath="url(#clip0_1251_131)">
+                  <path d="M14.3866 16.3675H22.7191C21.938 18.4818 19.1843 20.518 15.1678 20.518C10.2659 20.518 6.71158 17.3368 6.71158 12.9587C6.71158 8.5806 10.2659 5.49054 15.1678 5.49054C18.2079 5.49054 20.8378 6.6485 22.0421 8.50904L22.1202 8.63264H29.4242L29.3005 8.28135C27.5494 3.24618 21.9445 0 15.0376 0C6.321 0 0 5.45151 0 12.9522C0 20.4529 6.321 25.9044 15.0376 25.9044C23.7542 25.9044 29.9385 20.3358 29.9385 12.9522V11.2608H14.3931V16.361L14.3866 16.3675Z" fill="white"/>
+                  <path d="M69.2973 9.15875C69.2973 3.88939 64.9357 0.617188 57.9182 0.617188H46.5391V25.3116H53.2507V17.6938H57.7424L63.0934 25.3116H70.9182L64.4084 16.4708C67.5722 15.0591 69.3038 12.47 69.3038 9.15875H69.2973ZM62.5857 9.15875C62.5857 11.9691 59.4935 12.3919 57.6448 12.3919H53.2507V5.93208H57.6448C59.487 5.93208 62.5857 6.35493 62.5857 9.16526V9.15875Z" fill="white"/>
+                  <path d="M96.495 0.625L85.5586 25.3194H92.5241L94.451 20.6355H104.775L106.702 25.3194H114.176L103.259 0.625H96.5015H96.495ZM102.666 15.4182H96.5731L99.6197 7.98909L102.666 15.4182Z" fill="white"/>
+                  <path d="M129.777 25.3194H136.489V16.0688H149.014V10.8515H136.489V5.90086H150.57V0.625H129.777V25.3194Z" fill="white"/>
+                  <path d="M185.986 0.625L179.542 11.7622L173.071 0.625H165.383L175.916 17.539V25.3194H182.627V17.539L193.167 0.625H185.986Z" fill="white"/>
+                  <path d="M196.582 25.3697C198.469 25.3697 199.999 23.8406 199.999 21.9544C199.999 20.0682 198.469 18.5391 196.582 18.5391C194.694 18.5391 193.164 20.0682 193.164 21.9544C193.164 23.8406 194.694 25.3697 196.582 25.3697Z" fill="white"/>
+                </g>
+                <defs>
+                  <clipPath id="clip0_1251_131">
+                    <rect width="200" height="25.9109" fill="white"/>
+                  </clipPath>
+                </defs>
+             </svg>
+           </div>
+         </div>
+
+         <div className="flex flex-col justify-start order-1 lg:order-2">
+            <div className="bg-white/22 backdrop-blur-2xl border border-white/20 p-8 md:p-12 rounded-[2.5rem] shadow-2xl w-full max-w-md mx-auto">
+               <div className="mb-8 text-center text-white">
+                 <h2 className="text-3xl font-semibold mb-2 tracking-tight">
+                   Log In
+                 </h2>
+                 <p className="text-white/60 text-[13px] font-medium">
+                   로그인이 필요한 서비스입니다
+                 </p>
+               </div>
+
+               <form onSubmit={handleAuth} className="space-y-6">
+                 <GlassInput 
+                   icon={<UserIcon />}
+                   placeholder="사용자 ID"
+                   value={userId}
+                   onChange={(e) => setUserId(e.target.value)}
+                 />
+
+                 <GlassInput 
+                   icon={<LockIcon />}
+                   type="password"
+                   placeholder="비밀번호"
+                   value={password}
+                   onChange={(e) => setPassword(e.target.value)}
+                 />
+
+                 <div className="flex items-center justify-between text-sm">
+                   <label className="flex items-center text-white/70 cursor-pointer hover:text-white transition-colors font-medium">
+                     <input 
+                       type="checkbox" 
+                       className="mr-2 rounded border-white/20 bg-transparent text-blue-500 focus:ring-offset-0 focus:ring-blue-500"
+                       checked={autoLogin}
+                       onChange={(e) => setAutoLogin(e.target.checked)}
+                     />
+                     로그인 상태 유지
+                   </label>
+                   <a href="#" className="text-white/50 hover:text-white transition-colors font-medium">비밀번호 찾기</a>
+                 </div>
+
+                 {error && <p className="text-red-400 text-sm text-center font-medium bg-red-500/10 py-2 rounded-lg">{error}</p>}
+
+                 <button 
+                   type="submit"
+                   className="w-full bg-white/30 hover:bg-white/40 text-white font-semibold py-4 rounded-full transition-all duration-300 transform border border-white/20 flex items-center justify-center opacity-90 cursor-not-allowed"
+                   disabled
+                 >
+                   Sign In
+                   <span className="ml-2">
+                     <ArrowRightIcon />
+                   </span>
+                 </button>
+               </form>
+
+               <div className="my-8 flex items-center">
+                 <div className="flex-grow border-t border-white/10"></div>
+                 <span className="mx-4 text-white/30 text-xs tracking-widest uppercase font-semibold">Quick Connect</span>
+                 <div className="flex-grow border-t border-white/10"></div>
+               </div>
+
+               <div className="grid grid-cols-1 gap-4">
+                 <button 
+                   onClick={onLogin}
+                   disabled={isLoading}
+                   className="flex items-center justify-center px-4 py-4 bg-white text-black rounded-2xl hover:bg-[#f1f1f1] transition-all duration-300 text-base font-semibold shadow-2xl transform active:scale-95 disabled:opacity-50"
+                 >
+                   {isLoading ? (
+                     <div className="flex items-center gap-2">
+                       <i className="fa-solid fa-circle-notch fa-spin"></i>
+                       연결 중...
+                     </div>
+                   ) : (
+                     <div className="flex items-center gap-2">
+                       <GoogleIcon /> Google 계정으로 계속하기
+                     </div>
+                   )}
+                 </button>
+               </div>
+               
+                <div className="mt-10 text-center">
+                  <p className="text-white/40 text-sm font-medium">
+                    반갑습니다. <span className="text-white font-semibold">그래퍼</span>가 되신걸 환영합니다.
+                  </p>
                 </div>
             </div>
-        </div>
-    );
+         </div>
+      </div>
+    </div>
+  );
 };
 
 export default WelcomeScreen;

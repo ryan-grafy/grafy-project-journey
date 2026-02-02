@@ -50,30 +50,23 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
           <span className="text-white text-3xl font-black">G</span>
         </div>
         
-        <h1 className="text-3xl font-black text-black italic mb-2 text-center leading-tight">WELCOME TO GRAFY</h1>
-        <p className="text-slate-400 font-bold mb-10 text-sm">프로젝트의 여정을 시작해보세요.</p>
+        <h2 className="text-3xl font-black text-black mb-2 tracking-tighter">
+          {isLogin ? 'Welcome Back' : 'Create Account'}
+        </h2>
+        <p className="text-slate-400 font-bold mb-10 text-center">
+          {isLogin ? '서비스 이용을 위해 로그인해주세요.' : '새로운 계정을 생성하세요.'}
+        </p>
 
-        <div className="flex bg-slate-100 p-1.5 rounded-2xl w-full mb-8">
-          <button 
-            onClick={() => setIsLogin(true)}
-            className={`flex-1 py-3 text-sm font-black rounded-xl transition-all ${isLogin ? 'bg-white text-black shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
-          >로그인</button>
-          <button 
-            onClick={() => setIsLogin(false)}
-            className={`flex-1 py-3 text-sm font-black rounded-xl transition-all ${!isLogin ? 'bg-white text-black shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
-          >회원가입</button>
-        </div>
-
-        <form onSubmit={handleAuth} className="w-full flex flex-col gap-5">
+        <form onSubmit={handleAuth} className="w-full space-y-6">
           {!isLogin && (
             <div>
-              <label className="block text-[11px] font-black text-black mb-2 uppercase tracking-widest">Name</label>
+              <label className="block text-[11px] font-black text-black mb-2 uppercase tracking-widest">Full Name</label>
               <input 
                 type="text" 
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full bg-white border-2 border-slate-100 rounded-2xl p-4 text-sm font-bold text-black outline-none focus:border-black transition-all"
-                placeholder="이름을 입력하세요"
+                placeholder="이름"
               />
             </div>
           )}
@@ -120,6 +113,18 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
             {isLogin ? 'SIGN IN' : 'CREATE ACCOUNT'}
           </button>
         </form>
+
+        <div className="mt-8 pt-8 border-t border-slate-50 w-full text-center">
+          <button 
+            onClick={() => {
+              setIsLogin(!isLogin);
+              setError('');
+            }}
+            className="text-[13px] font-black text-slate-400 hover:text-black transition-all"
+          >
+            {isLogin ? '아직 계정이 없으신가요? 회원가입' : '이미 계정이 있으신가요? 로그인'}
+          </button>
+        </div>
       </div>
     </div>
   );

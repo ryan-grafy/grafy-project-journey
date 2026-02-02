@@ -3321,10 +3321,10 @@ const App: React.FC = () => {
       )}
 
       {isInitializing && (
-        <div className="min-h-screen flex items-center justify-center bg-[#e3e7ed]">
+        <div className="min-h-screen flex items-center justify-center bg-black">
           <div className="flex flex-col items-center gap-4">
-            <i className="fa-solid fa-plane text-4xl text-black animate-airplane-pulse"></i>
-            <p className="text-black font-bold">탑승 수속 중...</p>
+            <i className="fa-solid fa-plane text-4xl text-white animate-airplane-pulse"></i>
+            <p className="text-white font-bold">탑승 수속 중...</p>
           </div>
         </div>
       )}
