@@ -21,13 +21,24 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ teamMembers, te
   
   const [dropdownOpen, setDropdownOpen] = useState<'pm' | 'lead' | 'd1' | 'd2' | 'template' | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
+  const handleSubmit = async () => {
+    if (!name.trim() || !startDate.trim() || isSubmitting) return;
     setIsSubmitting(true);
-    // Pass custom_tasks from selected template if exists
-    await onCreate(name, pm, [designerLead, designer1, designer2], startDate, selectedTemplate?.custom_tasks, selectedTemplate?.name, selectedTemplate?.task_order, selectedTemplate);
-    setIsSubmitting(false);
+    try {
+      // Pass custom_tasks from selected template if exists
+      await onCreate(
+        name,
+        pm,
+        [designerLead, designer1, designer2],
+        startDate,
+        selectedTemplate?.custom_tasks,
+        selectedTemplate?.name,
+        selectedTemplate?.task_order,
+        selectedTemplate,
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDateChange = (val: string) => {
@@ -82,7 +93,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ teamMembers, te
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <div className="flex flex-col gap-5">
           {/* Template Selection */}
           <div className="relative">
             <label className="block text-[12px] font-black text-black mb-2 uppercase tracking-widest">TEMPLATE (선택)</label>
@@ -131,9 +142,9 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ teamMembers, te
 
           <div className="flex justify-end gap-3 mt-6">
             <button type="button" onClick={onClose} className="px-8 py-4 text-base font-bold text-slate-500 bg-slate-100 rounded-xl">취소</button>
-            <button type="submit" disabled={isSubmitting} className="px-10 py-4 text-base font-black text-white bg-black rounded-xl active:scale-95 transition-all">{isSubmitting ? '생성 중...' : '프로젝트 생성'}</button>
+            <button type="button" onClick={handleSubmit} disabled={isSubmitting} className="px-10 py-4 text-base font-black text-white bg-black rounded-xl active:scale-95 transition-all">{isSubmitting ? '생성 중...' : '프로젝트 생성'}</button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

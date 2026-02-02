@@ -116,4 +116,7 @@ export interface Project {
   client_visible_tasks?: string[]; // IDs of tasks visible to clients
   template_name?: string; // Name of the template used to create the project
   deleted_at?: string; // Timestamp of soft delete
+  nas_folder_path?: string; // Path to the project folder on NAS
+  nas_folder_created?: boolean; // Whether the NAS folder has been created
+  nas_last_synced?: string; // Last timestamp the folder was synced with NAS
 }
