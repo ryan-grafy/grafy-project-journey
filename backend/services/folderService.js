@@ -1,133 +1,265 @@
-const fs = require('fs').promises;
-const path = require('path');
+const synoApi = require('../utils/synoApi');
 const FOLDER_STRUCTURE = require('../config/folderStructure');
+const { generateFolderName } = require('../utils/folderNameParser');
+const supabase = require('../config/supabase');
 
-const NAS_BASE_PATH = process.env.NAS_BASE_PATH || '';
+// .env에서 #이 주석으로 인식되므로 코드에서 직접 설정
+const NAS_BASE_PATH = '/GRAFY/#Project/# 2026 GRAFY. 프로젝트';
+
+function normalizeNasPath(inputPath) {
+  if (!inputPath) return inputPath;
+
+  const basePath = NAS_BASE_PATH.replace(/\/+$/g, "");
+  const baseName = basePath.split("/").pop();
+
+  let normalized = String(inputPath)
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/\/+$/g, "");
+
+  if (!normalized) return normalized;
+
+  if (normalized.startsWith(basePath)) {
+    return normalized;
+  }
+
+  if (baseName && normalized.startsWith(`${baseName}/`)) {
+    return `${basePath}/${normalized.slice(baseName.length + 1)}`;
+  }
+
+  if (!normalized.startsWith("/") && !normalized.includes("/")) {
+    return `${basePath}/${normalized}`;
+  }
+
+  return normalized;
+}
 
 /**
- * 프로젝트 폴더 생성
+ * 프로젝트 폴더 생성 (Synology API 사용)
  */
 async function createProjectFolder({ name, startDate, pm, designers = [] }) {
-  const folderName = generateFolderName({ name, startDate, pm, designers });
-  const fullPath = path.join(NAS_BASE_PATH, folderName);
-
-  // 폴더 이미 존재 확인
   try {
-    await fs.access(fullPath);
-    return {
-      success: false,
-      error: '동일한 이름의 폴더가 이미 존재합니다',
-      code: 'FOLDER_EXISTS',
-      existingPath: fullPath,
+    const projectData = {
+      name,
+      startDate,
+      pmName: pm?.name,
+      designerNames: designers.map(d => d.name)
     };
-  } catch (err) {
-    // 폴더 없음, 계속 진행
+
+    const folderName = generateFolderName(projectData);
+    const fullPath = `${NAS_BASE_PATH}/${folderName}`;
+
+    console.log(`🚀 [NAS API] 프로젝트 폴더 생성 시도`);
+    console.log(`   기본경로: ${NAS_BASE_PATH}`);
+    console.log(`   폴더이름: ${folderName}`);
+
+    // 1. 폴더 이미 존재 확인
+    const alreadyExists = await synoApi.exists(fullPath);
+    if (alreadyExists) {
+        return {
+            success: false,
+            error: '동일한 이름의 폴더가 이미 존재합니다',
+            code: 'FOLDER_EXISTS',
+            existingPath: fullPath,
+        };
+    }
+
+    // 2. 메인 프로젝트 폴더 생성
+    await synoApi.createFolder(NAS_BASE_PATH, folderName);
+    console.log(`✅ 메인 폴더 생성 완료: ${fullPath}`);
+
+    // 3. 하위 폴더 구조 생성 (재귀 호출)
+    await createRecursive(fullPath, FOLDER_STRUCTURE);
+
+    return {
+      success: true,
+      folderName,
+      folderPath: fullPath,
+      message: '폴더가 성공적으로 생성되었습니다 (Synology API)',
+    };
+  } catch (error) {
+    console.error('❌ NAS 폴더 생성 실패:', error.message);
+    throw error;
   }
+}
 
-  // 메인 폴더 생성
-  await fs.mkdir(fullPath, { recursive: true });
-  console.log(`✅ 메인 폴더 생성: ${fullPath}`);
+/**
+ * 재귀적으로 하위 폴더 생성
+ */
+async function createRecursive(parentPath, structure) {
+  for (const item of structure) {
+    const itemName = typeof item === 'string' ? item : item.name;
 
-  const createdFolders = [];
-
-  // 하위 폴더 생성
-  for (const folder of FOLDER_STRUCTURE) {
-    const folderPath = path.join(fullPath, folder.name);
-    await fs.mkdir(folderPath, { recursive: true });
-    createdFolders.push(folder.name);
-    console.log(`  ├─ ${folder.name}`);
-
-    for (const child of folder.children || []) {
-      const childPath = path.join(folderPath, child);
-      await fs.mkdir(childPath, { recursive: true });
-      createdFolders.push(`${folder.name}/${child}`);
-      console.log(`  │  └─ ${child}`);
+    try {
+      await synoApi.createFolder(parentPath, itemName);
+      console.log(`   └─ ${itemName}`);
+      
+      if (typeof item === 'object' && item.children && item.children.length > 0) {
+        await createRecursive(`${parentPath}/${itemName}`, item.children);
+      }
+    } catch (error) {
+      console.warn(`⚠️ 하위 폴더 생성 실패 (계속 진행): ${itemName}`, error.message);
     }
   }
-
-  return {
-    success: true,
-    folderName,
-    folderPath: fullPath,
-    message: '폴더가 성공적으로 생성되었습니다',
-    createdFolders,
-  };
-}
-
-/**
- * 폴더명 생성
- */
-function generateFolderName({ name, startDate, pm, designers }) {
-  // 날짜 변환
-  const start = formatDate(startDate);
-  const end = 'xxxxxx';
-
-  // 프로젝트명 파싱
-  const [client, projectName] = parseProjectName(name);
-
-  // 담당자 조합
-  const members = [pm?.name, ...designers.map(d => d.name)]
-    .filter(Boolean)
-    .join(',');
-
-  const folderName = `${start}-${end}_${client}_${projectName}_${members}`;
-
-  return sanitizeFolderName(folderName);
-}
-
-/**
- * 날짜 포맷 (YYYY-MM-DD → YYMMDD)
- */
-function formatDate(dateStr) {
-  if (!dateStr) return 'xxxxxx';
-
-  const date = new Date(dateStr);
-  const yy = String(date.getFullYear()).slice(2);
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-
-  return `${yy}${mm}${dd}`;
-}
-
-/**
- * 프로젝트명 파싱 (클라이언트 / 프로젝트명)
- */
-function parseProjectName(name) {
-  const parts = name.split('/').map(s => s.trim());
-
-  if (parts.length >= 2) {
-    return [parts[0], parts.slice(1).join('_')];
-  }
-
-  return ['미지정', name];
-}
-
-/**
- * 특수문자 제거 및 정리
- */
-function sanitizeFolderName(name) {
-  return name
-    .replace(/[<>:"\/\\|?*]/g, '_')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .substring(0, 200);
 }
 
 /**
  * 폴더 존재 확인
  */
 async function checkFolderExists(folderName) {
-  const fullPath = path.join(NAS_BASE_PATH, folderName);
-  try {
-    await fs.access(fullPath);
-    return true;
-  } catch {
-    return false;
-  }
+  const fullPath = `${NAS_BASE_PATH}/${folderName}`;
+  return await synoApi.exists(fullPath);
+}
+
+/**
+ * 프로젝트 완료 처리 (NAS 폴더명 업데이트: xxxxxx -> YYMMDD)
+ */
+async function completeProjectFolder(projectId, currentPath) {
+    try {
+        const normalizedPath = normalizeNasPath(currentPath);
+        console.log(`[NAS] 프로젝트 완료 처리 시작: ${normalizedPath}`);
+        if (normalizedPath !== currentPath) {
+            console.log(`[NAS] 경로 정규화: ${currentPath} -> ${normalizedPath}`);
+        }
+        
+        const pathParts = normalizedPath.split('/');
+        const oldName = pathParts.pop();
+        const parentPath = pathParts.join('/');
+        
+        const { standardizeDate } = require('../utils/folderNameParser');
+        const today = standardizeDate(new Date());
+        
+        // xxxxxx 부분을 오늘 날짜로 변경
+        const newName = oldName.replace('-xxxxxx_', `-${today}_`);
+        
+        if (oldName === newName) {
+            console.log('[NAS] 이미 완료된 폴더명이거나 형식이 다릅니다.');
+            return { success: true, folderPath: currentPath };
+        }
+
+        const result = await synoApi.renameFolder(normalizedPath, newName);
+        
+        if (result.success) {
+            const newPath = `${parentPath}/${newName}`;
+            console.log(`[NAS] 폴더명 변경 성공: ${newPath}`);
+            return { success: true, folderPath: newPath };
+        }
+        
+        return { success: false, error: 'Rename API 실패' };
+    } catch (error) {
+        console.error('[NAS] 완료 처리 에러:', error.message);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * 프로젝트 정보 변경 시 NAS 폴더명 업데이트
+ */
+async function renameProjectFolder(projectId, currentPath, projectData = {}, lastUpdated) {
+    try {
+        const normalizedPath = normalizeNasPath(currentPath);
+        if (!normalizedPath) {
+            return { success: false, error: 'NAS 폴더 경로가 필요합니다.' };
+        }
+
+        let sourceData = projectData;
+        let sourceLastUpdated = lastUpdated;
+        let dbProject = null;
+
+        if (projectId && supabase.getProjectById) {
+            dbProject = await supabase.getProjectById(projectId);
+            if (dbProject?.last_updated) {
+                const dbTime = new Date(dbProject.last_updated).getTime();
+                const payloadTime = lastUpdated ? new Date(lastUpdated).getTime() : NaN;
+                if (isNaN(payloadTime) || (!isNaN(dbTime) && dbTime > payloadTime)) {
+                    sourceData = {
+                        name: dbProject.name,
+                        startDate: dbProject.start_date,
+                        endDate: dbProject.end_date,
+                        pmName: dbProject.pm_name,
+                        designerNames: [
+                            dbProject.designer_name,
+                            dbProject.designer_2_name,
+                            dbProject.designer_3_name
+                        ].filter(Boolean)
+                    };
+                    sourceLastUpdated = dbProject.last_updated;
+                    console.log('[NAS] 최신 정보가 DB에 있어 DB 데이터를 기준으로 처리');
+                }
+            }
+        }
+
+        const pmName = sourceData.pmName || sourceData.pm_name;
+        const designerNames = sourceData.designerNames || [
+            sourceData.designer_name,
+            sourceData.designer_2_name,
+            sourceData.designer_3_name
+        ].filter(Boolean);
+
+        const folderName = generateFolderName({
+            name: sourceData.name,
+            startDate: sourceData.startDate || sourceData.start_date,
+            endDate: sourceData.endDate || sourceData.end_date,
+            pmName,
+            designerNames
+        });
+
+        const pathParts = normalizedPath.split('/');
+        const oldName = pathParts.pop();
+        const parentPath = pathParts.join('/');
+
+        if (!oldName) {
+            return { success: false, error: '현재 폴더명을 찾을 수 없습니다.' };
+        }
+
+        if (oldName === folderName) {
+            if (projectId && supabase.updateProjectNASInfo) {
+                await supabase.updateProjectNASInfo(projectId, {
+                    name: sourceData.name,
+                    start_date: sourceData.startDate || sourceData.start_date,
+                    end_date: sourceData.endDate || sourceData.end_date,
+                    pm_name: pmName || null,
+                    designer_name: designerNames[0] || null,
+                    designer_2_name: designerNames[1] || null,
+                    designer_3_name: designerNames[2] || null,
+                    nas_folder_path: normalizedPath,
+                    last_updated: sourceLastUpdated
+                });
+            }
+            return { success: true, skipped: true, folderPath: normalizedPath };
+        }
+
+        const result = await synoApi.renameFolder(normalizedPath, folderName);
+        if (result.success) {
+            const newPath = `${parentPath}/${folderName}`;
+            if (projectId && supabase.updateProjectNASInfo) {
+                await supabase.updateProjectNASInfo(projectId, {
+                    name: sourceData.name,
+                    start_date: sourceData.startDate || sourceData.start_date,
+                    end_date: sourceData.endDate || sourceData.end_date,
+                    pm_name: pmName || null,
+                    designer_name: designerNames[0] || null,
+                    designer_2_name: designerNames[1] || null,
+                    designer_3_name: designerNames[2] || null,
+                    nas_folder_path: newPath,
+                    last_updated: sourceLastUpdated
+                });
+            }
+            console.log(`[NAS] 폴더명 변경 성공: ${newPath}`);
+            return { success: true, folderPath: newPath };
+        }
+
+        return { success: false, error: 'Rename API 실패' };
+    } catch (error) {
+        console.error('[NAS] 이름 변경 에러:', error.message);
+        return { success: false, error: error.message };
+    }
 }
 
 module.exports = {
   createProjectFolder,
   checkFolderExists,
-  generateFolderName,
+  completeProjectFolder,
+  renameProjectFolder,
+  NAS_BASE_PATH
 };
