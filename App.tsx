@@ -37,15 +37,14 @@ import {
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User>({
-    id: "dev-user",
-    userId: "dev-user",
-    name: "Dev User",
+    id: "guest",
+    userId: "guest",
+    name: "게스트",
     avatarUrl: "",
-    email: "dev@example.com",
   });
   const [currentView, setCurrentView] = useState<
     "welcome" | "list" | "detail" | "share"
-  >("list");
+  >("welcome");
   const [isInitializing, setIsInitializing] = useState(true);
   const [sharedProjectId, setSharedProjectId] = useState<string | null>(null);
   const [templates, setTemplates] = useState<Project[]>([]); // Templates State
@@ -105,7 +104,7 @@ const App: React.FC = () => {
   // Force Welcome if Guest is on List
   useEffect(() => {
     if (currentView === "list" && user.userId === "guest") {
-      // setCurrentView("welcome");
+      setCurrentView("welcome");
     }
   }, [currentView, user.userId]);
 
@@ -172,7 +171,7 @@ const App: React.FC = () => {
                 console.warn("Unauthorized user:", session.user.email);
                 await supabase.auth.signOut();
                 showToast("허가되지 않은 계정입니다.");
-                // setCurrentView("welcome");
+                setCurrentView("welcome");
                 setIsInitializing(false);
                 return;
               }
@@ -201,7 +200,7 @@ const App: React.FC = () => {
             }
           } else if (event === "SIGNED_OUT") {
             if (mounted) {
-              // setCurrentView("welcome");
+              setCurrentView("welcome");
               setUser({
                 id: "guest",
                 userId: "guest",
@@ -227,7 +226,7 @@ const App: React.FC = () => {
             // Double check
             supabase.auth.getSession().then(({ data }) => {
               if (!data.session) {
-                // setCurrentView("welcome");
+                setCurrentView("welcome");
                 setIsInitializing(false);
               }
             });
