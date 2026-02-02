@@ -7,15 +7,22 @@
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
-  "keywords": ["nas", "folder", "management"],
+  "keywords": [
+    "nas",
+    "folder",
+    "management"
+  ],
   "author": "Grafy Team",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "helmet": "^7.1.0",
-    "morgan": "^1.10.0"
+    "@supabase/supabase-js": "^2.93.3",
+    "axios": "^1.13.4",
+    "chokidar": "^5.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "helmet": "^7.2.0",
+    "morgan": "^1.10.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
