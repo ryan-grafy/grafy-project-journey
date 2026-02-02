@@ -18,6 +18,7 @@ import {
 } from "./supabaseClient.ts";
 import SharedProjectView from "./components/SharedProjectView.tsx";
 import TemplateSaveModal from "./components/TemplateSaveModal.tsx";
+import { createProjectFolder, completeProjectFolder, renameProjectFolder } from "./services/nasService";
 import {
   STEPS_STATIC,
   TEAM_MEMBERS as INITIAL_TEAM_MEMBERS,
@@ -36,14 +37,15 @@ import {
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User>({
-    id: "guest",
-    userId: "guest",
-    name: "게스트",
+    id: "dev-user",
+    userId: "dev-user",
+    name: "Dev User",
     avatarUrl: "",
+    email: "dev@example.com",
   });
   const [currentView, setCurrentView] = useState<
     "welcome" | "list" | "detail" | "share"
-  >("welcome");
+  >("list");
   const [isInitializing, setIsInitializing] = useState(true);
   const [sharedProjectId, setSharedProjectId] = useState<string | null>(null);
   const [templates, setTemplates] = useState<Project[]>([]); // Templates State
@@ -103,7 +105,7 @@ const App: React.FC = () => {
   // Force Welcome if Guest is on List
   useEffect(() => {
     if (currentView === "list" && user.userId === "guest") {
-      setCurrentView("welcome");
+      // setCurrentView("welcome");
     }
   }, [currentView, user.userId]);
 
@@ -170,7 +172,7 @@ const App: React.FC = () => {
                 console.warn("Unauthorized user:", session.user.email);
                 await supabase.auth.signOut();
                 showToast("허가되지 않은 계정입니다.");
-                setCurrentView("welcome");
+                // setCurrentView("welcome");
                 setIsInitializing(false);
                 return;
               }
@@ -199,7 +201,7 @@ const App: React.FC = () => {
             }
           } else if (event === "SIGNED_OUT") {
             if (mounted) {
-              setCurrentView("welcome");
+              // setCurrentView("welcome");
               setUser({
                 id: "guest",
                 userId: "guest",
@@ -225,7 +227,7 @@ const App: React.FC = () => {
             // Double check
             supabase.auth.getSession().then(({ data }) => {
               if (!data.session) {
-                setCurrentView("welcome");
+                // setCurrentView("welcome");
                 setIsInitializing(false);
               }
             });
@@ -530,6 +532,17 @@ const App: React.FC = () => {
         if (!remoteP) {
           mergedMap.set(localP.id, localP);
         } else {
+          const remoteNasTime = remoteP.nas_last_synced
+            ? new Date(remoteP.nas_last_synced).getTime()
+            : NaN;
+          const localNasTime = localP.nas_last_synced
+            ? new Date(localP.nas_last_synced).getTime()
+            : NaN;
+          const preferRemoteForNas =
+            !isNaN(remoteNasTime) &&
+            (isNaN(localNasTime) || remoteNasTime > localNasTime);
+          if (preferRemoteForNas) return;
+
           // Compare timestamps
           const remoteTime = new Date(remoteP.last_updated).getTime();
           const localTime = new Date(localP.last_updated).getTime();
@@ -565,6 +578,29 @@ const App: React.FC = () => {
       setProjects(active);
       setDeletedProjects(deleted);
       setTemplates(remoteTemplates); // Set templates separately
+
+      localStorage.setItem("grafy_projects", JSON.stringify(mergedList));
+
+      if (currentProject) {
+        const freshProject = mergedMap.get(currentProject.id);
+        if (freshProject) {
+          const freshTime = new Date(freshProject.last_updated).getTime();
+          const currentTime = new Date(currentProject.last_updated).getTime();
+          const freshNasTime = freshProject.nas_last_synced
+            ? new Date(freshProject.nas_last_synced).getTime()
+            : NaN;
+          const currentNasTime = currentProject.nas_last_synced
+            ? new Date(currentProject.nas_last_synced).getTime()
+            : NaN;
+          const shouldRefresh =
+            (!isNaN(freshTime) && !isNaN(currentTime) && freshTime > currentTime) ||
+            (!isNaN(freshNasTime) && (isNaN(currentNasTime) || freshNasTime > currentNasTime));
+          if (shouldRefresh) {
+            setCurrentProject(freshProject);
+            loadTasks(freshProject);
+          }
+        }
+      }
       
       // Mark data as loaded so subsequent fetches don't trigger spinner
       isDataLoadedRef.current = true;
@@ -572,6 +608,14 @@ const App: React.FC = () => {
     }
     setIsProjectLoading(false);
   };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchProjects(true);
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [isSupabaseReady]);
 
   const saveProjectsLocal = async (updatedActiveProjects: Project[]) => {
     setProjects(updatedActiveProjects);
@@ -740,35 +784,58 @@ const App: React.FC = () => {
   const handleToggleLock = async (locked: boolean) => {
     if (!currentProject) return;
 
-    let end_date = currentProject.end_date;
+    let endDate = currentProject.end_date;
     if (locked) {
       const now = new Date();
       const yy = String(now.getFullYear()).slice(-2);
       const mm = String(now.getMonth() + 1).padStart(2, "0");
       const dd = String(now.getDate()).padStart(2, "0");
-      end_date = `${yy}-${mm}-${dd}`;
+      endDate = `${yy}${mm}${dd}`;
     }
 
     const updated = {
       ...currentProject,
       is_locked: locked,
-      end_date,
+      end_date: endDate,
       last_updated: new Date().toISOString(),
     };
-    setCurrentProject(updated);
 
+    // UI 즉시 업데이트
+    setCurrentProject(updated);
     const nextProjects = projects.map((p) =>
       p.id === currentProject.id ? updated : p,
     );
     setProjects(nextProjects);
     localStorage.setItem("grafy_projects", JSON.stringify(nextProjects));
 
+    // Supabase 업데이트
     await syncProjectToSupabase(updated);
-    showToast(
-      locked
-        ? "프로젝트가 잠겼습니다. 종료일이 기록되었습니다."
-        : "프로젝트 잠금이 해제되었습니다.",
-    );
+
+    // NAS 폴더명 변경 연동 (잠금 시에만)
+    if (locked && updated.nas_folder_path) {
+      try {
+        showToast("🔄 NAS 폴더 종료일 업데이트 중...");
+        const result = await completeProjectFolder(updated.id, updated.nas_folder_path);
+        if (result.success) {
+          // 변경된 경로 반영
+          const finalProject = { ...updated, nas_folder_path: result.folderPath };
+          setCurrentProject(finalProject);
+          const finalProjects = projects.map((p) => (p.id === finalProject.id ? finalProject : p));
+          setProjects(finalProjects);
+          localStorage.setItem("grafy_projects", JSON.stringify(finalProjects));
+          
+          if (isSupabaseReady && supabase) {
+            await supabase.from("projects").update({ nas_folder_path: result.folderPath }).eq("id", finalProject.id);
+          }
+          showToast("✅ NAS 폴더 종료일 반영 완료");
+        }
+      } catch (err: any) {
+        console.error("NAS 완료 처리 실패:", err);
+        showToast(`⚠️ NAS 연동 실패: ${err.message}`);
+      }
+    } else {
+      showToast(locked ? "프로젝트가 잠겼습니다." : "프로젝트 잠금이 해제되었습니다.");
+    }
   };
 
   const selectProject = (project: Project) => {
@@ -825,7 +892,20 @@ const App: React.FC = () => {
     );
   };
 
-  const updateProjectInfo = (updates: Partial<Project>) => {
+  const shouldUpdateNasFolder = (updates: Partial<Project>) => {
+    const keys: (keyof Project)[] = [
+      "name",
+      "start_date",
+      "end_date",
+      "pm_name",
+      "designer_name",
+      "designer_2_name",
+      "designer_3_name",
+    ];
+    return keys.some((key) => key in updates);
+  };
+
+  const updateProjectInfo = async (updates: Partial<Project>) => {
     if (!currentProject || currentProject.is_locked) return;
 
     // Sync updates to meta for backup & realtime trigger assurance
@@ -857,7 +937,46 @@ const App: React.FC = () => {
     localStorage.setItem("grafy_projects", JSON.stringify(updatedProjects));
 
     // Sync to Supabase
-    syncProjectToSupabase(updatedProject);
+    await syncProjectToSupabase(updatedProject);
+
+    if (shouldUpdateNasFolder(updates) && updatedProject.nas_folder_path) {
+      try {
+        const result = await renameProjectFolder(
+          updatedProject.id,
+          updatedProject.nas_folder_path,
+          {
+            name: updatedProject.name,
+            startDate: updatedProject.start_date,
+            endDate: updatedProject.end_date,
+            pmName: updatedProject.pm_name,
+            designerNames: [
+              updatedProject.designer_name,
+              updatedProject.designer_2_name,
+              updatedProject.designer_3_name,
+            ].filter(Boolean),
+          },
+          updatedProject.last_updated,
+        );
+
+        if (result?.success && result.folderPath && result.folderPath !== updatedProject.nas_folder_path) {
+          const finalProject = { ...updatedProject, nas_folder_path: result.folderPath };
+          setCurrentProject(finalProject);
+          const finalProjects = projects.map((p) => (p.id === finalProject.id ? finalProject : p));
+          setProjects(finalProjects);
+          localStorage.setItem("grafy_projects", JSON.stringify(finalProjects));
+
+          if (isSupabaseReady && supabase) {
+            await supabase
+              .from("projects")
+              .update({ nas_folder_path: result.folderPath, last_updated: finalProject.last_updated })
+              .eq("id", finalProject.id);
+          }
+        }
+      } catch (err: any) {
+        console.error("NAS 이름 변경 실패:", err);
+        showToast(`⚠️ NAS 이름 변경 실패: ${err.message}`);
+      }
+    }
 
     showToast("프로젝트 정보 저장 완료");
   };
@@ -1989,6 +2108,8 @@ const App: React.FC = () => {
     }
   };
 
+
+
   const handleCreateProject = async (
     name: string,
     pm: TeamMember | null,
@@ -1999,130 +2120,196 @@ const App: React.FC = () => {
     taskOrderTemplate?: any,
     templateProject?: Project | null,
   ) => {
-    const [dLead, d1, d2] = designers;
-
-    // Prepare complex objects first to avoid self-reference issues
-    const finalCustomTasks = customTasksTemplate
-      ? JSON.parse(JSON.stringify(customTasksTemplate))
-      : JSON.parse(JSON.stringify(DEFAULT_CUSTOM_TASKS));
-    const finalTaskOrder = taskOrderTemplate
-      ? JSON.parse(JSON.stringify(taskOrderTemplate))
-      : {};
-    const finalDeletedTasks: string[] = [];
-
-    // Reset all task dates to 00-00-00 for new projects
-    for (let stepId = 1; stepId <= 5; stepId++) {
-      if (finalCustomTasks[stepId]) {
-        finalCustomTasks[stepId] = finalCustomTasks[stepId].map(
-          (task: Task) => ({
-            ...task,
-            completed_date: "00-00-00",
-          }),
-        );
-      }
-    }
-
-    const newProject: Project = {
-      id: crypto.randomUUID(),
-      created_at: new Date().toISOString(),
-      name,
-      pm_name: pm ? `${pm.name} ${pm.title}` : "",
-      pm_phone: pm?.phone,
-      pm_email: pm?.email,
-      designer_name: dLead ? `${dLead.name} ${dLead.title}` : "",
-      designer_phone: dLead?.phone,
-      designer_email: dLead?.email,
-      designer_2_name: d1 ? `${d1.name} ${d1.title}` : "",
-      designer_2_phone: d1?.phone,
-      designer_2_email: d1?.email,
-      designer_3_name: d2 ? `${d2.name} ${d2.title}` : "",
-      designer_3_phone: d2?.phone,
-      designer_3_email: d2?.email,
-      status: 0,
-      last_updated: new Date().toISOString(),
-      rounds_count: templateProject?.rounds_count ?? 2,
-      rounds2_count: templateProject?.rounds2_count ?? 2,
-      rounds_navigation_count: templateProject?.rounds_navigation_count ?? 2,
-      start_date: startDate,
-      end_date: "",
-      is_locked: false,
-      deleted_tasks: templateProject?.deleted_tasks
-        ? [...templateProject.deleted_tasks]
-        : finalDeletedTasks,
-      custom_tasks: finalCustomTasks,
-      task_order: finalTaskOrder,
-      task_states: {
-        completed: [],
-        links: {},
-        meta: {
-          rounds_count: templateProject?.rounds_count ?? 2,
-          rounds2_count: templateProject?.rounds2_count ?? 2,
-          rounds_navigation_count:
-            templateProject?.rounds_navigation_count ?? 2,
-          client_visible_tasks: [],
-          template_name: templateName,
-          custom_tasks: finalCustomTasks,
-          task_order: finalTaskOrder,
-          deleted_tasks: templateProject?.deleted_tasks
-            ? [...templateProject.deleted_tasks]
-            : finalDeletedTasks,
-          is_expedition2_hidden:
-            templateProject?.task_states?.meta?.is_expedition2_hidden,
-          step_titles: templateProject?.task_states?.meta?.step_titles,
-        },
-      },
-      client_visible_tasks: [],
-      template_name: templateName,
-    };
-
-    // Optimistic UI Update
-    const updatedProjects = [newProject, ...projects];
-    setProjects(updatedProjects);
-    localStorage.setItem("grafy_projects", JSON.stringify(updatedProjects));
-
-    // Sync to Supabase
     try {
-      if (isSupabaseReady && supabase) {
-        // Ensure all JSON fields are objects/arrays, not undefined
-        // AND Remove non-existent columns (rounds, client_visible_tasks)
-        const {
-          rounds_count,
-          rounds2_count,
-          rounds_navigation_count,
-          client_visible_tasks,
-          template_name,
-          ...baseProject
-        } = newProject;
+      const [dLead, d1, d2] = designers;
 
-        const projectToSave = {
-          ...baseProject,
-          custom_tasks: newProject.custom_tasks || {},
-          task_order: newProject.task_order || {},
-          task_states: newProject.task_states || {
-            completed: [],
-            links: {},
-            meta: {
-              rounds_count,
-              rounds2_count,
-              rounds_navigation_count,
-              client_visible_tasks,
-              custom_tasks: newProject.custom_tasks,
-              task_order: newProject.task_order,
-              deleted_tasks: newProject.deleted_tasks,
-              step_titles: templateProject?.task_states?.meta?.step_titles,
-            },
-          }, // Ensure meta is populated
-          deleted_tasks: newProject.deleted_tasks || [],
-        };
-        await supabase.from("projects").insert(projectToSave);
+      const withTimeout = async <T,>(promise: PromiseLike<T>, ms: number) => {
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        const timeoutPromise = new Promise((resolve) => {
+          timeoutId = setTimeout(() => resolve({ timeout: true }), ms);
+        });
+        const result = await Promise.race([
+          Promise.resolve(promise),
+          timeoutPromise,
+        ]);
+        if (timeoutId) clearTimeout(timeoutId);
+        return result;
+      };
+
+      // Prepare complex objects first to avoid self-reference issues
+      const finalCustomTasks = customTasksTemplate
+        ? JSON.parse(JSON.stringify(customTasksTemplate))
+        : JSON.parse(JSON.stringify(DEFAULT_CUSTOM_TASKS));
+      const finalTaskOrder = taskOrderTemplate
+        ? JSON.parse(JSON.stringify(taskOrderTemplate))
+        : {};
+      const finalDeletedTasks: string[] = [];
+
+      // Reset all task dates to 00-00-00 for new projects
+      for (let stepId = 1; stepId <= 5; stepId++) {
+        if (finalCustomTasks[stepId]) {
+          finalCustomTasks[stepId] = finalCustomTasks[stepId].map(
+            (task: Task) => ({
+              ...task,
+              completed_date: "00-00-00",
+            }),
+          );
+        }
       }
-    } catch (e) {
-      showToast("프로젝트 저장 중 오류가 발생했으나 로컬에는 저장되었습니다.");
-    }
 
-    setShowCreateModal(false);
-    selectProject(newProject);
-    showToast("프로젝트가 생성되었습니다.");
+      const newProject: Project = {
+        id: crypto.randomUUID(),
+        created_at: new Date().toISOString(),
+        name,
+        pm_name: pm ? `${pm.name} ${pm.title}` : "",
+        pm_phone: pm?.phone,
+        pm_email: pm?.email,
+        designer_name: dLead ? `${dLead.name} ${dLead.title}` : "",
+        designer_phone: dLead?.phone,
+        designer_email: dLead?.email,
+        designer_2_name: d1 ? `${d1.name} ${d1.title}` : "",
+        designer_2_phone: d1?.phone,
+        designer_2_email: d1?.email,
+        designer_3_name: d2 ? `${d2.name} ${d2.title}` : "",
+        designer_3_phone: d2?.phone,
+        designer_3_email: d2?.email,
+        status: 0,
+        last_updated: new Date().toISOString(),
+        rounds_count: templateProject?.rounds_count ?? 2,
+        rounds2_count: templateProject?.rounds2_count ?? 2,
+        rounds_navigation_count: templateProject?.rounds_navigation_count ?? 2,
+        start_date: startDate,
+        end_date: "",
+        is_locked: false,
+        deleted_tasks: templateProject?.deleted_tasks
+          ? [...templateProject.deleted_tasks]
+          : finalDeletedTasks,
+        custom_tasks: finalCustomTasks,
+        task_order: finalTaskOrder,
+        task_states: {
+          completed: [],
+          links: {},
+          meta: {
+            rounds_count: templateProject?.rounds_count ?? 2,
+            rounds2_count: templateProject?.rounds2_count ?? 2,
+            rounds_navigation_count:
+              templateProject?.rounds_navigation_count ?? 2,
+            client_visible_tasks: [],
+            template_name: templateName,
+            custom_tasks: finalCustomTasks,
+            task_order: finalTaskOrder,
+            deleted_tasks: templateProject?.deleted_tasks
+              ? [...templateProject.deleted_tasks]
+              : finalDeletedTasks,
+            is_expedition2_hidden:
+              templateProject?.task_states?.meta?.is_expedition2_hidden,
+            step_titles: templateProject?.task_states?.meta?.step_titles,
+          },
+        },
+        client_visible_tasks: [],
+        template_name: templateName,
+      };
+
+      // Optimistic UI Update
+      const updatedProjects = [newProject, ...projects];
+      setProjects(updatedProjects);
+      localStorage.setItem("grafy_projects", JSON.stringify(updatedProjects));
+
+      // NAS 폴더 생성 API 호출
+      console.log("🛠 [NAS] 단계 1: NAS 생성 로직 진입");
+      try {
+        if (startDate) {
+          console.log("🛠 [NAS] 단계 2: 파라미터 준비 완료", { name, startDate, pm, designers });
+          const designerNames = [
+            dLead ? `${dLead.name} ${dLead.title}` : undefined,
+            d1 ? `${d1.name} ${d1.title}` : undefined,
+            d2 ? `${d2.name} ${d2.title}` : undefined,
+          ].filter(Boolean) as string[];
+
+          console.log("🛠 [NAS] 단계 3: API 요청 전송 시작");
+          const nasResult = await createProjectFolder({
+            name,
+            startDate,
+            pmName: pm ? `${pm.name} ${pm.title}` : undefined,
+            designerNames,
+          });
+          console.log("🛠 [NAS] 단계 4: API 응답 수신", nasResult);
+
+          if (nasResult && nasResult.success) {
+            console.log("🛠 [NAS] 단계 5: 성공 처리");
+            newProject.nas_folder_path = nasResult.folderPath;
+            newProject.nas_folder_created = true;
+            showToast("✅ NAS 폴더 생성 완료");
+          } else {
+            console.log("🛠 [NAS] 단계 5: 서버는 응답했으나 실패 처리", nasResult);
+            showToast(`⚠️ NAS 응답 오류: ${nasResult?.error || "생성 실패"}`);
+          }
+        } else {
+          console.log("🛠 [NAS] 단계 2 실패: startDate가 없음");
+        }
+      } catch (nasError: any) {
+        console.error("❌ [NAS] 단계 3/4 에러 발생:", nasError);
+        showToast(`⚠️ NAS 통신 실패: ${nasError.message || "서버 응답 없음"}`);
+      }
+      console.log("🛠 [NAS] 단계 6: NAS 로직 종료 및 Supabase 동기화 진행");
+
+      // Sync to Supabase
+      try {
+        if (isSupabaseReady && supabase) {
+          // Ensure all JSON fields are objects/arrays, not undefined
+          // AND Remove non-existent columns (rounds, client_visible_tasks)
+          const {
+            rounds_count,
+            rounds2_count,
+            rounds_navigation_count,
+            client_visible_tasks,
+            template_name,
+            ...baseProject
+          } = newProject;
+
+          const projectToSave = {
+            ...baseProject,
+            custom_tasks: newProject.custom_tasks || {},
+            task_order: newProject.task_order || {},
+            task_states: newProject.task_states || {
+              completed: [],
+              links: {},
+              meta: {
+                rounds_count,
+                rounds2_count,
+                rounds_navigation_count,
+                client_visible_tasks,
+                custom_tasks: newProject.custom_tasks,
+                task_order: newProject.task_order,
+                deleted_tasks: newProject.deleted_tasks,
+                step_titles: templateProject?.task_states?.meta?.step_titles,
+              },
+            }, // Ensure meta is populated
+            deleted_tasks: newProject.deleted_tasks || [],
+            nas_folder_path: newProject.nas_folder_path || null,
+            nas_folder_created: newProject.nas_folder_created || false,
+          };
+
+          const insertResult = await withTimeout(
+            supabase.from("projects").insert(projectToSave),
+            8000,
+          );
+          if ((insertResult as any)?.timeout) {
+            showToast("⚠️ Supabase 저장 지연: 로컬에만 저장되었습니다.");
+          }
+        }
+      } catch (e) {
+        showToast("프로젝트 저장 중 오류가 발생했으나 로컬에는 저장되었습니다.");
+      }
+
+      selectProject(newProject);
+      showToast("프로젝트가 생성되었습니다.");
+    } catch (error: any) {
+      console.error("❌ 프로젝트 생성 중 오류:", error);
+      showToast("프로젝트 생성 중 오류가 발생했습니다.");
+    } finally {
+      setShowCreateModal(false);
+    }
   };
 
   const handleSaveTemplate = async (templateName: string) => {
