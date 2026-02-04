@@ -1,6 +1,6 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TeamMember } from '../types';
+import { X, Plus, Trash2, User } from 'lucide-react';
 
 interface TeamManagementModalProps {
   members: TeamMember[];
@@ -10,6 +10,16 @@ interface TeamManagementModalProps {
 
 const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ members, onClose, onUpdate }) => {
   const [editMembers, setEditMembers] = useState<TeamMember[]>([...members]);
+
+  // No scroll lock to prevent scrollbar shifting/shaking
+  useEffect(() => {
+    // Esc key to close
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
 
   const handleAdd = () => {
     const newMember: TeamMember = {
@@ -36,72 +46,133 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ members, onCl
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] animate-in fade-in duration-200">
-      <div className="bg-white rounded-[1.25rem] w-[800px] max-h-[80vh] flex flex-col p-10 shadow-2xl border border-slate-200">
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-2xl font-black tracking-tighter text-black uppercase">TEAM MANAGEMENT</h2>
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 transition-all text-black">
-            <i className="fa-solid fa-times text-xl"></i>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center">
+      {/* 
+         Backdrop: Removed bg-black/20 and backdrop-blur per request.
+         Kept for click-to-close functionality.
+      */}
+      <div className="absolute inset-0" onClick={onClose} />
+      
+      {/* 
+         Modal Container:
+         - bg-white/20: Brighter
+         - backdrop-blur-[35px]
+         - shadow: Enhanced for better separation without backdrop tint
+      */}
+      <div className="relative bg-white/20 backdrop-blur-[35px] rounded-[2.5rem] w-[1000px] max-h-[85vh] flex flex-col p-10 shadow-[0_30px_100px_-15px_rgba(0,0,0,0.25)] border border-white/50 ring-1 ring-white/20">
+        
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8 pl-2">
+          <div className="flex flex-col">
+            <h2 
+              className="text-3xl font-bold tracking-tight text-black"
+              style={{ fontFamily: "'Helvetica Now Display', 'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+            >
+              Team Management
+            </h2>
+            <p className="text-black/50 text-sm font-medium mt-1 ml-0.5">Manage your project members</p>
+          </div>
+          <button 
+            onClick={onClose} 
+            className="w-12 h-12 flex items-center justify-center rounded-full hover:bg-white/30 transition-all text-black/70 hover:text-black border border-transparent hover:border-white/20"
+          >
+            <X size={24} strokeWidth={2.5} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar mb-8">
-          <div className="grid grid-cols-12 gap-4 mb-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-            <div className="col-span-2">이름</div>
-            <div className="col-span-2">직함</div>
-            <div className="col-span-3">연락처</div>
-            <div className="col-span-4">이메일</div>
+        {/* List Header */}
+        <div className="flex-1 overflow-y-auto pr-3 custom-scrollbar mb-6">
+          <div className="grid grid-cols-12 gap-4 mb-3 px-4 text-[13px] font-semibold text-black/50 uppercase tracking-widest">
+            <div className="col-span-2">Name</div>
+            <div className="col-span-2">Position</div>
+            <div className="col-span-3">Contact</div>
+            <div className="col-span-4">Email</div>
             <div className="col-span-1"></div>
           </div>
 
           <div className="flex flex-col gap-3">
             {editMembers.map((m) => (
-              <div key={m.id} className="grid grid-cols-12 gap-4 items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+              <div 
+                key={m.id} 
+                // Prominent default state: bg-white/35
+                className="grid grid-cols-12 gap-4 items-center bg-white/35 hover:bg-white/55 p-3 rounded-2xl border border-white/30 transition-all group shadow-sm"
+              >
                 <input 
-                  className="col-span-2 bg-white border border-slate-200 rounded-lg p-2 text-sm font-bold outline-none focus:border-black text-black"
-                  placeholder="이름"
+                  className="col-span-2 bg-transparent border-b border-transparent focus:border-black/20 p-2 text-[16px] font-medium placeholder-black/30 outline-none text-black transition-colors"
+                  placeholder="Name"
                   value={m.name}
                   onChange={(e) => handleChange(m.id, 'name', e.target.value)}
+                  style={{ fontFamily: "'Helvetica Now Display', 'Helvetica Neue', sans-serif" }}
                 />
                 <input 
-                  className="col-span-2 bg-white border border-slate-200 rounded-lg p-2 text-sm font-bold outline-none focus:border-black text-black"
-                  placeholder="직함"
+                  className="col-span-2 bg-transparent border-b border-transparent focus:border-black/20 p-2 text-[16px] font-normal placeholder-black/30 outline-none text-black/80 transition-colors"
+                  placeholder="Position"
                   value={m.title}
                   onChange={(e) => handleChange(m.id, 'title', e.target.value)}
+                  style={{ fontFamily: "'Helvetica Now Display', 'Helvetica Neue', sans-serif" }}
                 />
                 <input 
-                  className="col-span-3 bg-white border border-slate-200 rounded-lg p-2 text-sm font-bold outline-none focus:border-black text-black"
-                  placeholder="010-0000-0000"
+                  className="col-span-3 bg-transparent border-b border-transparent focus:border-black/20 p-2 text-[16px] font-normal placeholder-black/30 outline-none text-black/80 transition-colors tracking-tight"
+                  placeholder="Contact"
                   value={m.phone}
                   onChange={(e) => handleChange(m.id, 'phone', e.target.value)}
+                  style={{ fontFamily: "'Helvetica Now Display', 'Helvetica Neue', sans-serif" }}
                 />
                 <input 
-                  className="col-span-4 bg-white border border-slate-200 rounded-lg p-2 text-sm font-bold outline-none focus:border-black text-black"
-                  placeholder="email@example.com"
+                  className="col-span-4 bg-transparent border-b border-transparent focus:border-black/20 p-2 text-[16px] font-normal placeholder-black/30 outline-none text-black/80 transition-colors tracking-tight"
+                  placeholder="Email Address"
                   value={m.email}
                   onChange={(e) => handleChange(m.id, 'email', e.target.value)}
+                  style={{ fontFamily: "'Helvetica Now Display', 'Helvetica Neue', sans-serif" }}
                 />
-                <button 
-                  onClick={() => handleRemove(m.id)}
-                  className="col-span-1 text-red-400 hover:text-red-600 transition-colors"
-                >
-                  <i className="fa-solid fa-minus-circle text-xl"></i>
-                </button>
+                <div className="col-span-1 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={() => handleRemove(m.id)}
+                    className="p-2 text-black/30 hover:text-red-500 hover:bg-red-500/10 rounded-full transition-all"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
 
           <button 
             onClick={handleAdd}
-            className="w-full mt-4 py-4 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-black hover:border-black hover:text-black transition-all flex items-center justify-center gap-2"
+            // Prominent default: bg-white/30, solid borders
+            // overflow-hidden for the 'pop-up' effect
+            className="w-full mt-6 py-6 border border-black/10 hover:border-black/20 rounded-[2.5rem] bg-white/30 text-black font-semibold hover:bg-white/45 transition-all flex items-center justify-center gap-3 group relative overflow-hidden shadow-sm shadow-black/5"
           >
-            <i className="fa-solid fa-plus"></i> 멤버 추가
+            <div className="relative w-8 h-8 flex items-center justify-center">
+              {/* Plus icon fades/scales out */}
+              <div className="transition-all duration-300 group-hover:scale-0 group-hover:opacity-0 bg-black/5 rounded-full p-1.5 flex items-center justify-center">
+                <Plus size={16} strokeWidth={3} />
+              </div>
+              {/* User icon pops up from bottom frame */}
+              <div className="absolute inset-0 flex items-center justify-center transition-all duration-300 translate-y-8 opacity-0 group-hover:translate-y-0 group-hover:opacity-100">
+                <User size={20} className="text-black" strokeWidth={2.5} />
+              </div>
+            </div>
+            <span style={{ fontFamily: "'Helvetica Now Display', 'Helvetica Neue', sans-serif" }}>Add New Member</span>
           </button>
         </div>
 
-        <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="px-8 py-4 text-sm font-bold text-slate-500 bg-slate-100 rounded-xl">취소</button>
-          <button onClick={handleSave} className="px-10 py-4 text-sm font-black text-white bg-black rounded-xl shadow-xl shadow-black/20">명단 저장</button>
+        {/* Footer */}
+        <div className="flex justify-end gap-3 mt-2 pt-6 border-t border-white/20">
+          <button 
+            onClick={onClose} 
+            className="px-8 py-4 text-[15px] font-medium text-black/70 bg-white/20 hover:bg-white/40 border border-white/30 rounded-[20px] transition-all backdrop-blur-md"
+            style={{ fontFamily: "'Helvetica Now Display', 'Helvetica Neue', sans-serif" }}
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={handleSave} 
+            className="px-10 py-4 text-[15px] font-bold text-black bg-white hover:bg-white/90 rounded-[20px] shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
+            style={{ fontFamily: "'Helvetica Now Display', 'Helvetica Neue', sans-serif" }}
+          >
+            Save Changes
+          </button>
         </div>
       </div>
     </div>

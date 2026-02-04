@@ -87,6 +87,13 @@ const StepColumn: React.FC<StepColumnProps> = ({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [dropLineIndex, setDropLineIndex] = useState<number | null>(null); // Keep for compatibility
+  const isDragging = draggedIndex !== null;
+  const dragScrollTargetsRef = useRef<{ x: HTMLElement | null; y: HTMLElement | null }>({
+    x: null,
+    y: null,
+  });
+  const lastDragPointRef = useRef<{ x: number; y: number } | null>(null);
+  const dragRafRef = useRef<number | null>(null);
 
   // Title & Group Title Editing
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -117,6 +124,177 @@ const StepColumn: React.FC<StepColumnProps> = ({
   const cachedRects = useRef<
     Map<string, { x1: number; y1: number; x2: number; y2: number }>
   >(new Map());
+
+  const findScrollableParent = (element: HTMLElement | null, axis: "x" | "y") => {
+    let current = element?.parentElement || null;
+    while (current) {
+      const style = window.getComputedStyle(current);
+      const overflow = axis === "x" ? style.overflowX : style.overflowY;
+      const canScroll =
+        (overflow === "auto" || overflow === "scroll") &&
+        (axis === "x"
+          ? current.scrollWidth > current.clientWidth
+          : current.scrollHeight > current.clientHeight);
+      if (canScroll) return current;
+      current = current.parentElement;
+    }
+    return null;
+  };
+
+  const resolveDragScrollTargets = () => {
+    const base = columnRef.current;
+    if (!base) return;
+    const horizontal =
+      (base.closest("[data-task-scroll]") as HTMLElement | null) ||
+      findScrollableParent(base, "x");
+    const vertical =
+      findScrollableParent(base, "y") ||
+      (document.scrollingElement as HTMLElement | null);
+    dragScrollTargetsRef.current = { x: horizontal, y: vertical };
+  };
+
+  const autoScrollOnDragPoint = (clientX: number, clientY: number) => {
+    if (!isDragging) return;
+    
+    // ALWAYS resolve targets to ensure we have them
+    let { x, y } = dragScrollTargetsRef.current;
+    if (!x) {
+      // Try direct query first
+      x = document.querySelector('[data-task-scroll="x"]') as HTMLElement | null;
+      if (!x && columnRef.current) {
+        x = columnRef.current.closest('[data-task-scroll]') as HTMLElement | null;
+      }
+      if (!x && columnRef.current) {
+        x = findScrollableParent(columnRef.current, 'x');
+      }
+      if (x) dragScrollTargetsRef.current.x = x;
+    }
+    
+    const edge = 200; // Increased for visibility
+    const minStep = 15;
+    const maxStep = 100;
+
+    if (x) {
+      const rect = x.getBoundingClientRect();
+      let deltaX = 0;
+      if (clientX < rect.left + edge) {
+        const distance = rect.left + edge - clientX;
+        deltaX = -Math.max(minStep, (distance / edge) * maxStep);
+      } else if (clientX > rect.right - edge) {
+        const distance = clientX - (rect.right - edge);
+        deltaX = Math.max(minStep, (distance / edge) * maxStep);
+      }
+      if (deltaX !== 0) x.scrollBy({ left: deltaX });
+    }
+
+    if (y) {
+      const rect = y.getBoundingClientRect();
+      let deltaY = 0;
+      if (clientY < rect.top + edge) {
+        const distance = rect.top + edge - clientY;
+        deltaY = -Math.max(minStep, (distance / edge) * maxStep);
+      } else if (clientY > rect.bottom - edge) {
+        const distance = clientY - (rect.bottom - edge);
+        deltaY = Math.max(minStep, (distance / edge) * maxStep);
+      }
+      if (deltaY !== 0) y.scrollBy({ top: deltaY });
+    }
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    resolveDragScrollTargets();
+
+    const handleWheel = (event: Event) => {
+      const e = event as WheelEvent;
+      
+      // Ensure scroll targets - querySelector first for certainty
+      let { x, y } = dragScrollTargetsRef.current;
+      if (!x) {
+        x = document.querySelector('[data-task-scroll="x"]') as HTMLElement | null;
+        if (!x) resolveDragScrollTargets();
+        if (x) dragScrollTargetsRef.current.x = x;
+      }
+      
+      if (!x && !y) return;
+
+      const wheelMultiplier = 5;
+      const horizontalDelta = (e.deltaX !== 0 ? e.deltaX : e.deltaY) * wheelMultiplier;
+      if (x && horizontalDelta !== 0) x.scrollBy({ left: horizontalDelta });
+      if (!x && y && e.deltaY !== 0) y.scrollBy({ top: e.deltaY * wheelMultiplier });
+      if (e.cancelable) e.preventDefault();
+    };
+
+    const handleDocumentDragOver = (e: DragEvent) => {
+      lastDragPointRef.current = { x: e.clientX, y: e.clientY };
+      if (e.cancelable) e.preventDefault();
+    };
+
+    const handleDocumentDrag = (e: DragEvent) => {
+      lastDragPointRef.current = { x: e.clientX, y: e.clientY };
+    };
+
+    document.addEventListener("wheel", handleWheel, { passive: false, capture: true });
+    window.addEventListener("wheel", handleWheel, { passive: false, capture: true });
+    document.addEventListener("mousewheel", handleWheel, { passive: false, capture: true });
+    window.addEventListener("mousewheel", handleWheel, { passive: false, capture: true });
+    document.addEventListener("dragover", handleDocumentDragOver, { capture: true });
+    document.addEventListener("drag", handleDocumentDrag, { capture: true });
+    return () => {
+      document.removeEventListener(
+        "wheel",
+        handleWheel,
+        { capture: true } as AddEventListenerOptions,
+      );
+      window.removeEventListener(
+        "wheel",
+        handleWheel,
+        { capture: true } as AddEventListenerOptions,
+      );
+      document.removeEventListener(
+        "mousewheel",
+        handleWheel,
+        { capture: true } as AddEventListenerOptions,
+      );
+      window.removeEventListener(
+        "mousewheel",
+        handleWheel,
+        { capture: true } as AddEventListenerOptions,
+      );
+      document.removeEventListener(
+        "dragover",
+        handleDocumentDragOver,
+        { capture: true } as AddEventListenerOptions,
+      );
+      document.removeEventListener(
+        "drag",
+        handleDocumentDrag,
+        { capture: true } as AddEventListenerOptions,
+      );
+    };
+  }, [isDragging]);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const tick = () => {
+      if (lastDragPointRef.current) {
+        autoScrollOnDragPoint(
+          lastDragPointRef.current.x,
+          lastDragPointRef.current.y,
+        );
+      }
+      dragRafRef.current = requestAnimationFrame(tick);
+    };
+
+    dragRafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (dragRafRef.current) cancelAnimationFrame(dragRafRef.current);
+      dragRafRef.current = null;
+      lastDragPointRef.current = null;
+    };
+  }, [isDragging]);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
@@ -208,6 +386,8 @@ const StepColumn: React.FC<StepColumnProps> = ({
   const handleDragOver = (e: React.DragEvent, idx: number) => {
     e.preventDefault();
     if (isLockedProject || draggedIndex === null) return;
+    lastDragPointRef.current = { x: e.clientX, y: e.clientY };
+    autoScrollOnDragPoint(e.clientX, e.clientY);
 
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const threshold = rect.top + rect.height / 2;
@@ -267,14 +447,33 @@ const StepColumn: React.FC<StepColumnProps> = ({
     onUpdateTask,
     isClientVisible: clientVisibleTasks?.has(task.id),
     isClientView,
+    isDragging,
   });
 
   const renderTasks = () => {
     const rendered = [];
 
     const currentStepGroups = groups;
-    const groupedTaskIds = new Set<string>();
-    currentStepGroups.forEach(g => (g.taskIds || []).forEach(id => groupedTaskIds.add(id)));
+    const groupByTaskId = new Map<
+      string,
+      { id: string; title: string; taskIds: string[] }
+    >();
+    const groupTasksMap = new Map<string, Task[]>();
+    const groupLastIndexMap = new Map<string, number>();
+
+    visibleTasks.forEach((task, index) => {
+      const taskGroup = currentStepGroups.find((g) =>
+        (g.taskIds || []).includes(task.id),
+      );
+      if (!taskGroup) return;
+      groupByTaskId.set(task.id, taskGroup);
+      const existing = groupTasksMap.get(taskGroup.id);
+      if (existing) existing.push(task);
+      else groupTasksMap.set(taskGroup.id, [task]);
+      groupLastIndexMap.set(taskGroup.id, index);
+    });
+
+    const renderedGroupIds = new Set<string>();
 
     let i = 0;
     while (i < visibleTasks.length) {
@@ -283,90 +482,108 @@ const StepColumn: React.FC<StepColumnProps> = ({
       const currentIndex = i;
 
       // Check if task belongs to a group
-      const taskGroup = currentStepGroups.find((g) => (g.taskIds || []).includes(task.id));
+      const taskGroup = groupByTaskId.get(task.id);
 
       if (taskGroup) {
-        // Find if this is the first task of the group in visibleTasks
-        const groupTasks = visibleTasks.filter((t) =>
-          (taskGroup.taskIds || []).includes(t.id),
-        );
-        const isFirstVisibleInGroup = groupTasks[0]?.id === task.id;
+        if (renderedGroupIds.has(taskGroup.id)) {
+          i++;
+          continue;
+        }
 
-        if (isFirstVisibleInGroup) {
-          const groupStartIndex = currentIndex;
-          
-          rendered.push(
+        const groupTasks = groupTasksMap.get(taskGroup.id) || [];
+        const groupStartIndex = currentIndex;
+        const groupLastIndex = groupLastIndexMap.get(taskGroup.id);
+        const canEditGroupTitle =
+          !isClientView && !isLockedProject && !isDragging;
+
+        renderedGroupIds.add(taskGroup.id);
+        rendered.push(
             <div
-              key={`group-${taskGroup.id}-${currentIndex}`}
+              key={`group-${taskGroup.id}`}
               draggable={canDrag}
-              onDragStart={() => canDrag && setDraggedIndex(groupStartIndex)}
+              onDragStart={() => {
+                if (!canDrag) return;
+                resolveDragScrollTargets();
+                setDraggedIndex(groupStartIndex);
+              }}
+              onDrag={(e) => {
+                lastDragPointRef.current = { x: e.clientX, y: e.clientY };
+                autoScrollOnDragPoint(e.clientX, e.clientY);
+              }}
               onDragEnd={() => {
                 setDraggedIndex(null);
                 setDragOverIndex(null);
               }}
-              onDragOver={(e) => handleDragOver(e, groupStartIndex)}
-              className={`mb-6 p-4 rounded-[20px] bg-black/5 border border-black/10 transition-all hover:bg-black/10 group/folder group-frame relative ${
-                draggedIndex === groupStartIndex ? "opacity-20 scale-95 blur-[2px]" : "opacity-100"
-              }`}
-            >
-              {dragOverIndex === groupStartIndex && draggedIndex !== null && (
-                <div className="absolute top-[-10px] left-0 w-full h-[6px] bg-black/60 rounded-full z-[100] animate-pulse shadow-[0_0_10px_rgba(0,0,0,0.3)]"></div>
-              )}
-              <div className="relative z-10">
-                <div className="flex items-center mb-5 px-2">
-                  {editingGroupId === taskGroup.id ? (
-                    <input
-                      autoFocus
-                      className="bg-white border border-black/10 rounded-xl px-4 py-1.5 text-sm font-bold outline-none shadow-sm w-full"
-                      value={editingGroupTitle}
-                      onChange={(e) => setEditingGroupTitle(e.target.value)}
-                      onBlur={() => {
+            onDragOver={(e) => handleDragOver(e, groupStartIndex)}
+            className={`mb-6 p-4 rounded-[20px] bg-black/5 border border-black/10 transition-all cursor-grab active:cursor-grabbing ${
+              isDragging ? "" : "hover:bg-black/10"
+            } group/folder group-frame relative ${
+              draggedIndex === groupStartIndex
+                ? "opacity-20 scale-95 blur-[2px]"
+                : "opacity-100"
+            }`}
+          >
+            {dragOverIndex === groupStartIndex && draggedIndex !== null && (
+              <div className="absolute top-[-10px] left-0 w-full h-[6px] bg-black/60 rounded-full z-[100] animate-pulse shadow-[0_0_10px_rgba(0,0,0,0.3)]"></div>
+            )}
+            <div className={`relative z-10 ${isDragging ? "pointer-events-none" : ""}`}>
+              <div className="flex items-center mb-5 px-2">
+                {canEditGroupTitle && editingGroupId === taskGroup.id ? (
+                  <input
+                    autoFocus
+                    className="bg-white border border-black/10 rounded-xl px-4 py-1.5 text-sm font-bold outline-none shadow-sm w-full"
+                    value={editingGroupTitle}
+                    onChange={(e) => setEditingGroupTitle(e.target.value)}
+                    onBlur={() => {
+                      onUpdateGroupTitle?.(step.id, taskGroup.id, editingGroupTitle);
+                      setEditingGroupId(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
                         onUpdateGroupTitle?.(step.id, taskGroup.id, editingGroupTitle);
                         setEditingGroupId(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          onUpdateGroupTitle?.(step.id, taskGroup.id, editingGroupTitle);
-                          setEditingGroupId(null);
-                        }
-                      }}
-                    />
-                  ) : (
-                    <span
-                      className="text-[14px] font-bold text-black/80 cursor-pointer hover:text-black transition-colors tracking-tight"
-                      onClick={() => {
-                        setEditingGroupId(taskGroup.id);
-                        setEditingGroupTitle(taskGroup.title);
-                      }}
-                    >
-                      {taskGroup.title}
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-col gap-3">
-                  {groupTasks.map((groupTask) => (
-                    <div
-                      key={groupTask.id}
-                      ref={(el) => (taskRefs.current[groupTask.id] = el)}
-                      className="task-card-container"
-                    >
-                      <TaskCard {...getTaskProps(groupTask)} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {groupStartIndex === visibleTasks.length - groupTasks.length &&
-                dragOverIndex === visibleTasks.length &&
-                draggedIndex !== null && (
-                  <div className="absolute bottom-[-10px] left-0 w-full h-[6px] bg-black/60 rounded-full z-[100] animate-pulse shadow-[0_0_10px_rgba(0,0,0,0.3)]"></div>
+                      }
+                    }}
+                  />
+                ) : (
+                  <span
+                    className={`text-[14px] font-bold text-black/80 tracking-tight ${
+                      canEditGroupTitle
+                        ? "cursor-pointer hover:text-black transition-colors"
+                        : ""
+                    }`}
+                    onClick={() => {
+                      if (!canEditGroupTitle) return;
+                      setEditingGroupId(taskGroup.id);
+                      setEditingGroupTitle(taskGroup.title);
+                    }}
+                  >
+                    {taskGroup.title}
+                  </span>
                 )}
-            </div>,
-          );
-          i += groupTasks.length;
-        } else {
-          // This should ideally not happen if groups are contiguous in visibleTasks
-          i++;
-        }
+              </div>
+              <div className="flex flex-col gap-3">
+                {groupTasks.map((groupTask) => (
+                  <div
+                    key={groupTask.id}
+                    ref={(el) => {
+                      taskRefs.current[groupTask.id] = el;
+                    }}
+                    className="task-card-container"
+                  >
+                    <TaskCard {...getTaskProps(groupTask)} />
+                  </div>
+                ))}
+              </div>
+            </div>
+            {groupLastIndex === visibleTasks.length - 1 &&
+              dragOverIndex === visibleTasks.length &&
+              draggedIndex !== null && (
+                <div className="absolute bottom-[-10px] left-0 w-full h-[6px] bg-black/60 rounded-full z-[100] animate-pulse shadow-[0_0_10px_rgba(0,0,0,0.3)]"></div>
+              )}
+          </div>,
+        );
+        i++;
       } else {
         // Single task (no group)
         rendered.push(
@@ -379,14 +596,24 @@ const StepColumn: React.FC<StepColumnProps> = ({
               <div className="absolute top-[-10px] left-0 w-full h-[6px] bg-black/60 rounded-full z-[100] animate-pulse shadow-[0_0_10px_rgba(0,0,0,0.3)]"></div>
             )}
             <div
-              ref={(el) => (taskRefs.current[task.id] = el)}
+              ref={(el) => {
+                taskRefs.current[task.id] = el;
+              }}
               draggable={canDrag}
-              onDragStart={() => canDrag && setDraggedIndex(currentIndex)}
+              onDragStart={() => {
+                if (!canDrag) return;
+                resolveDragScrollTargets();
+                setDraggedIndex(currentIndex);
+              }}
+              onDrag={(e) => {
+                lastDragPointRef.current = { x: e.clientX, y: e.clientY };
+                autoScrollOnDragPoint(e.clientX, e.clientY);
+              }}
               onDragEnd={() => {
                 setDraggedIndex(null);
                 setDragOverIndex(null);
               }}
-              className={`task-card-container transition-all duration-300 ${
+              className={`task-card-container transition-all duration-300 cursor-grab active:cursor-grabbing ${
                 draggedIndex === currentIndex ? "opacity-20 scale-95 blur-[2px]" : "opacity-100"
               }`}
             >
@@ -423,12 +650,18 @@ const StepColumn: React.FC<StepColumnProps> = ({
       onPointerLeave={handlePointerUp}
       onDragOver={(e) => {
         e.preventDefault();
+        lastDragPointRef.current = { x: e.clientX, y: e.clientY };
+        autoScrollOnDragPoint(e.clientX, e.clientY);
         if (draggedIndex !== null && dragOverIndex === null)
           setDragOverIndex(visibleTasks.length);
       }}
       onDrop={(e) => handleDrop(e, dragOverIndex ?? visibleTasks.length)}
     >
-      <div className="flex items-center justify-between mb-6 md:mb-10 px-2 lg:px-4">
+      <div
+        className={`flex items-center justify-between mb-6 md:mb-10 px-2 lg:px-4 ${
+          isDragging ? "pointer-events-none" : ""
+        }`}
+      >
          {/* ... Header content ... */}
           <div className="flex items-center gap-3">
           <div className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full bg-black text-white text-[13px] md:text-[15px] font-bold shrink-0">

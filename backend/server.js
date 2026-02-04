@@ -80,6 +80,6 @@ app.listen(PORT, () => {
   console.log(`📁 NAS 기준 경로: ${process.env.NAS_BASE_PATH}`);
   console.log("==========================================");
 
-  // 백그라운드 동기화 서비스 시작 (5초 주기)
-  startSyncService(5000);
+  // 백그라운드 동기화 서비스 시작 (5초 주기) -> 현재 문제 발생으로 잠시 비활성화
+  // startSyncService(5000);
 });

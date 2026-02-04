@@ -18,6 +18,7 @@ async function syncNasFolders() {
     const nasFolders = await nasApi.listFolders(NAS_BASE_PATH);
     const nasFolderPaths = new Set(nasFolders.map(f => f.path));
     const nasFolderByPath = new Map(nasFolders.map(f => [f.path, f]));
+    const renamedPaths = new Set();
     const addedPaths = lastNasFolderPaths
       ? [...nasFolderPaths].filter(path => !lastNasFolderPaths.has(path))
       : [];
@@ -48,6 +49,7 @@ async function syncNasFolders() {
     for (const project of syncedProjects) {
       if (!project.nas_folder_path) continue;
       if (!nasFolderPaths.has(project.nas_folder_path)) continue;
+      if (renamedPaths.has(project.nas_folder_path)) continue;
 
       const nasFolder = nasFolderByPath.get(project.nas_folder_path);
       if (!nasFolder) continue;
@@ -62,6 +64,12 @@ async function syncNasFolders() {
       if (result.success) {
         const parentPath = project.nas_folder_path.split('/').slice(0, -1).join('/');
         const newPath = `${parentPath}/${desiredName}`;
+        renamedPaths.add(project.nas_folder_path);
+        renamedPaths.add(newPath);
+        nasFolderPaths.delete(project.nas_folder_path);
+        nasFolderPaths.add(newPath);
+        nasFolderByPath.set(newPath, { ...nasFolder, name: desiredName, path: newPath });
+        project.nas_folder_path = newPath;
         await supabase.updateProjectNASInfo(project.id, {
           name: project.name,
           start_date: project.start_date,
@@ -152,22 +160,33 @@ async function updateProjectFromFolder(project, folder) {
     return;
   }
 
-  const updates = buildUpdatesFromParsed(parsed, folder.path);
+  const updates = buildUpdatesFromParsed(parsed, folder.path, project);
   await supabase.updateProjectNASInfo(project.id, updates);
   console.log(`✅ [SYNC] 업데이트 완료: ${project.id}`);
 }
 
-function buildUpdatesFromParsed(parsed, folderPath) {
+function buildUpdatesFromParsed(parsed, folderPath, project) {
+  // NAS 폴더명에서 파싱한 담당자 정보 (이름만)
   const responsible = Array.isArray(parsed.responsible) ? parsed.responsible : [];
+  
+  // ⚠️ 중요: NAS 폴더명 기준 vs DB 기준
+  // NAS 폴더명에 담당자가 있으면 NAS 기준 사용 (이름만 저장됨)
+  // NAS 폴더명에 담당자가 없으면 기존 DB 값 유지
+  // 이렇게 해야 사용자가 NAS에서 "예지"로 변경하면 DB도 "예지"가 됨
+  const pmName = responsible[0] || project?.pm_name || null;
+  const designerName = responsible[1] || project?.designer_name || null;
+  const designer2Name = responsible[2] || project?.designer_2_name || null;
+  const designer3Name = responsible[3] || project?.designer_3_name || null;
+  
   return {
     name: `${parsed.client} / ${parsed.projectName}`,
     start_date: parsed.startDate,
     end_date: parsed.endDate,
     nas_folder_path: folderPath,
-    pm_name: responsible[0] || null,
-    designer_name: responsible[1] || null,
-    designer_2_name: responsible[2] || null,
-    designer_3_name: responsible[3] || null
+    pm_name: pmName,
+    designer_name: designerName,
+    designer_2_name: designer2Name,
+    designer_3_name: designer3Name
   };
 }
 

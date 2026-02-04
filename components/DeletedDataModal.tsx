@@ -17,7 +17,7 @@ const DeletedDataModal: React.FC<DeletedDataModalProps> = ({ onClose, onRestore,
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] animate-in fade-in duration-200" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100]" onClick={onClose}>
       <div className="bg-white rounded-[1rem] w-[90%] max-w-[800px] max-h-[80vh] p-6 md:p-10 shadow-2xl border border-slate-100 flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-[20px] md:text-[25px] font-black tracking-tighter text-black uppercase">삭제 데이터 관리</h2>

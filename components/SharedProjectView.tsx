@@ -52,8 +52,12 @@ const SharedProjectView: React.FC<SharedProjectViewProps> = ({ projectId }) => {
             // Ensure we use the latest data even if top-level columns are not yet synced but meta is.
             // Priority: Top-level Column > Meta Backup > Default
             const meta = data.task_states?.meta;
+            const normalizedTaskStates = data.task_states
+                ? { ...data.task_states, meta: data.task_states?.meta || {} }
+                : { completed: [], links: {}, meta: {} };
             const normalizedProject = {
                 ...data,
+                task_states: normalizedTaskStates,
                 client_visible_tasks: (data.client_visible_tasks && data.client_visible_tasks.length > 0) ? data.client_visible_tasks : (meta?.client_visible_tasks || []),
                 
                 // Real-time Worker Info Fallback (Meta priority if standard columns lag or missing)
@@ -402,7 +406,7 @@ const SharedProjectView: React.FC<SharedProjectViewProps> = ({ projectId }) => {
                     </div>
 
                     {/* Steps Layout - Horizontal Scroll */}
-                    <div className="overflow-x-auto pb-8 no-scrollbar scroll-smooth">
+                    <div className="overflow-x-auto pb-8 no-scrollbar scroll-smooth" data-task-scroll="x">
                         <div className="flex gap-2 md:gap-4 min-w-max md:min-w-0 md:w-full px-0">
                             {STEPS_STATIC.filter((step) => {
                                 // Filter out Expedition 2 if hidden in team view
@@ -442,6 +446,7 @@ const SharedProjectView: React.FC<SharedProjectViewProps> = ({ projectId }) => {
                                         onSnapshotTaskSelect={() => { }}
                                         onAddTask={() => { }}
                                         isClientView={true}
+                                        groups={project.task_states?.meta?.task_groups?.[step.id] || []}
                                     />
                                 );
                             })}

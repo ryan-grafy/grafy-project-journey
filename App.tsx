@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Navbar from "./components/Navbar.tsx";
 import StepColumn from "./components/StepColumn.tsx";
 import UrlPopover from "./components/UrlPopover.tsx";
@@ -24,6 +24,7 @@ import {
   TEAM_MEMBERS as INITIAL_TEAM_MEMBERS,
   STORAGE_BUCKET,
   DEFAULT_CUSTOM_TASKS,
+  ADMIN_EMAILS,
 } from "./constants.ts";
 import {
   Role,
@@ -35,7 +36,46 @@ import {
   TeamMember,
 } from "./types.ts";
 
+import { Search, LayoutTemplate, Trash2, LogOut } from 'lucide-react';
+
+// A "quiet" hover button component for the top menu
+const QuietButton = ({ children, onClick }: { children?: React.ReactNode, onClick?: () => void }) => (
+  <button 
+    onClick={onClick}
+    className="text-[25px] font-normal text-black hover:opacity-60 transition-opacity duration-200 whitespace-nowrap"
+  >
+    {children}
+  </button>
+);
+
+// Filter Tab with Vertical Separator
+const FilterTab = ({ label, isSelected, onClick, isFirst = false, isLast = false }: { label: string, isSelected?: boolean, onClick?: () => void, isFirst?: boolean, isLast?: boolean }) => (
+  <div className="flex items-center h-[30px]">
+    <button 
+       onClick={onClick}
+       className={`${isFirst ? 'pl-4 pr-5' : 'px-5'} h-full text-[15px] transition-opacity flex items-center whitespace-nowrap text-black ${isSelected ? 'font-semibold' : 'font-normal hover:opacity-60'}`}
+    >
+      {label}
+    </button>
+    {!isLast && <div className="h-3 w-px bg-black mx-0.5" />}
+  </div>
+);
+
+// Grafy Logo SVG
+const GrafyLogo = () => (
+  <svg width="200" height="26" viewBox="0 0 200 26" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-[150px] md:w-[200px] h-auto text-black fill-black">
+    <path d="M14.3866 16.3675H22.7191C21.938 18.4818 19.1843 20.518 15.1678 20.518C10.2659 20.518 6.71158 17.3368 6.71158 12.9587C6.71158 8.5806 10.2659 5.49054 15.1678 5.49054C18.2079 5.49054 20.8378 6.6485 22.0421 8.50904L22.1202 8.63264H29.4242L29.3005 8.28135C27.5494 3.24618 21.9445 0 15.0376 0C6.321 0 0 5.45151 0 12.9522C0 20.4529 6.321 25.9044 15.0376 25.9044C23.7542 25.9044 29.9385 20.3358 29.9385 12.9522V11.2608H14.3931V16.361L14.3866 16.3675Z" fill="currentColor"/>
+    <path d="M69.2973 9.15875C69.2973 3.88939 64.9357 0.617188 57.9182 0.617188H46.5391V25.3116H53.2507V17.6938H57.7424L63.0934 25.3116H70.9182L64.4084 16.4708C67.5722 15.0591 69.3038 12.47 69.3038 9.15875H69.2973ZM62.5857 9.15875C62.5857 11.9691 59.4935 12.3919 57.6448 12.3919H53.2507V5.93208H57.6448C59.487 5.93208 62.5857 6.35493 62.5857 9.16526V9.15875Z" fill="currentColor"/>
+    <path d="M96.495 0.625L85.5586 25.3194H92.5241L94.451 20.6355H104.775L106.702 25.3194H114.176L103.259 0.625H96.5015H96.495ZM102.666 15.4182H96.5731L99.6197 7.98909L102.666 15.4182Z" fill="currentColor"/>
+    <path d="M129.777 25.3194H136.489V16.0688H149.014V10.8515H136.489V5.90086H150.57V0.625H129.777V25.3194Z" fill="currentColor"/>
+    <path d="M185.986 0.625L179.542 11.7622L173.071 0.625H165.383L175.916 17.539V25.3194H182.627V17.539L193.167 0.625H185.986Z" fill="currentColor"/>
+    <path d="M196.582 25.3697C198.469 25.3697 199.999 23.8406 199.999 21.9544C199.999 20.0682 198.469 18.5391 196.582 18.5391C194.694 18.5391 193.164 20.0682 193.164 21.9544C193.164 23.8406 194.694 25.3697 196.582 25.3697Z" fill="currentColor"/>
+  </svg>
+);
+
 const App: React.FC = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filter, setFilter] = useState('최근등록순');
   const [user, setUser] = useState<User>({
     id: "guest",
     userId: "guest",
@@ -71,7 +111,26 @@ const App: React.FC = () => {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const isDataLoadedRef = React.useRef(false); // Track if initial data load is complete
-  const [locationKey, setLocationKey] = useState(0); // Track URL changes manually for useEffect sync
+  const [locationKey, setLocationKey] = useState(0); // Track URL changes  // State for popover in step 3
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  // Profile Menu Ref for click outside
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close profile menu on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    }
+    if (showProfileMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showProfileMenu]);
 
   const [popover, setPopover] = useState<PopoverState>({
     isOpen: false,
@@ -99,6 +158,7 @@ const App: React.FC = () => {
   });
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [confirmHideExpedition2, setConfirmHideExpedition2] = useState(false); // Expedition 2 숨기기 확인 상태
+
 
   // --- SAFEGUARDS ---
   // Force Welcome if Guest is on List
@@ -308,6 +368,25 @@ const App: React.FC = () => {
       // To prevent flash, we can suppress 'list' rendering if 'project' param exists until 'currentProject' is set.
     }
   }, []);
+
+  // Force Background Color for List View to prevent white footer gap
+  useEffect(() => {
+    if (currentView === 'list' && !window.location.search.includes("project=")) {
+      // Apply to both body and documentElement to ensure full coverage
+      document.body.style.backgroundColor = '#F0EBE7';
+      document.documentElement.style.backgroundColor = '#F0EBE7';
+    } else {
+      // Reset to default (or empty to let CSS take over)
+      document.body.style.backgroundColor = '';
+      document.documentElement.style.backgroundColor = '';
+    }
+    
+    // Cleanup
+    return () => {
+      document.body.style.backgroundColor = '';
+      document.documentElement.style.backgroundColor = '';
+    };
+  }, [currentView]);
 
   // Helper to check if email is allowed
   const checkEmailAuthorization = async (
@@ -2238,6 +2317,7 @@ const App: React.FC = () => {
             console.log("🛠 [NAS] 단계 5: 성공 처리");
             newProject.nas_folder_path = nasResult.folderPath;
             newProject.nas_folder_created = true;
+            newProject.nas_last_synced = newProject.last_updated;
             showToast("✅ NAS 폴더 생성 완료");
           } else {
             console.log("🛠 [NAS] 단계 5: 서버는 응답했으나 실패 처리", nasResult);
@@ -2287,6 +2367,7 @@ const App: React.FC = () => {
             deleted_tasks: newProject.deleted_tasks || [],
             nas_folder_path: newProject.nas_folder_path || null,
             nas_folder_created: newProject.nas_folder_created || false,
+            nas_last_synced: newProject.nas_last_synced || null,
           };
 
           const insertResult = await withTimeout(
@@ -2544,6 +2625,42 @@ const App: React.FC = () => {
         })
         .eq("id", updatedProject.id);
     }
+  };
+
+  const handleExportAllProjects = async () => {
+    if (projects.length === 0) {
+      showToast("내보낼 프로젝트가 없습니다.");
+      return;
+    }
+
+    import("xlsx")
+      .then((XLSX) => {
+        const data = projects.map((p) => ({
+          프로젝트명: p.name,
+          시작일: p.start_date || "-",
+          종료일: p.end_date || "-",
+          진행률: `${p.status}%`,
+          PM: p.pm_name || "-",
+          "PM 연락처": p.pm_phone || "-",
+          "PM 이메일": p.pm_email || "-",
+          디자이너: p.designer_name || "-",
+          "최종 업데이트": p.last_updated
+            ? new Date(p.last_updated).toLocaleString("ko-KR")
+            : "-",
+        }));
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(data);
+        XLSX.utils.book_append_sheet(wb, ws, "프로젝트 목록");
+
+        const filename = `프로젝트_목록_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        XLSX.writeFile(wb, filename);
+        showToast("전체 프로젝트 목록이 다운로드되었습니다.");
+      })
+      .catch((error) => {
+        console.error("Error exporting projects:", error);
+        showToast("다운로드 중 오류가 발생했습니다.");
+      });
   };
 
   const handleExportToExcel = async () => {
@@ -3286,8 +3403,10 @@ const App: React.FC = () => {
 
   const status = currentProject?.status || 0;
 
+  const isListView = currentView === 'list' && !window.location.search.includes("project=");
+
   return (
-    <div className="min-h-screen pb-20 bg-[#f1f3f6] selection:bg-black selection:text-white">
+    <div className={`min-h-screen selection:bg-black selection:text-white ${isListView ? 'bg-[#F0EBE7]' : 'bg-[#f1f3f6]'}`}>
       {isSnapshotMode && (
         <div className="fixed top-[72px] left-0 w-full z-30 bg-black text-white px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-3 shadow-md animate-in slide-in-from-top-2">
           <div className="flex items-center gap-3">
@@ -3319,7 +3438,6 @@ const App: React.FC = () => {
       {currentView === "welcome" && !isInitializing && (
         <WelcomeScreen onLogin={handleGoogleLogin} isLoading={isAuthLoading} />
       )}
-
       {isInitializing && (
         <div className="min-h-screen flex items-center justify-center bg-black">
           <div className="flex flex-col items-center gap-4">
@@ -3335,24 +3453,186 @@ const App: React.FC = () => {
 
       {currentView === "list" &&
         !window.location.search.includes("project=") && (
-          <>
-            <ProjectList
-              projects={projects}
-              onSelectProject={selectProject}
-              onNewProject={() => setShowCreateModal(true)}
-              onManageTeam={() => setShowTeamModal(true)}
-              isLoading={isProjectLoading}
-              onDeleteProject={handleDeleteProject}
-              onLogout={handleLogout}
-              onLogin={handleGoogleLogin}
-              user={user}
-              deletedProjects={deletedProjects}
-              onRestoreProject={handleRestoreProject}
-              onUpdateProject={handleUpdateProject}
-              templates={templates}
-              onManageDeletedData={() => setShowDeletedDataModal(true)}
-              onManageTemplates={() => setShowTemplateManagerModal(true)}
-            />
+          <div className="w-full h-full min-h-screen bg-[#F0EBE7] text-black pb-0 font-['Pretendard_Variable']">
+             
+             {/* 
+                Responsive Header Section 
+                Max-width 2100px as requested
+              */}
+              <header className="px-8 pt-12 pb-10 max-w-[2100px] mx-auto w-full">
+                <div className="grid grid-cols-1 xl:grid-cols-[1fr_minmax(300px,600px)_1fr] items-start gap-x-8 gap-y-12">
+                  
+                  {/* 1. Main Title (Left Column) */}
+                  <div className="flex justify-start">
+                     <h1 className="text-[clamp(3.5rem,7vw,6.5rem)] leading-[0.82] tracking-tight font-normal whitespace-nowrap">
+                      Project(s)<br/>
+                      Mgmt.<br/>
+                      System
+                    </h1>
+                  </div>
+
+                  {/* 2. Search Bar (Center Column) - Reference Style */}
+                  <div className="flex justify-center xl:pt-4 w-full">
+                    <div className="relative group w-full max-w-lg">
+                       {/* Visual Label + Icon -> Hides when searching to allow input visibility */}
+                       <div className={`flex justify-between items-end border-b border-black pb-[5px] transition-opacity duration-200 ${searchTerm ? 'opacity-0' : 'opacity-100'}`}>
+                         <span className="text-[27px] font-normal leading-none text-black pointer-events-none">search</span>
+                         <Search className="mb-1 text-black" strokeWidth={1.5} size={22} />
+                       </div>
+                       
+                       {/* Input Overlay */}
+                       <input 
+                          type="text"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="absolute inset-0 w-full bg-transparent outline-none text-[27px] font-normal placeholder-transparent text-black z-10 selection:bg-black selection:text-white"
+                        />
+                       
+                       {/* Animated Line */}
+                       <div className="absolute bottom-0 left-0 w-full h-[2px] bg-black scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left z-20" />
+                    </div>
+                  </div>
+
+                  {/* 3. Top Menu (Right Column) - Horizontal Layout */}
+                  <div className="flex flex-col lg:flex-row items-start lg:items-center justify-end gap-8 xl:pt-4">
+                      <div className="flex items-center gap-8">
+                        <QuietButton onClick={() => setShowTeamModal(true)}>teams</QuietButton>
+                        <QuietButton onClick={currentView === 'list' ? handleExportAllProjects : handleExportToExcel}>xlsx</QuietButton>
+                        
+                         {/* Profile Menu */}
+                        <div className="relative" ref={profileMenuRef}>
+                           <button 
+                              onClick={() => setShowProfileMenu(!showProfileMenu)} 
+                              className="text-[25px] font-bold whitespace-nowrap text-black hover:opacity-60 transition-opacity"
+                           >
+                             {ADMIN_EMAILS.includes(user.email || '') ? 'admin.' : 'grafer.'}
+                           </button>
+                           {showProfileMenu && (
+                              <div className="absolute left-0 top-full mt-6 bg-white/40 backdrop-blur-2xl border border-white/50 shadow-xl rounded-[30px] p-2 z-50 min-w-[200px] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                 {ADMIN_EMAILS.includes(user.email || '') && (
+                                   <>
+                                      <button 
+                                          onClick={() => {
+                                            setShowTemplateManagerModal(true);
+                                            setShowProfileMenu(false);
+                                          }}
+                                          className="flex items-center gap-3 w-full text-left px-5 py-3 hover:bg-white/40 rounded-[20px] text-[15px] font-normal text-black transition-all duration-200"
+                                      >
+                                        <LayoutTemplate size={16} strokeWidth={2} />
+                                        템플릿 관리
+                                      </button>
+                                       <button 
+                                          onClick={() => {
+                                            setShowDeletedDataModal(true);
+                                            setShowProfileMenu(false);
+                                          }}
+                                          className="flex items-center gap-3 w-full text-left px-5 py-3 hover:bg-white/40 rounded-[20px] text-[15px] font-normal text-black transition-all duration-200"
+                                      >
+                                        <Trash2 size={16} strokeWidth={2} />
+                                        휴지통
+                                      </button>
+                                      <div className="h-px bg-black/5 my-1 mx-3"/>
+                                   </>
+                                 )}
+                                 <button 
+                                    onClick={() => {
+                                       handleLogout();
+                                       setShowProfileMenu(false);
+                                    }} 
+                                    className="flex items-center gap-3 w-full text-left px-5 py-3 hover:bg-white/40 rounded-[20px] text-[15px] font-normal text-black transition-all duration-200"
+                                 >
+                                   <LogOut size={16} strokeWidth={2} />
+                                   로그아웃
+                                 </button>
+                              </div>
+                           )}
+                        </div>
+                      </div>
+                      
+                      {/* Logo - Black SVG */}
+                      <div className="lg:pl-10 hidden xl:block">
+                        <GrafyLogo />
+                      </div>
+                  </div>
+                </div>
+              </header>
+
+              {/* Main Content Area - 2100px Max Width */}
+              <main className="px-8 max-w-[2100px] mx-auto w-full mt-20">
+                
+                {/* Controls Bar */}
+                <div className="flex flex-col sm:flex-row items-end justify-between relative mb-0 gap-4">
+                   
+                   {/* Filters */}
+                   <div className="flex items-center translate-y-[-5px] overflow-x-auto no-scrollbar w-full sm:w-auto">
+                      <div className="flex items-center">
+                        <FilterTab label="최근등록순" isSelected={filter === '최근등록순'} onClick={() => setFilter('최근등록순')} isFirst />
+                        <FilterTab label="프로젝트명순" isSelected={filter === '프로젝트명순'} onClick={() => setFilter('프로젝트명순')} />
+                        <FilterTab label="진행율높은순" isSelected={filter === '진행율높은순'} onClick={() => setFilter('진행율높은순')} />
+                        <FilterTab label="최근종료일순" isSelected={filter === '최근종료일순'} onClick={() => setFilter('최근종료일순')} />
+                        <FilterTab label="카테고리순" isSelected={filter === '카테고리순'} onClick={() => setFilter('카테고리순')} isLast />
+                      </div>
+                   </div>
+
+                   {/* Plus Button - Reference Style (Rotating Cross) */}
+                   <div className="flex items-end h-[30px] translate-y-[-15px] flex-shrink-0">
+                      <button 
+                         onClick={() => setShowCreateModal(true)}
+                         className="group relative w-[48px] h-[48px] flex items-center justify-center cursor-pointer"
+                         title="프로젝트 추가"
+                      >
+                         <div className="relative w-[48px] h-[48px] group-hover:rotate-90 transition-transform duration-300 ease-in-out">
+                            <div className="absolute left-1/2 top-0 w-[1.5px] h-full bg-black -translate-x-1/2" />
+                            <div className="absolute top-1/2 left-0 w-full h-[1.5px] bg-black -translate-y-1/2" />
+                         </div>
+                      </button>
+                   </div>
+                </div>
+
+                {/* The Grid List */}
+                <div className="w-full border-t border-black">
+                    <ProjectList
+                      projects={projects
+                        .filter(p => {
+                           if (!searchTerm) return true;
+                           const s = searchTerm.toLowerCase();
+                           const pilotsStr = [p.pm_name, p.designer_name, p.designer_2_name, p.designer_3_name].filter(Boolean).join(' ').toLowerCase();
+                           return (
+                             p.name.toLowerCase().includes(s) ||
+                             (p.start_date && p.start_date.includes(s)) ||
+                             (p.end_date && p.end_date.includes(s)) ||
+                             pilotsStr.includes(s)
+                           );
+                        })
+                        .sort((a,b) => {
+                           if (filter === '프로젝트명순') return a.name.localeCompare(b.name);
+                           if (filter === '진행율높은순') return b.status - a.status;
+                           if (filter === '최근종료일순') {
+                              return new Date(b.end_date || 0).getTime() - new Date(a.end_date || 0).getTime();
+                           }
+                           if (filter === '카테고리순') {
+                              const genreA = a.template_name || (a.name.includes('Web') ? 'Web' : a.name.includes('App') ? 'App' : a.name.includes('Video') ? 'Video' : 'Branding');
+                              const genreB = b.template_name || (b.name.includes('Web') ? 'Web' : b.name.includes('App') ? 'App' : b.name.includes('Video') ? 'Video' : 'Branding');
+                              return genreA.localeCompare(genreB);
+                           }
+                           // 최근등록순 (default)
+                           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+                        })
+                      }
+                      onSelectProject={selectProject}
+                      isAdmin={ADMIN_EMAILS.includes(user?.email || '')}
+                      onDeleteProject={handleDeleteProject}
+                    />
+                </div>
+
+                {/* Footer Section */}
+                <footer className="mt-[30px] pb-[70px] flex justify-between items-center text-[15px] font-light text-black">
+                   <span>The projects on this list are confidential. Please take security seriously.</span>
+                   <span className="font-light">ⓒ GRAFY.</span>
+                </footer>
+              </main>
+            
+            {/* Keeping Modals inside Layout */}
             {showCreateModal && (
               <CreateProjectModal
                 teamMembers={teamMembers}
@@ -3373,7 +3653,7 @@ const App: React.FC = () => {
                 }}
               />
             )}
-          </>
+          </div>
         )}
 
       {currentView === "detail" && currentProject && (
@@ -3440,7 +3720,18 @@ const App: React.FC = () => {
               </div>
 
               {/* Steps Layout */}
-              <div className="overflow-x-auto pb-12 no-scrollbar scroll-smooth snap-x snap-mandatory md:snap-none px-4 md:px-0">
+              <div
+                className="overflow-x-auto pb-12 no-scrollbar scroll-smooth snap-x snap-mandatory md:snap-none px-4 md:px-0"
+                data-task-scroll="x"
+                onWheel={(e) => {
+                  const container = e.currentTarget;
+                  if (container.scrollWidth <= container.clientWidth) return;
+                  const delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
+                  if (delta === 0) return;
+                  container.scrollBy({ left: delta * 4 }); // Increased from 2 to 4
+                  if (e.cancelable) e.preventDefault();
+                }}
+              >
                 <div className="flex items-start gap-4 md:gap-6 w-full container-full-steps">
                   {STEPS_STATIC.filter((step) => {
                     const isHidden =

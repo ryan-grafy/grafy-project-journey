@@ -13,6 +13,7 @@ const roleStyles: Record<Role, string> = {
   [Role.PM]: 'bg-orange-100 text-orange-800 border-orange-200',
   [Role.DESIGNER]: 'bg-pink-100 text-pink-800 border-pink-200',
   [Role.MANAGER]: 'bg-green-100 text-green-800 border-green-200',
+  [Role.DEVELOPER]: 'bg-indigo-100 text-indigo-800 border-indigo-200',
   [Role.ALL]: 'bg-slate-900 text-white border-slate-700',
 };
 

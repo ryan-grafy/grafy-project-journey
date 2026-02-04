@@ -1,631 +1,313 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Project, User, Role, Task } from '../types';
+import React, { useState } from 'react';
+import { Project } from '../types';
+import { Lock, Check, Minus, X } from 'lucide-react';
 import { STEPS_STATIC } from '../constants';
-import DeletedDataModal from './DeletedDataModal';
-import TemplateManagerModal from './TemplateManagerModal';
 
 interface ProjectListProps {
   projects: Project[];
-  user: User;
   onSelectProject: (project: Project) => void;
-  onNewProject: () => void;
-  onManageTeam: () => void;
-  onDeleteProject: (projectId: string) => void;
-  onLogout: () => void;
-  onLogin: () => void;
-  isLoading: boolean;
-  deletedProjects: Project[];
-  onRestoreProject: (id: string) => void;
-  onUpdateProject: (projectId: string, updates: Partial<Project>) => void;
-  templates: Project[];
-  onManageDeletedData: () => void;
-  onManageTemplates: () => void;
+  isAdmin?: boolean;
+  onDeleteProject?: (projectId: string) => void;
 }
 
-type SortOption = 'recent_created' | 'name' | 'progress' | 'recent_ended' | 'category';
+// 6-Color Palette from Image
+const PALETTE = [
+  'bg-[#F2F29D]', // Yellow
+  'bg-[#FBCF9D]', // Orange
+  'bg-[#ACA379]', // Olive
+  'bg-[#F2D5D1]', // Pink
+  'bg-[#DEDEF8]', // Lavender
+  'bg-[#C4EAE9]', // Mint
+];
 
-
-const getTemplateBadgeColor = (name: string) => {
-  const colors = [
-    'bg-red-100 text-red-700', 'bg-orange-100 text-orange-700',
-    'bg-amber-100 text-amber-700', 'bg-yellow-100 text-yellow-700',
-    'bg-lime-100 text-lime-700', 'bg-green-100 text-green-700',
-    'bg-emerald-100 text-emerald-700', 'bg-teal-100 text-teal-700',
-    'bg-cyan-100 text-cyan-700', 'bg-sky-100 text-sky-700',
-    'bg-blue-100 text-blue-700', 'bg-indigo-100 text-indigo-700',
-    'bg-violet-100 text-violet-700', 'bg-purple-100 text-purple-700',
-    'bg-fuchsia-100 text-fuchsia-700', 'bg-pink-100 text-pink-700',
-    'bg-rose-100 text-rose-700'
-  ];
+// Helper to get consistent color from string hash
+const getHashColor = (str: string) => {
   let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
   }
-  const index = Math.abs(hash) % colors.length;
-  return colors[index];
+  const index = Math.abs(hash) % PALETTE.length;
+  return PALETTE[index];
 };
 
-interface ProjectRowItemProps {
-  project: Project;
-  index: number;
-  total: number;
-  onSelectProject: (p: Project) => void;
-  onDeleteProject: (id: string) => void;
-  getTeamString: (p: Project) => string;
-  currentEmail?: string;
-}
-
-const getNextSchedule = (project: Project): { date: string, title: string, isOverdue: boolean } | null => {
-  const completedSet = new Set(project.task_states?.completed || []);
-  const deletedSet = new Set(project.deleted_tasks || []);
-  const customTasks = project.custom_tasks || {};
-  const taskOrder = project.task_order || {};
-
-  const stepIds = [1, 2, 3, 4];
+// Helper for 'Next Mission' status
+const checkIfUrgent = (dateStr: string | undefined) => {
+  if (!dateStr || dateStr === '-' || dateStr === '00-00-00') return false;
   
-  for (const stepId of stepIds) {
-    let tasks: Task[] = [];
-    
-    // 1. Collect Base Tasks
-    if (stepId === 2) {
-        const roundCount = project.rounds_navigation_count || 1;
-        for (let r = 1; r <= roundCount; r++) {
-            tasks.push({ id: `t2-round-${r}-prop`, title: `${r}차 제안`, completed_date: '00-00-00', roles: [Role.PM, Role.DESIGNER] });
-            tasks.push({ id: `t2-round-${r}-feed`, title: `${r}차 피드백`, completed_date: '00-00-00', roles: [Role.CLIENT, Role.PM] });
-        }
-    } else if (stepId === 3) {
-        tasks.push(STEPS_STATIC[2].tasks[0]); // Base 1
-        const roundCount = project.rounds_count || 2;
-        for (let r = 1; r <= roundCount; r++) {
-            tasks.push({ id: `t3-round-${r}-pm`, title: `${r}차 피드백 수급`, completed_date: '00-00-00', roles: [Role.PM] });
-            tasks.push({ id: `t3-round-${r}-des`, title: `${r}차 수정`, completed_date: '00-00-00', roles: [Role.DESIGNER] });
-        }
-        tasks.push(STEPS_STATIC[2].tasks[1]); // Final
-    } else if (stepId === 4) {
-        const roundCount = project.rounds2_count || 2;
-        for (let r = 1; r <= roundCount; r++) {
-            tasks.push({ id: `t4-round-${r}-pm`, title: `${r}차 피드백 수급`, completed_date: '00-00-00', roles: [Role.PM] });
-            tasks.push({ id: `t4-round-${r}-des`, title: `${r}차 수정`, completed_date: '00-00-00', roles: [Role.DESIGNER] });
-        }
-    } else {
-        tasks = [...(STEPS_STATIC.find(s => s.id === stepId)?.tasks || [])];
-    }
-
-    // 2. Merge Custom Tasks (Override info or Add new)
-    const stepCustoms = customTasks[stepId] || [];
-    // Override existing
-    tasks = tasks.map(t => {
-        const found = stepCustoms.find(ct => ct.id === t.id);
-        if (found) return { ...t, ...found };
-        return t;
-    });
-    // Add pure custom tasks
-    const pureCustoms = stepCustoms.filter(ct => !tasks.some(t => t.id === ct.id));
-    tasks = [...tasks, ...pureCustoms];
-
-    // 3. Filter Deleted
-    tasks = tasks.filter(t => !deletedSet.has(t.id));
-
-    // 4. Sort by Order
-    const order = taskOrder[stepId];
-    if (order && order.length > 0) {
-        tasks.sort((a, b) => {
-            const idxA = order.indexOf(a.id);
-            const idxB = order.indexOf(b.id);
-            const valA = idxA === -1 ? 999 : idxA;
-            const valB = idxB === -1 ? 999 : idxB;
-            return valA - valB;
-        });
-    }
-
-    // 5. Find First Incomplete
-    for (const t of tasks) {
-        if (!completedSet.has(t.id)) {
-            const dateStr = t.completed_date || '00-00-00';
-            let isOverdue = false;
-            
-            if (dateStr !== '00-00-00') {
-               try {
-                  const today = new Date();
-                  today.setHours(0,0,0,0);
-                  const parts = dateStr.split('-');
-                  if(parts.length === 3) {
-                    const fullYear = parseInt(parts[0]) + 2000;
-                    const d = new Date(fullYear, parseInt(parts[1])-1, parseInt(parts[2]));
-                    if (d < today) isOverdue = true;
-                  }
-               } catch(e) {}
-            }
-
-            return {
-                title: t.title,
-                date: dateStr,
-                isOverdue
-            };
-        }
-    }
-  }
-
-  return null;
-};
-
-const getDayOfWeek = (dateStr: string) => {
-    if (!dateStr || dateStr === '-') return '';
-    try {
-        const parts = dateStr.split('-');
-        let year = parseInt(parts[0]);
-        const month = parseInt(parts[1]) - 1;
-        const day = parseInt(parts[2]);
-        
-        // Guess year if 2 digits. Assume 20xx
-        if (year < 100) year += 2000;
-
-        const date = new Date(year, month, day);
-        const days = ['일', '월', '화', '수', '목', '금', '토'];
-        return `(${days[date.getDay()]})`;
-    } catch (e) {
-        return '';
-    }
-};
-
-const formatDateWithDay = (dateStr: string) => {
-    if (!dateStr || dateStr === '-') return dateStr;
-    const day = getDayOfWeek(dateStr);
-    return `${dateStr} ${day}`;
-};
-
-const ProjectRowItem: React.FC<ProjectRowItemProps> = ({ project, index, total, onSelectProject, onDeleteProject, getTeamString, currentEmail }) => {
-  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-
-  useEffect(() => {
-    if (isConfirmingDelete) {
-      const timer = setTimeout(() => setIsConfirmingDelete(false), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [isConfirmingDelete]);
-
-  const handleDeleteClick = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent link navigation
-    e.stopPropagation();
-    if (!isConfirmingDelete) {
-      setIsConfirmingDelete(true);
-    } else {
-      onDeleteProject(project.id);
-      setIsConfirmingDelete(false);
-    }
-  };
-
-  const isCompleted = project.status === 100;
-  const isLast = index === total - 1;
-
-  const nextSchedule = getNextSchedule(project);
-  const isProjectEnded = project.status === 100 && project.is_locked;
-
-  const handleRowClick = (e: React.MouseEvent) => {
-    // Allow default browser behavior for modifier keys (Ctrl+Click, Cmd+Click, Shift+Click, Middle Click)
-    if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) {
-      return;
-    }
-    e.preventDefault();
-    onSelectProject(project);
-  };
-
-  return (
-    <>
-      {/* Desktop Row View */}
-      <div
-        className={`hidden md:grid grid-cols-[60px_170px_120px_200px_120px_1fr_350px_250px] border-b border-slate-100 hover:bg-slate-50/50 transition-all items-center group relative h-[33px] ${isLast ? 'rounded-b-[1rem] md:rounded-b-[1.25rem] border-b-0' : ''}`}
-      >
-        <a 
-          href={`?project=${project.id}`}
-          onClick={handleRowClick}
-          className="absolute inset-0 z-0 block"
-        ></a>
-
-        <div className="px-1 py-0.5 flex items-center justify-center text-slate-300 font-black text-xl group-hover:text-black transition-colors border-r border-slate-100 relative z-10 pointer-events-none">
-          {String(index + 1).padStart(2, '0')}
-        </div>
-        <div className="px-2 py-0.5 flex items-center justify-center border-r border-slate-100 relative z-10 pointer-events-none">
-            {(project.template_name || project.task_states?.meta?.template_name) ? (
-                <span className={`px-1.5 py-0.5 rounded text-[13px] font-bold uppercase tracking-wider whitespace-nowrap overflow-hidden text-ellipsis max-w-full ${getTemplateBadgeColor(project.template_name || project.task_states?.meta?.template_name || '')}`}>
-                    {project.template_name || project.task_states?.meta?.template_name}
-                </span>
-            ) : (
-                <span className="text-slate-200 text-xs">-</span>
-            )}
-        </div>
-        <div className="px-2 py-0.5 flex items-center justify-center text-[15px] font-bold text-slate-500 whitespace-nowrap border-r border-slate-100 relative z-10 pointer-events-none">
-          {formatDateWithDay(project.start_date)}
-        </div>
-        <div className="px-2 py-0.5 flex flex-col items-center justify-center border-r border-slate-100 overflow-hidden relative z-10 pointer-events-none">
-            {isProjectEnded ? (
-               <span className="text-[13px] font-bold text-white bg-emerald-500 px-2 py-0.75 rounded-full whitespace-nowrap shadow-sm">프로젝트 종료!</span>
-            ) : nextSchedule ? (
-                <div className="flex flex-col items-center justify-center gap-0 leading-none w-full overflow-hidden">
-                    <span className={`font-mono text-[13px] font-bold ${nextSchedule.isOverdue ? 'text-red-500 animate-pulse' : 'text-emerald-500'}`}>
-                        {formatDateWithDay(nextSchedule.date)}
-                    </span>
-                    <span className={`text-[10.5px] w-full text-center px-1 mt-0.5 block truncate ${nextSchedule.isOverdue ? 'text-red-500' : 'text-emerald-500'}`} title={nextSchedule.title}>
-                        {nextSchedule.title}
-                    </span>
-                </div>
-            ) : (
-                <span className="text-xs text-slate-300">-</span>
-            )}
-        </div>
-        <div className={`px-2 py-0.5 flex items-center justify-center text-[15px] font-bold ${isCompleted ? 'text-emerald-500' : 'text-slate-400'} whitespace-nowrap transition-colors duration-500 border-r border-slate-100 relative z-10 pointer-events-none`}>
-          {formatDateWithDay(project.end_date)}
-        </div>
-        <div className="px-6 py-0.5 flex items-center font-black text-black text-[16px] group-hover:translate-x-1 transition-transform border-r border-slate-100 overflow-hidden relative z-10 pointer-events-none">
-          <span className="truncate">{project.name}</span>
-          {project.is_locked && (
-            <div className="w-5 h-5 ml-2 rounded-full bg-red-500 flex items-center justify-center text-white shadow-sm shrink-0">
-              <i className="fa-solid fa-lock text-[8px]"></i>
-            </div>
-          )}
-        </div>
-        <div className="px-4 py-0.5 flex items-center text-[15px] font-bold text-slate-600 border-r border-slate-100 overflow-hidden relative z-10 pointer-events-none">
-          <span className="truncate">{getTeamString(project)}</span>
-        </div>
-        <div className="px-6 py-0.5 flex items-center justify-end gap-3 ml-auto w-full relative z-10 pointer-events-none">
-          <div className="flex items-center justify-end gap-3 w-full">
-            <div className="w-5 flex-shrink-0 flex items-center justify-center">
-              {isCompleted && (
-                <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-sm shrink-0">
-                  <i className="fa-solid fa-check text-[9px]"></i>
-                </div>
-              )}
-            </div>
-            <div className="flex-1 min-w-[60px] h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-50 shadow-inner relative flex items-center">
-              <div className={`h-full ${isCompleted ? 'bg-emerald-500' : 'bg-black'} rounded-full transition-all duration-500`} style={{ width: `${project.status}%` }}></div>
-            </div>
-            <div className="flex items-center gap-2 min-w-[45px] justify-end shrink-0">
-              <span className={`text-lg font-black ${isCompleted ? 'text-emerald-500' : 'text-black'} text-right transition-colors duration-500`}>{project.status}%</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Desktop Delete Button: Positioned outside the frame to the right */}
-        {(['mondo.kim@gmail.com', 'wjatnsdl527@gmail.com'].includes(currentEmail || '')) && (
-          <div className="absolute left-full top-1/2 -translate-y-1/2 ml-4 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-            <button
-              onClick={handleDeleteClick}
-              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-lg border-2 ${isConfirmingDelete
-                ? 'bg-red-500 border-red-600 text-white animate-pulse'
-                : 'bg-white border-slate-200 text-slate-400 hover:border-red-400 hover:text-red-500 hover:scale-110'
-                }`}
-              title={isConfirmingDelete ? "정말 삭제할까요?" : "프로젝트 삭제"}
-            >
-              <i className={`fa-solid ${isConfirmingDelete ? 'fa-xmark' : 'fa-minus'} text-[12px]`}></i>
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Mobile Card View */}
-      <div className="md:hidden flex flex-col p-4 border-b border-slate-100 bg-white hover:bg-slate-50 transition-colors relative block">
-        <a 
-          href={`?project=${project.id}`}
-          onClick={handleRowClick}
-          className="absolute inset-0 z-0 block"
-        ></a>
-
-        <div className="flex justify-between items-start mb-1.5 relative z-10 pointer-events-none">
-          <span className="text-[11px] font-black text-slate-300">NO. {String(index + 1).padStart(2, '0')}</span>
-          <div className="flex flex-col items-end">
-            <span className="text-[12px] font-bold text-slate-400">S: {project.start_date || '-'}</span>
-            {nextSchedule && <span className={`text-[11px] font-bold ${nextSchedule.isOverdue ? 'text-red-500' : 'text-blue-500'} mt-0.5`}>Next: {nextSchedule.date}</span>}
-            {project.end_date && <span className={`text-[11px] font-bold ${isCompleted ? 'text-emerald-500' : 'text-slate-300'} transition-colors duration-500`}>E: {project.end_date}</span>}
-          </div>
-        </div>
-        <h3 className="text-lg font-black text-black mb-1 flex items-center gap-2 relative z-10 pointer-events-none">
-          <span className="truncate">{project.name}</span>
-          {project.is_locked && (
-            <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-white shrink-0">
-              <i className="fa-solid fa-lock text-[8px]"></i>
-            </div>
-          )}
-          {isCompleted && (
-            <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center text-white shrink-0">
-              <i className="fa-solid fa-check text-[8px]"></i>
-            </div>
-          )}
-        </h3>
-        <p className="text-sm font-bold text-slate-500 mb-3 line-clamp-1 text-[13px] relative z-10 pointer-events-none">{getTeamString(project)}</p>
-
-        <div className="flex items-center gap-4 relative z-10 pointer-events-none">
-          <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-50 relative flex items-center">
-            <div className={`h-full ${isCompleted ? 'bg-emerald-500' : 'bg-black'} rounded-full transition-colors duration-500`} style={{ width: `${project.status}%` }}></div>
-          </div>
-          <span className={`text-lg font-black ${isCompleted ? 'text-emerald-500' : 'text-black'} whitespace-nowrap transition-colors duration-500`}>{project.status}%</span>
-        </div>
-
-        {(['mondo.kim@gmail.com', 'wjatnsdl527@gmail.com'].includes(currentEmail || '')) && (
-          <button
-            onClick={handleDeleteClick}
-            className={`absolute top-4 right-4 w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-sm border ${isConfirmingDelete
-              ? 'bg-red-500 border-red-600 text-white animate-pulse z-20'
-              : 'bg-white border-slate-200 text-slate-400'
-              }`}
-          >
-            <i className={`fa-solid ${isConfirmingDelete ? 'fa-xmark' : 'fa-minus'} text-[10px]`}></i>
-          </button>
-        )}
-      </div>
-    </>
-  );
-};
-
-const ProjectList: React.FC<ProjectListProps> = ({ projects, user = { id: 'guest', userId: 'guest', name: 'Guest', avatarUrl: '' } as User, onSelectProject, onNewProject, onManageTeam, onDeleteProject, onLogout, onLogin, isLoading, deletedProjects, onRestoreProject, onUpdateProject, templates, onManageDeletedData, onManageTemplates }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<SortOption>('recent_created');
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const closeMenu = () => setProfileMenuOpen(false);
-    window.addEventListener('click', closeMenu);
-    return () => window.removeEventListener('click', closeMenu);
-  }, []);
-
-  const sortedAndFilteredProjects = useMemo(() => {
-    let result = projects.filter(p =>
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.pm_name && p.pm_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (p.designer_name && p.designer_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (p.designer_2_name && p.designer_2_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (p.designer_3_name && p.designer_3_name.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-
-    return result.sort((a, b) => {
-      if (sortBy === 'recent_created') {
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      } else if (sortBy === 'name') {
-        return a.name.localeCompare(b.name);
-      } else if (sortBy === 'progress') {
-        return b.status - a.status;
-      } else if (sortBy === 'recent_ended') {
-        const dateA = a.end_date || '00-00-00';
-        const dateB = b.end_date || '00-00-00';
-        return dateB.localeCompare(dateA);
-      } else if (sortBy === 'category') {
-        const catA = a.template_name || a.task_states?.meta?.template_name || '';
-        const catB = b.template_name || b.task_states?.meta?.template_name || '';
-        return catA.localeCompare(catB);
+  try {
+    let normalized = dateStr;
+    if (dateStr.includes('-')) {
+      const parts = dateStr.split('-');
+      if (parts[0].length === 2) {
+        normalized = `20${dateStr}`;
       }
-      return 0;
-    });
-  }, [projects, searchTerm, sortBy]);
+    } else if (dateStr.length === 6) {
+      normalized = `20${dateStr.slice(0,2)}-${dateStr.slice(2,4)}-${dateStr.slice(4,6)}`;
+    }
+    
+    // Create UTC dates to avoid timezone shifts during comparison
+    const taskDate = new Date(normalized);
+    if (isNaN(taskDate.getTime())) return false;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const diffTime = taskDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Urgent if deadline is within 7 days (diffDays <= 7) or already passed
+    return diffDays <= 7;
+  } catch {
+    return false;
+  }
+};
 
-  const exportToCSV = () => {
-    const headers = ["No", "카테고리", "시작일", "종료일", "클라이언트 / 프로젝트명", "진행 인원", "Status", "Last Updated"];
-    const rows = sortedAndFilteredProjects.map((p, i) => [
-      i + 1,
-      p.template_name || '-',
-      p.start_date || '-',
-      p.end_date || '-',
-      p.name,
-      getTeamString(p),
-      `${p.status}%`,
-      new Date(p.last_updated).toLocaleDateString()
-    ]);
+export const ProjectList: React.FC<ProjectListProps> = ({ 
+  projects, 
+  onSelectProject,
+  isAdmin = false,
+  onDeleteProject
+}) => {
+  // Track confirmation state for deletion
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  
+  // Custom grid template
+  const gridTemplate = "60px 140px 120px 180px 150px 1fr 400px 200px";
 
-    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
-    const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `grafy_projects_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // General table font size is 14px
+  const tableFontSize = "text-[14px]";
+  // Next Mission specific font size is 12px
+  const nextMissionFontSize = "text-[12px]";
+
+  // Deeper Solid Red Point (Updated from #F17565 to #F06A58)
+  const redPointColor = "bg-[#F06A58]";
+
+  // Helper for formatting date with Korean day
+  const formatDateWithDay = (dateStr: string | undefined) => {
+    if (!dateStr || dateStr === '-' || dateStr === '00-00-00') return dateStr || '-';
+    try {
+      let yy, mm, dd;
+      if (dateStr.includes('-')) {
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+          yy = parts[0].length === 4 ? parts[0].slice(2) : parts[0];
+          mm = parts[1];
+          dd = parts[2];
+        }
+      } else if (dateStr.length === 6) {
+        yy = dateStr.slice(0, 2);
+        mm = dateStr.slice(2, 4);
+        dd = dateStr.slice(4, 6);
+      } else if (dateStr.length === 8) {
+        yy = dateStr.slice(2, 4);
+        mm = dateStr.slice(4, 6);
+        dd = dateStr.slice(6, 8);
+      }
+
+      if (!yy || !mm || !dd) return dateStr;
+
+      const d = new Date(`20${yy}-${mm}-${dd}`);
+      if (isNaN(d.getTime())) return dateStr;
+      const days = ['일', '월', '화', '수', '목', '금', '토'];
+      return `${yy}-${mm}-${dd} (${days[d.getDay()]})`;
+    } catch {
+      return dateStr;
+    }
   };
 
-  const getTeamString = (p: Project) => {
-    const members = [p.pm_name, p.designer_name, p.designer_2_name, p.designer_3_name].filter(Boolean);
-    // Strip job titles (assume "Name Title" format, take first part)
-    return members.map(m => m.split(' ')[0]).join(', ');
+  // Helper to find the next task info
+  const getNextTaskInfo = (p: Project) => {
+    if (p.status >= 100) return { title: "프로젝트 종료!", date: "" };
+
+    const completedSet = new Set(p.task_states?.completed || []);
+    
+    // Find first incomplete task across all steps
+    for (const step of STEPS_STATIC) {
+      const staticTasks = step.tasks || [];
+      const customTasks = p.custom_tasks?.[step.id] || [];
+      const order = p.task_order?.[step.id] || [];
+      const deletedSet = new Set(p.deleted_tasks || []);
+
+      let stepTasks: any[] = [];
+      if (step.id === 2 || step.id === 3 || step.id === 4) {
+        stepTasks = customTasks;
+      } else {
+        stepTasks = staticTasks.filter(st => !deletedSet.has(st.id));
+        const additionalCustoms = customTasks.filter(ct => !staticTasks.some(st => st.id === ct.id));
+        stepTasks = [...stepTasks, ...additionalCustoms];
+        stepTasks = stepTasks.map(st => customTasks.find(ct => ct.id === st.id) || st);
+      }
+
+      if (order.length > 0) {
+        stepTasks.sort((a, b) => {
+          const idxA = order.indexOf(a.id);
+          const idxB = order.indexOf(b.id);
+          return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+        });
+      }
+
+      for (const t of stepTasks) {
+        if (!completedSet.has(t.id)) {
+          return { 
+            title: t.title, 
+            date: t.completed_date && t.completed_date !== '00-00-00' ? t.completed_date : "00-00-00" 
+          };
+        }
+      }
+    }
+
+    return { title: "진행 중인 태스크...", date: "-" };
   };
 
   return (
-    <div className="max-w-[2100px] mx-auto px-4 md:px-6 py-6 md:py-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 md:mb-8">
-        <div className="flex items-baseline gap-2">
-          <h1 className="text-2xl md:text-3xl font-black tracking-tighter uppercase text-black">GRAFY Project Airport</h1>
-          <span className="text-[15px] md:text-[18px] text-slate-400 font-normal lowercase">Ver 1.0</span>
-        </div>
-        <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto py-1 pr-1 overflow-visible">
-          <div className="flex items-center gap-2 md:gap-4 overflow-x-auto no-scrollbar scroll-smooth flex-1 md:flex-initial">
-            {['mondo.kim@gmail.com', 'wjatnsdl527@gmail.com'].includes(user.email || '') && (
-              <button
-                onClick={onManageTeam}
-                className="shrink-0 bg-white border-2 border-slate-100 text-slate-700 px-4 py-2 md:px-5 md:py-2.5 rounded-xl text-xs md:text-sm font-bold hover:border-black transition-all flex items-center gap-2"
-              >
-                <i className="fa-solid fa-users text-blue-600"></i>
-                <span className="whitespace-nowrap">팀 멤버 관리</span>
-              </button>
-            )}
-            <button
-              onClick={exportToCSV}
-              className="shrink-0 bg-white border-2 border-slate-100 text-slate-700 px-4 py-2 md:px-5 md:py-2.5 rounded-xl text-xs md:text-sm font-bold hover:border-black transition-all flex items-center gap-2"
+    <div className="w-full font-['Pretendard_Variable'] font-normal text-black">
+      {/* Table Header - Set to 14px */}
+      <div 
+        className={`grid bg-[#F0EBE7] border-b border-black items-center h-[30px] ${tableFontSize}`}
+        style={{ gridTemplateColumns: gridTemplate }}
+      >
+        <div className="pl-4">No.</div>
+        <div className="pl-4">Genre</div>
+        <div className="pl-4">Start</div>
+        <div className="pl-4">Next</div>
+        <div className="pl-4">End</div>
+        <div className="pl-4">Passenger / Project</div>
+        <div className="pl-4">Pilots</div>
+        <div className="pl-4">Flight time</div>
+      </div>
+
+      {/* Table Body - Row height 30px */}
+      <div>
+        {projects.map((p, index) => {
+          // Derive Genre from name or defaults
+          const genre = p.name.includes('Web') ? 'Web' : p.name.includes('App') ? 'App' : p.name.includes('Video') ? 'Video' : 'Branding';
+          
+          // Derive Pilots
+          const pilots = [
+            p.pm_name,
+            p.designer_name,
+            p.designer_2_name,
+            p.designer_3_name
+          ].filter(Boolean).map(name => ({ name }));
+
+          const isCompleted = p.status >= 100;
+          const nextInfo = getNextTaskInfo(p);
+          const isUrgent = !isCompleted && checkIfUrgent(nextInfo.date);
+          const isConfirming = confirmDeleteId === p.id;
+
+          return (
+            <div 
+              key={p.id}
+              onClick={() => onSelectProject(p)}
+              onMouseLeave={() => setConfirmDeleteId(null)}
+              className="group grid border-b border-black bg-[#F0EBE7] transition-colors duration-200 cursor-pointer h-[30px] items-stretch hover:bg-black/5"
+              style={{ gridTemplateColumns: gridTemplate }}
             >
-              <i className="fa-solid fa-file-excel text-emerald-600"></i><span className="whitespace-nowrap">엑셀 변환</span>
-            </button>
-          </div>
-
-          <div className="relative ml-2 shrink-0">
-            {user.userId === 'guest' ? (
-              <button
-                onClick={(e) => { e.stopPropagation(); onLogin(); }}
-                className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-slate-100 rounded-xl hover:border-black transition-all shadow-sm group"
-              >
-                <img src="https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png" alt="Google" className="w-4 h-4" />
-                <span className="text-[13px] font-bold text-slate-700">Login</span>
-              </button>
-            ) : (
-              <div className="relative">
-                <button
-                  onClick={(e) => { e.stopPropagation(); setProfileMenuOpen(!profileMenuOpen); }}
-                  className="w-10 h-10 md:w-11 md:h-11 rounded-full border-2 border-white shadow-[0_4px_12px_rgba(0,0,0,0.15)] overflow-hidden bg-slate-200 hover:scale-105 transition-all flex-shrink-0"
-                >
-                  <img
-                    src={user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}
-                    alt={user.name}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`;
-                    }}
-                  />
-                </button>
-
-                {profileMenuOpen && (
-                  <div className="absolute right-0 top-12 w-[220px] bg-white border border-slate-200 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100" onClick={(e) => e.stopPropagation()}>
-                    <div className="px-4 py-3 border-b border-slate-100">
-                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">내 정보</p>
-                      <div className="flex items-center gap-2">
-                        <p className="text-[14px] font-bold text-black">{user.name}</p>
-                        {['mondo.kim@gmail.com', 'wjatnsdl527@gmail.com'].includes(user.email || '') && (
-                          <span className="text-[9px] font-black px-1.5 py-0.5 bg-black text-white rounded uppercase tracking-wider">ADMIN</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="py-1">
-                      {['mondo.kim@gmail.com', 'wjatnsdl527@gmail.com'].includes(user.email || '') && (
-                        <>
-                          <button
-                            onClick={() => {
-                              setProfileMenuOpen(false);
-                              onManageDeletedData();
-                            }}
-                            className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors flex items-center gap-3 text-slate-700"
-                          >
-                            <i className="fa-solid fa-trash-arrow-up text-sm text-amber-600"></i>
-                            <span className="text-[13px] font-bold">삭제 데이터 관리</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setProfileMenuOpen(false);
-                              onManageTemplates();
-                            }}
-                            className="w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors flex items-center gap-3 text-slate-700"
-                          >
-                            <i className="fa-solid fa-layer-group text-sm text-purple-600"></i>
-                            <span className="text-[13px] font-bold">템플릿 관리</span>
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={onLogout}
-                        className="w-full text-left px-4 py-2 hover:bg-red-50 transition-colors flex items-center gap-3 text-red-500"
+              {/* No / Delete Button */}
+              <div className={`relative flex items-center pl-4 tabular-nums text-black ${tableFontSize}`}>
+                {isAdmin ? (
+                  <div className="flex items-center justify-start w-full h-full group/no">
+                    {!isConfirming && (
+                      <span className="group-hover/no:hidden">{index + 1}</span>
+                    )}
+                    
+                    {!isConfirming && (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmDeleteId(p.id);
+                        }}
+                        className="hidden group-hover/no:flex items-center justify-center w-5 h-5 rounded-full hover:bg-black/10 transition-colors"
+                        title="Delete project"
                       >
-                        <i className="fa-solid fa-arrow-right-from-bracket text-sm"></i>
-                        <span className="text-[13px] font-bold">로그아웃</span>
+                        <Minus size={14} strokeWidth={2.5} />
                       </button>
-                    </div>
+                    )}
+                    {isConfirming && (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteProject?.(p.id);
+                          setConfirmDeleteId(null);
+                        }}
+                        className="flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors"
+                        title="Confirm deletion"
+                      >
+                        <X size={12} strokeWidth={3} />
+                      </button>
+                    )}
                   </div>
+                ) : (
+                  index + 1
                 )}
               </div>
-            )}
-          </div>
-        </div>
-      </div>
 
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-6">
-        <div className="flex bg-slate-100 p-1 rounded-xl md:rounded-2xl border border-slate-200 w-full lg:w-auto overflow-x-auto no-scrollbar h-[56px] items-stretch">
-          <button
-            onClick={() => setSortBy('recent_created')}
-            className={`flex-1 px-4 md:px-6 py-2 rounded-lg md:rounded-l-xl md:rounded-r-none text-sm md:text-base font-black transition-all whitespace-nowrap border-r border-slate-200 last:border-r-0 h-full ${sortBy === 'recent_created' ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-black'}`}
-          >
-            최근등록순
-          </button>
-          <button
-            onClick={() => setSortBy('name')}
-            className={`flex-1 px-4 md:px-6 py-2 rounded-lg md:rounded-none text-sm md:text-base font-black transition-all whitespace-nowrap border-r border-slate-200 last:border-r-0 h-full ${sortBy === 'name' ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-black'}`}
-          >
-            프로젝트명순
-          </button>
-          <button
-            onClick={() => setSortBy('progress')}
-            className={`flex-1 px-4 md:px-6 py-2 rounded-lg md:rounded-none text-sm md:text-base font-black transition-all whitespace-nowrap border-r border-slate-200 last:border-r-0 h-full ${sortBy === 'progress' ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-black'}`}
-          >
-            진행율높은순
-          </button>
-          <button
-            onClick={() => setSortBy('recent_ended')}
-            className={`flex-1 px-4 md:px-6 py-2 rounded-lg md:rounded-none text-sm md:text-base font-black transition-all whitespace-nowrap border-r border-slate-200 last:border-r-0 h-full ${sortBy === 'recent_ended' ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-black'}`}
-          >
-            최근종료일순
-          </button>
-          <button
-            onClick={() => setSortBy('category')}
-            className={`flex-1 px-4 md:px-6 py-2 rounded-lg md:rounded-r-xl md:rounded-l-none text-sm md:text-base font-black transition-all whitespace-nowrap border-r border-slate-200 last:border-r-0 h-full ${sortBy === 'category' ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-black'}`}
-          >
-            카테고리순
-          </button>
-        </div>
+              {/* Genre - Show Template Name */}
+              <div className={`flex items-center justify-center text-black ${tableFontSize} ${getHashColor(p.template_name || (genre === 'Video' ? '패키지' : (genre === 'Branding' ? '브랜딩' : genre)))}`}>
+                {p.template_name || (genre === 'Video' ? '패키지' : (genre === 'Branding' ? '브랜딩' : genre))}
+              </div>
 
-        <div className="flex flex-col md:flex-row items-center gap-4 w-full lg:w-auto">
-          <div className="relative w-full md:w-[300px] lg:w-[400px]">
-            <i className="fa-solid fa-magnifying-glass absolute left-4 md:left-5 top-1/2 -translate-y-1/2 text-slate-400"></i>
-            <input
-              type="text"
-              placeholder="검색..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white border-2 border-slate-100 rounded-xl h-[56px] pl-12 md:pl-14 pr-4 md:pr-6 text-sm md:text-base font-bold text-black outline-none focus:border-black transition-all shadow-sm"
-            />
-          </div>
-          <button
-            onClick={onNewProject}
-            className="w-full md:w-auto bg-black text-white px-6 md:px-8 h-[56px] rounded-xl text-sm md:text-base font-black hover:bg-slate-800 transition-all shadow-xl active:scale-95 flex items-center justify-center gap-3"
-          >
-            <i className="fa-solid fa-plus"></i>프로젝트 생성
-          </button>
-        </div>
-      </div>
+              {/* Start Date */}
+              <div className={`flex items-center pl-4 tabular-nums tracking-tight text-black ${tableFontSize}`}>
+                {formatDateWithDay(p.start_date)}
+              </div>
 
-      {isLoading ? (
-        <div className="flex justify-center py-20 text-black">
-          <i className="fa-solid fa-circle-notch fa-spin text-4xl md:text-5xl"></i>
-        </div>
-      ) : (
-        <div className="bg-white rounded-[1rem] md:rounded-[1.25rem] shadow-xl shadow-black/5 border border-slate-100">
-          {/* Desktop Header */}
-          <div className="hidden md:grid grid-cols-[60px_170px_120px_200px_120px_1fr_350px_250px] bg-black text-[13px] md:text-[14px] font-black text-white uppercase tracking-widest text-center rounded-t-[1rem] md:rounded-t-[1.25rem]">
-            <div className="py-1.5 border-r border-white/20">No.</div>
-            <div className="py-1.5 border-r border-white/20">프로젝트 종류</div>
-            <div className="py-1.5 border-r border-white/20">시작일</div>
-            <div className="py-1.5 border-r border-white/20 text-emerald-300">다음 미션</div>
-            <div className="py-1.5 border-r border-white/20">종료일</div>
-            <div className="py-1.5 border-r border-white/20 px-6 text-left">프로젝트시작일정_클라이언트_프로젝트명 ( 서버 폴더명과 동일하게 저장 )</div>
-            <div className="py-1.5 border-r border-white/20 px-4 text-left">진행 인원</div>
-            <div className="py-1.5">진행율</div>
-          </div>
+              {/* Next Mission - 12px */}
+              <div className={`relative flex items-center overflow-hidden h-full w-full ${isCompleted ? 'bg-black' : ''}`}>
+                 {/* Solid Red Background for Urgent */}
+                 {isUrgent && <div className={`absolute inset-0 ${redPointColor}`} />}
+                 
+                 <div className={`relative z-10 w-full pl-4 pr-2 truncate leading-[1.2] ${isCompleted ? 'text-white' : 'text-black'} ${nextMissionFontSize}`}>
+                    {isCompleted ? (
+                      <div className="font-normal">프로젝트 종료</div>
+                    ) : (
+                      <>
+                        <div className="font-semibold">{formatDateWithDay(nextInfo.date)}</div>
+                        <div className="truncate opacity-80">{nextInfo.title}</div>
+                      </>
+                    )}
+                 </div>
+              </div>
 
-          {sortedAndFilteredProjects.length === 0 ? (
-            <div className="p-16 md:p-24 text-center flex flex-col items-center gap-4 md:gap-6">
-              <i className="fa-solid fa-folder-open text-5xl md:text-7xl text-slate-100"></i>
-              <p className="text-slate-400 font-bold text-lg md:text-xl">결과가 없습니다.</p>
+              {/* End Date */}
+              <div className={`flex items-center pl-4 tabular-nums tracking-tight text-black ${tableFontSize}`}>
+                {formatDateWithDay(p.end_date)}
+              </div>
+
+              {/* Client / Project */}
+              <div className="flex items-center pl-4 min-w-0 pr-4">
+                <div className={`flex items-center text-black ${tableFontSize} max-w-full truncate`}>
+                  <span className="flex-shrink-0 truncate" title={p.name}>{p.name}</span>
+                  {p.is_locked && <Lock size={12} className="ml-2 text-black flex-shrink-0 mb-[1px]" />}
+                </div>
+              </div>
+
+              {/* Pilots */}
+              <div className={`flex items-center pl-4 truncate text-black ${tableFontSize}`}>
+                {pilots.map(pilot => pilot.name).join(', ')}
+              </div>
+
+              {/* Progress / Flight time */}
+              <div className="relative h-full w-full flex items-center justify-start">
+                  {/* Solid Red Progress Bar */}
+                  <div 
+                    className={`absolute left-0 top-0 bottom-0 ${redPointColor} transition-all duration-700 ease-out z-0`}
+                    style={{ width: `${p.status}%` }}
+                  />
+                  
+                  <div className="relative z-10 flex items-center gap-2 pl-4">
+                    {p.status === 100 && (
+                       <Check size={15} className="text-black" strokeWidth={1.5} />
+                    )}
+                    <span className={`tabular-nums text-black ${tableFontSize}`}>
+                      {p.status}%
+                    </span>
+                  </div>
+              </div>
             </div>
-          ) : (
-            <div className="flex flex-col">
-              {sortedAndFilteredProjects.map((project, index) => (
-                <ProjectRowItem
-                  key={project.id}
-                  project={project}
-                  index={index}
-                  total={sortedAndFilteredProjects.length}
-                  onSelectProject={onSelectProject}
-                  onDeleteProject={onDeleteProject}
-                  getTeamString={getTeamString}
-                  currentEmail={user.email}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-
+          );
+        })}
+      </div>
     </div>
   );
 };

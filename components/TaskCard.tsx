@@ -23,6 +23,7 @@ interface TaskCardProps {
   isSelected?: boolean;
   onSnapshotSelect?: () => void;
   isClientView?: boolean;
+  isDragging?: boolean;
 }
 
 const roleStyles: Record<Role, { style: string; icon: string }> = {
@@ -49,7 +50,7 @@ const accentColors: Record<number, string> = {
 
 const TaskCard: React.FC<TaskCardProps> = ({
   task, isCompleted, isLockedStep, stepId, linkUrl, linkLabel, onToggle, onContextMenu, onEditContextMenu, onDelete, onToast, isLockedProject, projectId,
-  isSnapshotMode, isSelected, onSnapshotSelect, isClientView, onUpdateTask, isClientVisible
+  isSnapshotMode, isSelected, onSnapshotSelect, isClientView, onUpdateTask, isClientVisible, isDragging
 }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
@@ -115,12 +116,13 @@ const TaskCard: React.FC<TaskCardProps> = ({
   };
 
   const pointColor = accentColors[stepId] || 'bg-black';
+  const hoverClasses = !isDragging && !isCompleted ? 'hover:border-black/50 hover:-translate-y-1' : '';
 
   return (
     <div
       onClick={handleToggleClick}
       onContextMenu={handleRightClickInfo}
-      className={`relative flex flex-col p-4 mb-2 bg-white border border-black/25 rounded-xl cursor-pointer min-h-[100px] group overflow-hidden transition-colors duration-200 ${isCompleted ? '' : 'hover:border-black/50 hover:-translate-y-1'} ${
+      className={`relative flex flex-col p-4 mb-2 bg-white border border-black/25 rounded-xl cursor-pointer min-h-[100px] group overflow-hidden transition-colors duration-200 ${hoverClasses} ${
         isSelected && !isClientView
           ? isSnapshotMode
             ? '!border-emerald-400 !border-[3px] ring-4 ring-emerald-50 z-50 shadow-[0_4px_20px_rgba(52,211,153,0.3)]'

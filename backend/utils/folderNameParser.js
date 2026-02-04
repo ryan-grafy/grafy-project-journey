@@ -34,6 +34,52 @@ function standardizeDate(dateInput) {
   return "";
 }
 
+function stripTitleAndSurname(rawName) {
+  if (!rawName) return "";
+
+  const trimmed = String(rawName).trim();
+  if (!trimmed) return "";
+
+  const titles = [
+    "대표",
+    "이사",
+    "부장",
+    "차장",
+    "과장",
+    "대리",
+    "주임",
+    "사원",
+    "팀장",
+    "실장",
+    "본부장",
+    "디렉터",
+    "매니저",
+    "리드",
+    "수석",
+    "책임",
+    "선임",
+    "파트장",
+    "PM",
+    "PD"
+  ];
+
+  const titlePattern = new RegExp(`\\s*(?:${titles.join("|")})$`, "i");
+  let normalized = trimmed;
+  while (titlePattern.test(normalized)) {
+    normalized = normalized.replace(titlePattern, "").trim();
+  }
+
+  const hasSpace = /\s/.test(normalized);
+  const firstToken = normalized.split(/\s+/)[0];
+  if (!firstToken) return "";
+
+  if (/^[가-힣]/.test(firstToken) && (hasSpace || firstToken.length >= 3)) {
+    return firstToken.slice(1);
+  }
+
+  return firstToken;
+}
+
 function generateFolderName(projectData) {
   const { name, startDate, endDate = "xxxxxx", pmName, designerNames = [] } = projectData;
 
@@ -61,7 +107,8 @@ function generateFolderName(projectData) {
   responsiblePeople.push(...designerNames.filter(Boolean));
 
   const sanitizedResponsible = responsiblePeople
-    .map(name => sanitizeFolderName(name))
+    .map(name => sanitizeFolderName(stripTitleAndSurname(name)))
+    .filter(Boolean)
     .join(",");
 
   return `${formattedStartDate}-${formattedEndDate}_${client}_${projectName}_${sanitizedResponsible}`;

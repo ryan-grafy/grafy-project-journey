@@ -9,7 +9,7 @@ const TemplateSaveModal: React.FC<TemplateSaveModalProps> = ({ onClose, onSave }
   const [name, setName] = useState('');
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] animate-in fade-in duration-200" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200]" onClick={onClose}>
       <div className="bg-white rounded-2xl p-6 w-[400px] shadow-2xl" onClick={e => e.stopPropagation()}>
         <h3 className="text-lg font-black mb-4">템플릿 저장</h3>
         <p className="text-sm text-slate-500 mb-4 font-bold">현재 프로젝트 상태를 템플릿으로 저장합니다.</p>
