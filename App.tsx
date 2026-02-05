@@ -115,6 +115,13 @@ const App: React.FC = () => {
   const [roundsNavigation, setRoundsNavigation] = useState<number>(2); // Navigation rounds (Step 2)
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(() => {
+    return localStorage.getItem("grafy_logout_active") === "true";
+  });
+  const isLoggingOutRef = React.useRef(isLoggingOut);
+  useEffect(() => {
+    isLoggingOutRef.current = isLoggingOut;
+  }, [isLoggingOut]);
   const isDataLoadedRef = React.useRef(false); // Track if initial data load is complete
   const realtimeRefreshRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchProjectsRef = React.useRef<(isBackground?: boolean) => void>(() => undefined);
@@ -306,15 +313,23 @@ const App: React.FC = () => {
             }
           } else if (event === "SIGNED_OUT") {
             if (mounted) {
-              setCurrentView("welcome");
+              // Ensure logout flag is cleared when session is fully gone
+              if (localStorage.getItem("grafy_logout_active") === "true") {
+                // Keep the current view until handleLogout finishes the sequence
+                if (!isLoggingOutRef.current) {
+                  setCurrentView("welcome");
+                }
+                localStorage.removeItem("grafy_logout_active");
+              } else if (!isLoggingOutRef.current) {
+                // Typical sign out or session expiration
+                setCurrentView("welcome");
+              }
               setUser({
                 id: "guest",
                 userId: "guest",
                 name: "게스트",
                 avatarUrl: "",
               });
-              setIsInitializing(false);
-              setIsAuthLoading(false);
             }
           }
         },
@@ -334,6 +349,8 @@ const App: React.FC = () => {
               if (!data.session) {
                 setCurrentView("welcome");
                 setIsInitializing(false);
+                setIsLoggingOut(false);
+                localStorage.removeItem("grafy_logout_active");
               }
             });
           }
@@ -554,14 +571,22 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     try {
+      setIsLoggingOut(true);
+      localStorage.setItem("grafy_logout_active", "true");
+      
+      // We call signOut early but keep the view via the listener check
       await signOut();
-      showToast("로그아웃 되었습니다.");
-      // Force a hard reload to root to ensure clean state and show login screen
-      window.location.href = "/";
+      
+      // Total 4 seconds sequence (2s backdrop + 1s text + 1s stay)
+      setTimeout(() => {
+        setCurrentView("welcome");
+        setIsLoggingOut(false);
+        localStorage.removeItem("grafy_logout_active");
+      }, 4000);
     } catch (error) {
+      setIsLoggingOut(false);
+      localStorage.removeItem("grafy_logout_active");
       showToast("로그아웃 중 오류가 발생했습니다.");
-      // Even if error, try to redirect
-      window.location.href = "/";
     }
   };
 
@@ -682,12 +707,12 @@ const App: React.FC = () => {
 
     const syncError = await syncTeamMembersToSupabase(normalized);
     if (syncError) {
-      console.warn("팀 명단 Supabase 저장 실패:", syncError);
+      console.error("팀 명단 Supabase 저장 실패:", syncError);
       showToast("팀 명단 저장 실패");
       return;
     }
 
-    showToast("팀 명단 저장");
+    showToast("팀 정보가 잘 저장되었습니다 :)");
   };
 
   const showToast = (msg: string) => {
@@ -793,6 +818,11 @@ const App: React.FC = () => {
         const remoteP = mergedMap.get(localP.id);
         if (!remoteP) {
           mergedMap.set(localP.id, localP);
+          continue;
+        }
+
+        if (remoteP.status === -99) {
+          mergedMap.set(localP.id, remoteP);
           continue;
         }
 
@@ -3671,11 +3701,39 @@ const App: React.FC = () => {
           isLoading={isAuthLoading}
         />
       )}
-      {isInitializing && (
+      {isInitializing && !isLoggingOut && (
         <div className="min-h-screen flex items-center justify-center bg-black">
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-6">
             <i className="fa-solid fa-plane text-4xl text-white animate-airplane-pulse"></i>
             <p className="text-white font-bold">탑승 수속 중...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Global Logout Overlay (No Hard Reload version) */}
+      {isLoggingOut && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center animate-logout-backdrop">
+          <style>{`
+            @keyframes logoutBackdropFade {
+              0% { background-color: rgba(0,0,0,0); backdrop-filter: blur(0px); }
+              100% { background-color: rgba(0,0,0,0.8); backdrop-filter: blur(10px); }
+            }
+            @keyframes logoutTextFadeIn {
+              0% { opacity: 0; transform: translateY(10px); }
+              100% { opacity: 1; transform: translateY(0); }
+            }
+            .animate-logout-backdrop {
+              animation: logoutBackdropFade 2s ease-out forwards;
+            }
+            .animate-logout-text-delayed {
+              opacity: 0;
+              animation: logoutTextFadeIn 1.5s ease-out forwards;
+              animation-delay: 1.5s;
+            }
+          `}</style>
+          <div className="text-center font-['Pretendard_Variable'] font-semibold text-white leading-relaxed space-y-1 animate-logout-text-delayed">
+            <p className="text-[15pt]">함께여서 행복했습니다.</p>
+            <p className="text-[15pt]">남은 여정도 행복하길 기원하겠습니다.</p>
           </div>
         </div>
       )}
@@ -3692,11 +3750,11 @@ const App: React.FC = () => {
                 Responsive Header Section 
                 Max-width 2100px as requested
               */}
-              <header className="px-8 pt-12 pb-10 max-w-[2100px] mx-auto w-full">
-                <div className="grid grid-cols-1 xl:grid-cols-[1fr_minmax(300px,600px)_1fr] items-start gap-x-8 gap-y-12">
+                            <header className="px-8 pt-12 pb-10 max-w-[2100px] mx-auto w-full">
+                <div className="grid grid-cols-1 xl:grid-cols-[60px_160px_120px_180px_150px_1fr_400px_200px] items-start gap-x-0 gap-y-12">
                   
-                  {/* 1. Main Title (Left Column) */}
-                  <div className="flex justify-start">
+                  {/* 1. Main Title (Spans first 5 columns on Desktop) */}
+                  <div className="flex justify-start xl:col-span-5">
                      <h1 className="text-[clamp(3.5rem,7vw,6.5rem)] leading-[0.82] tracking-tight font-normal whitespace-nowrap">
                       Project(s)<br/>
                       Mgmt.<br/>
@@ -3704,9 +3762,10 @@ const App: React.FC = () => {
                     </h1>
                   </div>
 
-                  {/* 2. Search Bar (Center Column) - Reference Style */}
-                  <div className="flex justify-center xl:pt-4 w-full">
-                    <div className="relative group w-full max-w-lg">
+                  {/* 2. Search Bar (Column 6 - Passenger / Project) */}
+                  {/* Aligned to 'Passenger / Project' with pl-4 matching table header */}
+                  <div className="flex justify-start w-full xl:col-span-1 xl:pl-4">
+                    <div className="relative group w-[550px]">
                        {/* Visual Label + Icon -> Hides when searching to allow input visibility */}
                        <div className={`flex justify-between items-end border-b border-black pb-[5px] transition-opacity duration-200 ${searchTerm ? 'opacity-0' : 'opacity-100'}`}>
                          <span className="text-[27px] font-normal leading-none text-black pointer-events-none">search</span>
@@ -3726,8 +3785,9 @@ const App: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* 3. Top Menu (Right Column) - Horizontal Layout */}
-                  <div className="flex flex-col lg:flex-row items-start lg:items-center justify-end gap-8 xl:pt-4">
+                  {/* 3. Top Menu (Column 7 - Pilots) */}
+                  {/* Aligned to 'Pilots' with pl-4 matching table header */}
+                  <div className="flex flex-col lg:flex-row items-start lg:items-center justify-start gap-8 xl:col-span-1 xl:pl-4">
                       <div className="flex items-center gap-8">
                         <QuietButton onClick={() => setShowTeamModal(true)}>teams</QuietButton>
                         <QuietButton onClick={currentView === 'list' ? handleExportAllProjects : handleExportToExcel}>xlsx</QuietButton>
@@ -3772,10 +3832,10 @@ const App: React.FC = () => {
                                 )}
                                  <button 
                                    type="button"
-                                    onClick={() => {
-                                       handleLogout();
-                                       setShowProfileMenu(false);
-                                    }} 
+                                   onClick={() => {
+                                      handleLogout();
+                                      setShowProfileMenu(false);
+                                   }} 
                                    className="flex items-center gap-3 w-full text-left px-5 py-3 hover:bg-white/40 rounded-[20px] text-[15px] font-normal text-black transition-all duration-200"
                                  >
                                    <LogOut size={16} strokeWidth={2} />
@@ -3785,11 +3845,11 @@ const App: React.FC = () => {
                            )}
                         </div>
                       </div>
-                      
-                      {/* Logo - Black SVG */}
-                      <div className="lg:pl-10 hidden xl:block">
-                        <GrafyLogo />
-                      </div>
+                  </div>
+                  
+                  {/* 4. Logo (Column 8 - Flight time) */}
+                  <div className="hidden xl:block xl:col-span-1">
+                     <GrafyLogo />
                   </div>
                 </div>
               </header>
@@ -3828,7 +3888,14 @@ const App: React.FC = () => {
                 </div>
 
                 {/* The Grid List */}
-                <div className="w-full border-t border-black">
+                <div className="w-full border-t border-black relative min-h-[300px]">
+                    {isProjectLoading && (
+                      <div className="absolute inset-x-0 top-[90px] flex flex-col items-center justify-center z-20">
+                         <div className="flex flex-col items-center">
+                            <p className="text-[12pt] text-black animate-blink-slow">프로젝트 로딩중 입니다.</p>
+                         </div>
+                      </div>
+                    )}
                     <ProjectList
                       projects={projects
                         .filter(p => {
@@ -3866,7 +3933,7 @@ const App: React.FC = () => {
                 {/* Footer Section */}
                 <footer className="mt-[30px] pb-[70px] flex justify-between items-center text-[15px] font-light text-black">
                    <span>The projects on this list are confidential. Please take security seriously.</span>
-                   <span className="font-light">ⓒ GRAFY.</span>
+                   <span className="font-bold">ⓒ GRAFY.</span>
                 </footer>
               </main>
             
@@ -4156,14 +4223,8 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {isInitializing && (
-        <div className="min-h-screen flex items-center justify-center bg-[#f1f3f6]">
-          <div className="flex flex-col items-center gap-4">
-            <i className="fa-solid fa-plane text-4xl text-black animate-airplane-pulse"></i>
-            <p className="text-black font-bold">탑승 수속 중...</p>
-          </div>
-        </div>
-      )}
+      {/* Removed redundant isInitializing block to fix flickering and maintain consistency */}
+
 
       {/* Global Modals */}
       {showDeletedDataModal && (
