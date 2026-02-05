@@ -4,10 +4,11 @@ import { GoogleIcon, UserIcon, LockIcon, ArrowRightIcon } from './ui/Icons';
 
 interface WelcomeScreenProps {
   onLogin: () => void;
+  onAdminLogin: (userId: string, password: string) => void;
   isLoading?: boolean;
 }
 
-const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, isLoading }) => {
+const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAdminLogin, isLoading }) => {
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [autoLogin, setAutoLogin] = useState(false);
@@ -16,7 +17,12 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, isLoading }) => 
 
   const handleAuth = (e: React.FormEvent) => {
     e.preventDefault();
-    setError('이 서비스는 Google 로그인을 권장합니다. 아래 Google 버튼을 이용해 주세요.');
+    if (userId === 'admin' && password === 'rmfovlWkd!2026') {
+      setError('');
+      onAdminLogin(userId, password);
+      return;
+    }
+    setError('아이디 또는 비밀번호가 일치하지 않습니다.');
   };
 
   const videoUrl = "https://pub-72641fd7f7434e30ad221762f61a610f.r2.dev/grafy/IMG_0688.webm";
@@ -82,9 +88,10 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, isLoading }) => 
               </p>
            </div>
            
-           <div className="flex items-center pb-2">
-             <svg width="160" height="21" viewBox="0 0 200 26" fill="none" xmlns="http://www.w3.org/2000/svg" className="hover:opacity-80 transition-opacity drop-shadow-lg">
-                <g clipPath="url(#clip0_1251_131)">
+            <div className="flex items-center pb-2">
+              <svg width="160" height="21" viewBox="0 0 200 26" fill="none" xmlns="http://www.w3.org/2000/svg" className="hover:opacity-80 transition-opacity drop-shadow-lg">
+                 <title>Grafy</title>
+                 <g clipPath="url(#clip0_1251_131)">
                   <path d="M14.3866 16.3675H22.7191C21.938 18.4818 19.1843 20.518 15.1678 20.518C10.2659 20.518 6.71158 17.3368 6.71158 12.9587C6.71158 8.5806 10.2659 5.49054 15.1678 5.49054C18.2079 5.49054 20.8378 6.6485 22.0421 8.50904L22.1202 8.63264H29.4242L29.3005 8.28135C27.5494 3.24618 21.9445 0 15.0376 0C6.321 0 0 5.45151 0 12.9522C0 20.4529 6.321 25.9044 15.0376 25.9044C23.7542 25.9044 29.9385 20.3358 29.9385 12.9522V11.2608H14.3931V16.361L14.3866 16.3675Z" fill="white"/>
                   <path d="M69.2973 9.15875C69.2973 3.88939 64.9357 0.617188 57.9182 0.617188H46.5391V25.3116H53.2507V17.6938H57.7424L63.0934 25.3116H70.9182L64.4084 16.4708C67.5722 15.0591 69.3038 12.47 69.3038 9.15875H69.2973ZM62.5857 9.15875C62.5857 11.9691 59.4935 12.3919 57.6448 12.3919H53.2507V5.93208H57.6448C59.487 5.93208 62.5857 6.35493 62.5857 9.16526V9.15875Z" fill="white"/>
                   <path d="M96.495 0.625L85.5586 25.3194H92.5241L94.451 20.6355H104.775L106.702 25.3194H114.176L103.259 0.625H96.5015H96.495ZM102.666 15.4182H96.5731L99.6197 7.98909L102.666 15.4182Z" fill="white"/>
@@ -138,17 +145,17 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, isLoading }) => 
                      />
                      로그인 상태 유지
                    </label>
-                   <a href="#" className="text-white/50 hover:text-white transition-colors font-medium">비밀번호 찾기</a>
+                    <button type="button" className="text-white/50 hover:text-white transition-colors font-medium">비밀번호 찾기</button>
                  </div>
 
                  {error && <p className="text-red-400 text-sm text-center font-medium bg-red-500/10 py-2 rounded-lg">{error}</p>}
 
-                 <button 
-                   type="submit"
-                   className="w-full bg-white/30 hover:bg-white/40 text-white font-semibold py-4 rounded-full transition-all duration-300 transform border border-white/20 flex items-center justify-center opacity-90 cursor-not-allowed"
-                   disabled
-                 >
-                   Sign In
+                  <button 
+                    type="submit"
+                    className="w-full bg-white/30 hover:bg-white/40 text-white font-semibold py-4 rounded-full transition-all duration-300 transform border border-white/20 flex items-center justify-center opacity-90 disabled:opacity-60"
+                    disabled={isLoading}
+                  >
+                    Sign In
                    <span className="ml-2">
                      <ArrowRightIcon />
                    </span>
@@ -162,11 +169,12 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, isLoading }) => 
                </div>
 
                <div className="grid grid-cols-1 gap-4">
-                 <button 
-                   onClick={onLogin}
-                   disabled={isLoading}
-                   className="flex items-center justify-center px-4 py-4 bg-white text-black rounded-2xl hover:bg-[#f1f1f1] transition-all duration-300 text-base font-semibold shadow-2xl transform active:scale-95 disabled:opacity-50"
-                 >
+                  <button 
+                    type="button"
+                    onClick={onLogin}
+                    disabled={isLoading}
+                    className="flex items-center justify-center px-4 py-4 bg-white text-black rounded-2xl hover:bg-[#f1f1f1] transition-all duration-300 text-base font-semibold shadow-2xl transform active:scale-95 disabled:opacity-50"
+                  >
                    {isLoading ? (
                      <div className="flex items-center gap-2">
                        <i className="fa-solid fa-circle-notch fa-spin"></i>

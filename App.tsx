@@ -435,6 +435,7 @@ const App: React.FC = () => {
     };
   }, [currentView]);
 
+
   useEffect(() => {
     if (currentView !== "detail") return;
     const handlePointerDown = () => {
@@ -528,6 +529,27 @@ const App: React.FC = () => {
       // If we didn't return early due to auth check, stop loading
       setTimeout(() => setIsAuthLoading(false), 3000);
     }
+  };
+
+  const handleAdminLogin = (userId: string, password: string) => {
+    if (userId !== "admin" || password !== "rmfovlWkd!2026") {
+      showToast("아이디 또는 비밀번호가 일치하지 않습니다.");
+      return;
+    }
+
+    setUser({
+      id: "local-admin",
+      userId: "admin",
+      name: "admin",
+      avatarUrl: "",
+      email: "ryan@grafydesign.com",
+    });
+    setCurrentView("list");
+    fetchTeamMembers();
+    fetchProjects();
+    setIsAuthLoading(false);
+    setIsInitializing(false);
+    showToast("로컬 로그인되었습니다.");
   };
 
   const handleLogout = async () => {
@@ -3643,7 +3665,11 @@ const App: React.FC = () => {
       )}
 
       {currentView === "welcome" && !isInitializing && (
-        <WelcomeScreen onLogin={handleGoogleLogin} isLoading={isAuthLoading} />
+        <WelcomeScreen
+          onLogin={handleGoogleLogin}
+          onAdminLogin={handleAdminLogin}
+          isLoading={isAuthLoading}
+        />
       )}
       {isInitializing && (
         <div className="min-h-screen flex items-center justify-center bg-black">
@@ -3708,10 +3734,10 @@ const App: React.FC = () => {
                         
                          {/* Profile Menu */}
                         <div className="relative" ref={profileMenuRef}>
-                           <button 
-                              type="button"
-                              onClick={() => setShowProfileMenu(!showProfileMenu)} 
-                              className="text-[25px] font-bold whitespace-nowrap text-black hover:opacity-60 transition-opacity"
+                            <button 
+                               type="button"
+                               onClick={() => setShowProfileMenu(!showProfileMenu)} 
+                               className="text-[25px] font-bold whitespace-nowrap text-black hover:opacity-60 transition-opacity"
                             >
                              {ADMIN_EMAILS.includes(user.email || '') ? 'admin.' : 'grafer.'}
                            </button>
@@ -3743,14 +3769,14 @@ const App: React.FC = () => {
                                       </button>
                                       <div className="h-px bg-black/5 my-1 mx-3"/>
                                    </>
-                                 )}
+                                )}
                                  <button 
-                                    type="button"
-                                     onClick={() => {
-                                        handleLogout();
-                                        setShowProfileMenu(false);
-                                     }} 
-                                    className="flex items-center gap-3 w-full text-left px-5 py-3 hover:bg-white/40 rounded-[20px] text-[15px] font-normal text-black transition-all duration-200"
+                                   type="button"
+                                    onClick={() => {
+                                       handleLogout();
+                                       setShowProfileMenu(false);
+                                    }} 
+                                   className="flex items-center gap-3 w-full text-left px-5 py-3 hover:bg-white/40 rounded-[20px] text-[15px] font-normal text-black transition-all duration-200"
                                  >
                                    <LogOut size={16} strokeWidth={2} />
                                    로그아웃
