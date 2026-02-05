@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { AnimatePresence } from "framer-motion";
 import Navbar from "./components/Navbar.tsx";
 import StepColumn from "./components/StepColumn.tsx";
 import UrlPopover from "./components/UrlPopover.tsx";
@@ -3660,26 +3661,30 @@ const App: React.FC = () => {
               </main>
             
             {/* Keeping Modals inside Layout */}
-            {showCreateModal && (
-              <CreateProjectModal
-                teamMembers={teamMembers}
-                templates={templates}
-                onClose={() => setShowCreateModal(false)}
-                onCreate={handleCreateProject}
-              />
-            )}
+              <AnimatePresence>
+                {showCreateModal && (
+                  <CreateProjectModal
+                    teamMembers={teamMembers}
+                    templates={templates}
+                    onClose={() => setShowCreateModal(false)}
+                    onCreate={handleCreateProject}
+                  />
+                )}
+              </AnimatePresence>
 
-            {showTeamModal && (
-              <TeamManagementModal
-                members={teamMembers}
-                onClose={() => setShowTeamModal(false)}
-                onUpdate={(t) => {
-                  setTeamMembers(t);
-                  localStorage.setItem("grafy_team", JSON.stringify(t));
-                  showToast("팀 명단 저장");
-                }}
-              />
-            )}
+              <AnimatePresence>
+                {showTeamModal && (
+                  <TeamManagementModal
+                    members={teamMembers}
+                    onClose={() => setShowTeamModal(false)}
+                    onUpdate={(t) => {
+                      setTeamMembers(t);
+                      localStorage.setItem("grafy_team", JSON.stringify(t));
+                      showToast("팀 명단 저장");
+                    }}
+                  />
+                )}
+              </AnimatePresence>
           </div>
         )}
 

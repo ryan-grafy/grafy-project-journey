@@ -1,6 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { TeamMember, Project } from '../types';
 import { X, ChevronDown } from 'lucide-react';
+import { motion } from "framer-motion";
+
+const overlayVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1 },
+  exit: { opacity: 0 }
+};
+
+const modalVariants = {
+  hidden: { scale: 0.9, opacity: 0, y: 20, filter: "blur(10px)" },
+  visible: { 
+    scale: 1, 
+    opacity: 1, 
+    y: 0, 
+    filter: "blur(0px)",
+    transition: { type: "spring", damping: 25, stiffness: 350 } 
+  },
+  exit: { 
+    scale: 0.95, 
+    opacity: 0, 
+    y: 10,
+    filter: "blur(10px)",
+    transition: { duration: 0.2 }
+  }
+};
 
 interface CreateProjectModalProps {
   teamMembers: TeamMember[];
