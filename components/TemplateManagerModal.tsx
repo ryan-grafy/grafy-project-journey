@@ -13,6 +13,9 @@ const TemplateManagerModal: React.FC<TemplateManagerModalProps> = ({ templates, 
   const [editName, setEditName] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const getTemplateLabel = (template: Project) =>
+    template.template_name || template.task_states?.meta?.template_name || template.name;
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -30,7 +33,7 @@ const TemplateManagerModal: React.FC<TemplateManagerModalProps> = ({ templates, 
 
   const handleStartEdit = (template: Project) => {
     setEditingId(template.id);
-    setEditName(template.name);
+    setEditName(getTemplateLabel(template));
   };
 
   const handleSaveEdit = (templateId: string) => {
@@ -115,7 +118,7 @@ const TemplateManagerModal: React.FC<TemplateManagerModalProps> = ({ templates, 
                   ) : (
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="font-black text-lg text-black">{template.name}</h3>
+                        <h3 className="font-black text-lg text-black">{getTemplateLabel(template)}</h3>
                         <p className="text-xs text-slate-500 mt-1">
                           생성일: {new Date(template.created_at).toLocaleDateString('ko-KR')}
                         </p>

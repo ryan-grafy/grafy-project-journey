@@ -102,7 +102,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, isLoading }) => 
          </div>
 
          <div className="flex flex-col justify-start order-1 lg:order-2">
-            <div className="bg-white/22 backdrop-blur-2xl border border-white/20 p-8 md:p-12 rounded-[2.5rem] shadow-2xl w-full max-w-md mx-auto">
+            <div className="bg-white/22 backdrop-blur-2xl border border-white/20 p-8 md:p-12 rounded-[2.5rem] shadow-2xl w-full max-w-md ml-auto">
                <div className="mb-8 text-center text-white">
                  <h2 className="text-3xl font-semibold mb-2 tracking-tight">
                    Log In

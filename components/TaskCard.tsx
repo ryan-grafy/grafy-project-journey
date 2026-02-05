@@ -130,7 +130,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
           : ''
       }`}
       style={{
-        filter: isLockedStep && !isSnapshotMode ? 'grayscale(0.5)' : 'grayscale(0)',
+        filter: isLockedProject ? 'grayscale(0.2)' : (isLockedStep && !isSnapshotMode ? 'grayscale(0.5)' : 'grayscale(0)'),
         transition: 'filter 200ms ease-in-out, transform 200ms ease-in-out'
       }}
     >
@@ -138,6 +138,11 @@ const TaskCard: React.FC<TaskCardProps> = ({
         {isClientVisible && !isClientView && (
           <div className="flex items-center justify-center w-7 h-7 bg-emerald-500 rounded-full shadow-sm" title="클라이언트 뷰 공개됨">
             <i className="fa-solid fa-magnifying-glass text-white text-[12px]"></i>
+          </div>
+        )}
+        {isLockedProject && (
+          <div className="flex items-center justify-center w-7 h-7" title="프로젝트 잠김">
+             <i className="fa-solid fa-lock text-slate-400/50 text-[14px]"></i>
           </div>
         )}
         {isCompleted ? (

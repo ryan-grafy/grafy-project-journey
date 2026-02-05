@@ -3,8 +3,7 @@ const FOLDER_STRUCTURE = require('../config/folderStructure');
 const { generateFolderName } = require('../utils/folderNameParser');
 const supabase = require('../config/supabase');
 
-// .env에서 #이 주석으로 인식되므로 코드에서 직접 설정
-const NAS_BASE_PATH = '/GRAFY/#Project/# 2026 GRAFY. 프로젝트';
+const NAS_BASE_PATH = process.env.NAS_BASE_PATH || '/GRAFY/#Project/# 2026 GRAFY. 프로젝트';
 
 function normalizeNasPath(inputPath) {
   if (!inputPath) return inputPath;

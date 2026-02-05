@@ -153,6 +153,28 @@ const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <nav ref={navRef} className="w-full bg-white border-b border-slate-200 py-3 md:py-4 sticky top-0 z-40 shadow-sm">
+      <style>{`
+        @keyframes stretch-open {
+          0% {
+            opacity: 0;
+            transform: scale(0);
+          }
+          60% {
+            transform: scale(1.05) translateY(5px);
+          }
+          80% {
+              transform: scale(0.95) translateY(-2px);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+        .animate-stretch-open {
+          transform-origin: top right;
+          animation: stretch-open 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+      `}</style>
       <div className="max-w-[2200px] mx-auto px-4 md:px-6 flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-center">
 
         {/* Left Side: Title & Info */}
@@ -315,7 +337,7 @@ const Navbar: React.FC<NavbarProps> = ({
                     </button>
 
                     {profileMenuOpen && (
-                      <div className="absolute right-0 top-12 w-[220px] bg-white border border-slate-200 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100" onClick={(e) => e.stopPropagation()}>
+                      <div className="absolute right-0 top-12 w-[220px] bg-white border border-slate-200 rounded-2xl shadow-2xl py-2 z-50 animate-stretch-open" onClick={(e) => e.stopPropagation()}>
                         <div className="px-4 py-3 border-b border-slate-100">
                           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">내 정보</p>
                           <div className="flex items-center gap-2">

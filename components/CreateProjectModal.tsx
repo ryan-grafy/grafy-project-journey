@@ -1,31 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TeamMember, Project } from '../types';
 import { X, ChevronDown } from 'lucide-react';
-import { motion } from "framer-motion";
-
-const overlayVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1 },
-  exit: { opacity: 0 }
-};
-
-const modalVariants = {
-  hidden: { scale: 0.9, opacity: 0, y: 20, filter: "blur(10px)" },
-  visible: { 
-    scale: 1, 
-    opacity: 1, 
-    y: 0, 
-    filter: "blur(0px)",
-    transition: { type: "spring", damping: 25, stiffness: 350 } 
-  },
-  exit: { 
-    scale: 0.95, 
-    opacity: 0, 
-    y: 10,
-    filter: "blur(10px)",
-    transition: { duration: 0.2 }
-  }
-};
 
 interface CreateProjectModalProps {
   teamMembers: TeamMember[];
@@ -46,6 +21,9 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ teamMembers, te
   
   const [dropdownOpen, setDropdownOpen] = useState<'pm' | 'lead' | 'd1' | 'd2' | 'template' | null>(null);
 
+  const getTemplateLabel = (template: Project) =>
+    template.template_name || template.task_states?.meta?.template_name || template.name;
+
   // No scroll lock to prevent scrollbar shifting/shaking
   useEffect(() => {
     // Esc key to close
@@ -60,6 +38,9 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ teamMembers, te
     if (!name.trim() || !startDate.trim() || isSubmitting) return;
     setIsSubmitting(true);
     try {
+      const templateLabel = selectedTemplate
+        ? getTemplateLabel(selectedTemplate)
+        : undefined;
       // Pass custom_tasks from selected template if exists
       await onCreate(
         name,
@@ -67,7 +48,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ teamMembers, te
         [designerLead, designer1, designer2],
         startDate,
         selectedTemplate?.custom_tasks,
-        selectedTemplate?.name,
+        templateLabel,
         selectedTemplate?.task_order,
         selectedTemplate,
       );
@@ -168,7 +149,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ teamMembers, te
               className="w-full bg-white/30 hover:bg-white/45 border border-white/30 rounded-2xl p-4 text-[15px] font-bold cursor-pointer transition-all text-black/70 flex justify-between items-center shadow-sm"
               style={{ fontFamily: "'Helvetica Now Display', sans-serif" }}
             >
-                <span>{selectedTemplate ? selectedTemplate.name : 'Default (Basic)'}</span>
+                <span>{selectedTemplate ? getTemplateLabel(selectedTemplate) : 'Default (Basic)'}</span>
                 <ChevronDown size={14} className={`text-black/30 transition-transform duration-300 ${dropdownOpen === 'template' ? 'rotate-180' : ''}`} />
             </div>
             {dropdownOpen === 'template' && (
@@ -177,7 +158,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ teamMembers, te
                         <div onClick={() => { setSelectedTemplate(null); setDropdownOpen(null); }} className="px-5 py-3 text-[14px] font-medium hover:bg-white/40 rounded-xl cursor-pointer text-black/30 italic">Default (Basic)</div>
                         {templates.map(t => (
                             <div key={t.id} onClick={() => { setSelectedTemplate(t); setDropdownOpen(null); }} className="px-5 py-3 text-[14px] font-medium hover:bg-white/40 rounded-xl cursor-pointer text-black transition-colors">
-                                {t.name}
+                                {getTemplateLabel(t)}
                             </div>
                         ))}
                     </div>

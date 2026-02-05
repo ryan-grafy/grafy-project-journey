@@ -80,23 +80,47 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ members, onCl
           </button>
         </div>
 
-        {/* List Header */}
-        <div className="flex-1 overflow-y-auto pr-3 custom-scrollbar mb-6">
-          <div className="grid grid-cols-12 gap-4 mb-3 px-4 text-[13px] font-semibold text-black/50 uppercase tracking-widest">
-            <div className="col-span-2">Name</div>
-            <div className="col-span-2">Position</div>
-            <div className="col-span-3">Contact</div>
-            <div className="col-span-4">Email</div>
-            <div className="col-span-1"></div>
-          </div>
+        {/* Scoped Scrollbar Style */}
+        <style>{`
+          .custom-scrollbar-black::-webkit-scrollbar {
+            width: 8px;
+          }
+          .custom-scrollbar-black::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 4px;
+          }
+          .custom-scrollbar-black::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+          }
+          .custom-scrollbar-black::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.4);
+          }
+        `}</style>
 
-          <div className="flex flex-col gap-3">
-            {editMembers.map((m) => (
+        {/* List Header (Fixed) */}
+        <div className="grid grid-cols-12 gap-4 mb-3 px-4 text-[13px] font-semibold text-black/50 uppercase tracking-widest flex-shrink-0">
+          <div className="col-span-1 pl-2">No.</div>
+          <div className="col-span-2 pl-2">Name</div>
+          <div className="col-span-2 pl-2">Position</div>
+          <div className="col-span-3 pl-2">Contact</div>
+          <div className="col-span-3 pl-2">Email</div>
+          <div className="col-span-1"></div>
+        </div>
+
+        {/* Scrollable List Area */}
+        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar-black mb-4 -mr-2">
+          <div className="flex flex-col gap-3 pb-2 pt-1 px-1">
+            {editMembers.map((m, index) => (
               <div 
                 key={m.id} 
-                // Prominent default state: bg-white/35
                 className="grid grid-cols-12 gap-4 items-center bg-white/35 hover:bg-white/55 p-3 rounded-2xl border border-white/30 transition-all group shadow-sm"
               >
+                {/* Index Number */}
+                <div className="col-span-1 pl-2 font-medium text-black/40 text-sm">
+                  {String(index + 1).padStart(2, '0')}
+                </div>
+
                 <input 
                   className="col-span-2 bg-transparent border-b border-transparent focus:border-black/20 p-2 text-[16px] font-medium placeholder-black/30 outline-none text-black transition-colors"
                   placeholder="Name"
@@ -119,7 +143,7 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ members, onCl
                   style={{ fontFamily: "'Helvetica Now Display', 'Helvetica Neue', sans-serif" }}
                 />
                 <input 
-                  className="col-span-4 bg-transparent border-b border-transparent focus:border-black/20 p-2 text-[16px] font-normal placeholder-black/30 outline-none text-black/80 transition-colors tracking-tight"
+                  className="col-span-3 bg-transparent border-b border-transparent focus:border-black/20 p-2 text-[16px] font-normal placeholder-black/30 outline-none text-black/80 transition-colors tracking-tight"
                   placeholder="Email Address"
                   value={m.email}
                   onChange={(e) => handleChange(m.id, 'email', e.target.value)}
@@ -136,26 +160,25 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ members, onCl
               </div>
             ))}
           </div>
-
-          <button 
-            onClick={handleAdd}
-            // Prominent default: bg-white/30, solid borders
-            // overflow-hidden for the 'pop-up' effect
-            className="w-full mt-6 py-6 border border-black/10 hover:border-black/20 rounded-[2.5rem] bg-white/30 text-black font-semibold hover:bg-white/45 transition-all flex items-center justify-center gap-3 group relative overflow-hidden shadow-sm shadow-black/5"
-          >
-            <div className="relative w-8 h-8 flex items-center justify-center">
-              {/* Plus icon fades/scales out */}
-              <div className="transition-all duration-300 group-hover:scale-0 group-hover:opacity-0 bg-black/5 rounded-full p-1.5 flex items-center justify-center">
-                <Plus size={16} strokeWidth={3} />
-              </div>
-              {/* User icon pops up from bottom frame */}
-              <div className="absolute inset-0 flex items-center justify-center transition-all duration-300 translate-y-8 opacity-0 group-hover:translate-y-0 group-hover:opacity-100">
-                <User size={20} className="text-black" strokeWidth={2.5} />
-              </div>
-            </div>
-            <span style={{ fontFamily: "'Helvetica Now Display', 'Helvetica Neue', sans-serif" }}>Add New Member</span>
-          </button>
         </div>
+
+        {/* Add Member Button (Fixed) */}
+        <button 
+          onClick={handleAdd}
+          className="w-full mb-2 py-5 border border-black/10 hover:border-black/20 rounded-[2rem] bg-white/30 text-black font-semibold hover:bg-white/45 transition-all flex items-center justify-center gap-3 group relative overflow-hidden shadow-sm shadow-black/5 flex-shrink-0"
+        >
+          <div className="relative w-7 h-7 flex items-center justify-center">
+            {/* Plus icon fades/scales out */}
+            <div className="transition-all duration-300 group-hover:scale-0 group-hover:opacity-0 bg-black/5 rounded-full p-1.5 flex items-center justify-center">
+              <Plus size={14} strokeWidth={3} />
+            </div>
+            {/* User icon pops up from bottom frame */}
+            <div className="absolute inset-0 flex items-center justify-center transition-all duration-300 translate-y-8 opacity-0 group-hover:translate-y-0 group-hover:opacity-100">
+              <User size={18} className="text-black" strokeWidth={2.5} />
+            </div>
+          </div>
+          <span style={{ fontFamily: "'Helvetica Now Display', 'Helvetica Neue', sans-serif" }}>Add New Member</span>
+        </button>
 
         {/* Footer */}
         <div className="flex justify-end gap-3 mt-2 pt-6 border-t border-white/20">

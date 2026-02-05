@@ -3,7 +3,7 @@ const supabase = require('../config/supabase');
 const { parseFolderName, generateFolderName } = require('../utils/folderNameParser');
 
 // folderService.js와 동일한 기준 경로 사용
-const NAS_BASE_PATH = '/GRAFY/#Project/# 2026 GRAFY. 프로젝트';
+const NAS_BASE_PATH = process.env.NAS_BASE_PATH || '/GRAFY/#Project/# 2026 GRAFY. 프로젝트';
 
 let lastNasFolderPaths = null;
 

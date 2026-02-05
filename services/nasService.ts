@@ -1,10 +1,12 @@
 const DEV_API_BASE = "/api";
 const ENV_API_BASE = import.meta.env.VITE_NAS_API_BASE as string | undefined;
-const API_BASE = ENV_API_BASE
-  ? ENV_API_BASE.replace(/\/+$/, "")
-  : import.meta.env.DEV
-    ? DEV_API_BASE
-    : `${window.location.origin}/api`;
+const normalizedEnvBase = ENV_API_BASE ? ENV_API_BASE.replace(/\/+$/, "") : undefined;
+const PROD_API_BASE = normalizedEnvBase
+  ? normalizedEnvBase.endsWith("/api")
+    ? normalizedEnvBase
+    : `${normalizedEnvBase}/api`
+  : `${window.location.origin}/api`;
+const API_BASE = import.meta.env.DEV ? DEV_API_BASE : PROD_API_BASE;
 
 export async function createProjectFolder(data: {
   name: string;

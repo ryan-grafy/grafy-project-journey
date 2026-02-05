@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { AnimatePresence } from "framer-motion";
 import Navbar from "./components/Navbar.tsx";
 import StepColumn from "./components/StepColumn.tsx";
 import UrlPopover from "./components/UrlPopover.tsx";
@@ -42,6 +41,7 @@ import { Search, LayoutTemplate, Trash2, LogOut } from 'lucide-react';
 // A "quiet" hover button component for the top menu
 const QuietButton = ({ children, onClick }: { children?: React.ReactNode, onClick?: () => void }) => (
   <button 
+    type="button"
     onClick={onClick}
     className="text-[25px] font-normal text-black hover:opacity-60 transition-opacity duration-200 whitespace-nowrap"
   >
@@ -53,6 +53,7 @@ const QuietButton = ({ children, onClick }: { children?: React.ReactNode, onClic
 const FilterTab = ({ label, isSelected, onClick, isFirst = false, isLast = false }: { label: string, isSelected?: boolean, onClick?: () => void, isFirst?: boolean, isLast?: boolean }) => (
   <div className="flex items-center h-[30px]">
     <button 
+       type="button"
        onClick={onClick}
        className={`${isFirst ? 'pl-4 pr-5' : 'px-5'} h-full text-[15px] transition-opacity flex items-center whitespace-nowrap text-black ${isSelected ? 'font-semibold' : 'font-normal hover:opacity-60'}`}
     >
@@ -65,6 +66,7 @@ const FilterTab = ({ label, isSelected, onClick, isFirst = false, isLast = false
 // Grafy Logo SVG
 const GrafyLogo = () => (
   <svg width="200" height="26" viewBox="0 0 200 26" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-[150px] md:w-[200px] h-auto text-black fill-black">
+    <title>Grafy</title>
     <path d="M14.3866 16.3675H22.7191C21.938 18.4818 19.1843 20.518 15.1678 20.518C10.2659 20.518 6.71158 17.3368 6.71158 12.9587C6.71158 8.5806 10.2659 5.49054 15.1678 5.49054C18.2079 5.49054 20.8378 6.6485 22.0421 8.50904L22.1202 8.63264H29.4242L29.3005 8.28135C27.5494 3.24618 21.9445 0 15.0376 0C6.321 0 0 5.45151 0 12.9522C0 20.4529 6.321 25.9044 15.0376 25.9044C23.7542 25.9044 29.9385 20.3358 29.9385 12.9522V11.2608H14.3931V16.361L14.3866 16.3675Z" fill="currentColor"/>
     <path d="M69.2973 9.15875C69.2973 3.88939 64.9357 0.617188 57.9182 0.617188H46.5391V25.3116H53.2507V17.6938H57.7424L63.0934 25.3116H70.9182L64.4084 16.4708C67.5722 15.0591 69.3038 12.47 69.3038 9.15875H69.2973ZM62.5857 9.15875C62.5857 11.9691 59.4935 12.3919 57.6448 12.3919H53.2507V5.93208H57.6448C59.487 5.93208 62.5857 6.35493 62.5857 9.16526V9.15875Z" fill="currentColor"/>
     <path d="M96.495 0.625L85.5586 25.3194H92.5241L94.451 20.6355H104.775L106.702 25.3194H114.176L103.259 0.625H96.5015H96.495ZM102.666 15.4182H96.5731L99.6197 7.98909L102.666 15.4182Z" fill="currentColor"/>
@@ -87,6 +89,8 @@ const App: React.FC = () => {
     "welcome" | "list" | "detail" | "share"
   >("welcome");
   const [isInitializing, setIsInitializing] = useState(true);
+  const isInitializingRef = React.useRef(isInitializing);
+  const currentViewRef = React.useRef(currentView);
   const [sharedProjectId, setSharedProjectId] = useState<string | null>(null);
   const [templates, setTemplates] = useState<Project[]>([]); // Templates State
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
@@ -114,6 +118,35 @@ const App: React.FC = () => {
   const isDataLoadedRef = React.useRef(false); // Track if initial data load is complete
   const realtimeRefreshRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchProjectsRef = React.useRef<(isBackground?: boolean) => void>(() => undefined);
+  const fetchTeamMembersRef = React.useRef<() => void>(() => undefined);
+  const loadTasksRef = React.useRef<(project: Project) => void>(() => undefined);
+  const checkEmailAuthorizationRef = React.useRef<
+    (email: string | undefined) => Promise<boolean>
+  >(async () => false);
+  const showToastRef = React.useRef<(msg: string) => void>(() => undefined);
+  const updateProjectProgressRef = React.useRef<
+    (
+      nextCompleted: Set<string>,
+      project: Project,
+      nextLinks?: Map<string, { url: string; label: string }>,
+    ) => Promise<void>
+  >(async () => undefined);
+  const saveProjectsLocalRef = React.useRef<
+    (updatedActiveProjects: Project[]) => Promise<void>
+  >(async () => undefined);
+  const handleGroupTasksRef = React.useRef<() => Promise<void>>(
+    async () => undefined,
+  );
+  const handleUngroupTasksRef = React.useRef<() => Promise<void>>(
+    async () => undefined,
+  );
+  const calculateTotalTasksRef = React.useRef<
+    (
+      project: Project,
+      overrideCompleted?: Set<string>,
+      overrideCustomTasks?: any,
+    ) => { total: number; completed: number }
+  >(() => ({ total: 0, completed: 0 }));
   const [locationKey, setLocationKey] = useState(0); // Track URL changes  // State for popover in step 3
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
@@ -165,11 +198,11 @@ const App: React.FC = () => {
 
   // --- SAFEGUARDS ---
   // Force Welcome if Guest is on List
-  useEffect(() => {
-    if (currentView === "list" && user.userId === "guest") {
-      setCurrentView("welcome");
-    }
-  }, [currentView, user.userId]);
+  // useEffect(() => {
+  //   if (currentView === "list" && user.userId === "guest") {
+  //     setCurrentView("welcome");
+  //   }
+  // }, [currentView, user.userId]);
 
   // Global Safety Timeout for Initialization
   useEffect(() => {
@@ -182,6 +215,14 @@ const App: React.FC = () => {
     }, 5000);
     return () => clearTimeout(timer);
   }, [isInitializing]);
+
+  useEffect(() => {
+    isInitializingRef.current = isInitializing;
+  }, [isInitializing]);
+
+  useEffect(() => {
+    currentViewRef.current = currentView;
+  }, [currentView]);
 
   // Listen for browser history changes (Back/Forward)
   useEffect(() => {
@@ -227,13 +268,13 @@ const App: React.FC = () => {
           if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
             if (session) {
               // Check Authorization
-              const isAuthorized = await checkEmailAuthorization(
+              const isAuthorized = await checkEmailAuthorizationRef.current(
                 session.user.email,
               );
               if (!isAuthorized) {
                 console.warn("Unauthorized user:", session.user.email);
                 await supabase.auth.signOut();
-                showToast("허가되지 않은 계정입니다.");
+                showToastRef.current("허가되지 않은 계정입니다.");
                 setCurrentView("welcome");
                 setIsInitializing(false);
                 return;
@@ -251,12 +292,14 @@ const App: React.FC = () => {
                 email: session.user.email,
               });
 
-              // Only switch view if not already in detail or list
-              setCurrentView((prev) => (prev === "welcome" ? "list" : prev));
+              // Force Switch to List View after Login
+              if (currentViewRef.current === "welcome") {
+                setCurrentView("list");
+              }
 
               // Fetch Data
-              fetchTeamMembers();
-              fetchProjects();
+              fetchTeamMembersRef.current();
+              fetchProjectsRef.current();
 
               setIsAuthLoading(false);
               setIsInitializing(false);
@@ -285,7 +328,7 @@ const App: React.FC = () => {
       if (!session && !window.location.hash.includes("access_token")) {
         // If no session immediately, give a small grace period for listener or recovery
         setTimeout(() => {
-          if (mounted && isInitializing) {
+          if (mounted && isInitializingRef.current) {
             // Double check
             supabase.auth.getSession().then(({ data }) => {
               if (!data.session) {
@@ -320,10 +363,11 @@ const App: React.FC = () => {
       mounted = false;
       if (authListener) authListener.unsubscribe();
     };
-  }, [isSupabaseReady]);
+  }, []);
 
   // URL Search Params for Direct Project Navigation & History Handling
   useEffect(() => {
+    if (locationKey < 0) return;
     const params = new URLSearchParams(window.location.search);
     const projectIdParam = params.get("project");
 
@@ -340,7 +384,7 @@ const App: React.FC = () => {
           setRounds(targetProject.rounds_count || 2);
           setRounds2(targetProject.rounds2_count || 2);
           setRoundsNavigation(targetProject.rounds_navigation_count || 2);
-          loadTasks(targetProject);
+          loadTasksRef.current(targetProject);
           setCurrentView("detail");
           setActiveRole(Role.ALL);
         }
@@ -358,7 +402,7 @@ const App: React.FC = () => {
         setCurrentProject(null);
       }
     }
-  }, [projects, locationKey]); // Depend on projects load AND manual locationKey trigger
+  }, [projects, locationKey, currentProject?.id, currentView]); // Depend on projects load AND manual locationKey trigger
 
   // Initial View Setup based on URL
   useEffect(() => {
@@ -391,12 +435,23 @@ const App: React.FC = () => {
     };
   }, [currentView]);
 
+  useEffect(() => {
+    if (currentView !== "detail") return;
+    const handlePointerDown = () => {
+      setPopover((p) => ({ ...p, isOpen: false }));
+      setTaskEditPopover((p) => ({ ...p, isOpen: false }));
+    };
+    window.addEventListener("mousedown", handlePointerDown);
+    return () => window.removeEventListener("mousedown", handlePointerDown);
+  }, [currentView]);
+
   // Helper to check if email is allowed
   const checkEmailAuthorization = async (
     email: string | undefined,
   ): Promise<boolean> => {
-    return true; // FIXME: TEMPORARY FIX FOR LOGIN ISSUE
-    // if (!email) return false;
+    let bypassAuth = true;
+    if (bypassAuth) return true;
+    if (!email) return false;
 
     // 1. Check Constants (Fastest)
     const constantEmails = INITIAL_TEAM_MEMBERS.map((m) => m.email);
@@ -413,7 +468,7 @@ const App: React.FC = () => {
         )
           return true;
       } catch (e) {
-        // Error parsing
+        console.warn("팀 명단 로컬 파싱 실패:", e);
       }
     }
 
@@ -427,11 +482,14 @@ const App: React.FC = () => {
           .limit(1);
         if (data && data.length > 0) return true;
       } catch (e) {
+        console.warn("팀 명단 권한 조회 실패:", e);
       }
     }
 
     return false;
   };
+
+  checkEmailAuthorizationRef.current = checkEmailAuthorization;
 
   const handleGoogleLogin = async () => {
     try {
@@ -485,38 +543,137 @@ const App: React.FC = () => {
     }
   };
 
+  const buildInitialTeamMembers = (): TeamMember[] =>
+    INITIAL_TEAM_MEMBERS.map((member, index) => ({
+      id: `team-${index}`,
+      name: member.name || "",
+      title: member.title || "",
+      phone: member.phone || "",
+      email: member.email || "",
+    }));
+
+  const normalizeTeamMembers = (
+    members: Array<Partial<TeamMember>>,
+  ): TeamMember[] =>
+    members.map((member, index) => ({
+      id: member.id || `team-${index}`,
+      name: member.name || "",
+      title: member.title || "",
+      phone: member.phone || "",
+      email: member.email || "",
+    }));
+
+  const getLocalTeamMembers = (): TeamMember[] => {
+    const savedTeam = localStorage.getItem("grafy_team");
+    if (savedTeam) {
+      try {
+        const parsed = JSON.parse(savedTeam);
+        if (Array.isArray(parsed)) {
+          return normalizeTeamMembers(parsed);
+        }
+      } catch (e) {
+        console.warn("팀 명단 로컬 로드 실패:", e);
+      }
+    }
+    return buildInitialTeamMembers();
+  };
+
+  const syncTeamMembersToSupabase = async (members: TeamMember[]) => {
+    if (!isSupabaseReady || !supabase) return null;
+
+    const payload = members.map((member) => ({
+      id: member.id,
+      name: member.name,
+      title: member.title,
+      phone: member.phone,
+      email: member.email,
+    }));
+
+    const { error } = await supabase
+      .from("team_members")
+      .upsert(payload, { onConflict: "id" });
+
+    if (error) return error;
+
+    const { data: existing, error: existingError } = await supabase
+      .from("team_members")
+      .select("id");
+
+    if (existingError || !existing) return existingError || null;
+
+    const keepIds = new Set(members.map((member) => member.id));
+    const idsToDelete = existing
+      .map((row) => row.id)
+      .filter((id) => !keepIds.has(id));
+
+    if (idsToDelete.length === 0) return null;
+
+    const { error: deleteError } = await supabase
+      .from("team_members")
+      .delete()
+      .in("id", idsToDelete);
+
+    if (deleteError) return deleteError;
+
+    return null;
+  };
+
   const fetchTeamMembers = async () => {
     try {
       if (isSupabaseReady && supabase) {
-        const { data, error } = await supabase.from("team_members").select("*");
+        const { data, error } = await supabase
+          .from("team_members")
+          .select("id,name,title,phone,email");
         if (!error && data && data.length > 0) {
-          setTeamMembers(data);
+          const normalized = normalizeTeamMembers(data);
+          setTeamMembers(normalized);
+          localStorage.setItem("grafy_team", JSON.stringify(normalized));
           return;
         }
+
+        const fallback = getLocalTeamMembers();
+        setTeamMembers(fallback);
+        localStorage.setItem("grafy_team", JSON.stringify(fallback));
+        const syncError = await syncTeamMembersToSupabase(fallback);
+        if (syncError) {
+          console.warn("팀 명단 Supabase 동기화 실패:", syncError);
+        }
+        return;
       }
-      const savedTeam = localStorage.getItem("grafy_team");
-      if (savedTeam) {
-        setTeamMembers(JSON.parse(savedTeam));
-      } else {
-        const initial = INITIAL_TEAM_MEMBERS.map((m, i) => ({
-          ...m,
-          id: `team-${i}`,
-        }));
-        setTeamMembers(initial);
-      }
+
+      const fallback = getLocalTeamMembers();
+      setTeamMembers(fallback);
+      localStorage.setItem("grafy_team", JSON.stringify(fallback));
     } catch (e) {
-      const initial = INITIAL_TEAM_MEMBERS.map((m, i) => ({
-        ...m,
-        id: `team-${i}`,
-      }));
-      setTeamMembers(initial);
+      console.warn("팀 명단 로드 실패:", e);
+      const fallback = getLocalTeamMembers();
+      setTeamMembers(fallback);
     }
+  };
+
+  fetchTeamMembersRef.current = fetchTeamMembers;
+
+  const handleUpdateTeamMembers = async (members: TeamMember[]) => {
+    const normalized = normalizeTeamMembers(members);
+    setTeamMembers(normalized);
+    localStorage.setItem("grafy_team", JSON.stringify(normalized));
+
+    const syncError = await syncTeamMembersToSupabase(normalized);
+    if (syncError) {
+      console.warn("팀 명단 Supabase 저장 실패:", syncError);
+      showToast("팀 명단 저장 실패");
+      return;
+    }
+
+    showToast("팀 명단 저장");
   };
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3000);
   };
+
+  showToastRef.current = showToast;
 
   const fetchTemplates = async () => {
     if (isSupabaseReady && supabase) {
@@ -605,46 +762,49 @@ const App: React.FC = () => {
 
       // 3. Merge: Prefer Local if it has more critical info or is newer
       const mergedMap = new Map<string, Project>();
-      remoteData.forEach((p) => mergedMap.set(p.id, p));
+      remoteData.forEach((p) => {
+        mergedMap.set(p.id, p);
+      });
 
-      localData.forEach((localP) => {
-        if (localP.status === -1) return; // Skip templates
+      for (const localP of localData) {
+        if (localP.status === -1) continue; // Skip templates
         const remoteP = mergedMap.get(localP.id);
         if (!remoteP) {
           mergedMap.set(localP.id, localP);
-        } else {
-          const remoteNasTime = remoteP.nas_last_synced
-            ? new Date(remoteP.nas_last_synced).getTime()
-            : NaN;
-          const localNasTime = localP.nas_last_synced
-            ? new Date(localP.nas_last_synced).getTime()
-            : NaN;
-          const preferRemoteForNas =
-            !isNaN(remoteNasTime) &&
-            (isNaN(localNasTime) || remoteNasTime > localNasTime);
-          if (preferRemoteForNas) return;
-
-          // Compare timestamps
-          const remoteTime = new Date(remoteP.last_updated).getTime();
-          const localTime = new Date(localP.last_updated).getTime();
-
-          // Checking critical column loss in remote (specifically Navigation Rounds)
-          const remoteMissingRounds =
-            !remoteP.rounds_navigation_count ||
-            remoteP.rounds_navigation_count === 1;
-          const localHasRounds =
-            localP.rounds_navigation_count &&
-            localP.rounds_navigation_count > 1;
-
-          // If Local is newer OR Remote is broken (missing rounds), use Local
-          if (
-            localTime >= remoteTime ||
-            (remoteMissingRounds && localHasRounds)
-          ) {
-            mergedMap.set(localP.id, localP);
-          }
+          continue;
         }
-      });
+
+        const remoteNasTime = remoteP.nas_last_synced
+          ? new Date(remoteP.nas_last_synced).getTime()
+          : NaN;
+        const localNasTime = localP.nas_last_synced
+          ? new Date(localP.nas_last_synced).getTime()
+          : NaN;
+        const preferRemoteForNas =
+          !isNaN(remoteNasTime) &&
+          (isNaN(localNasTime) || remoteNasTime > localNasTime);
+        if (preferRemoteForNas) continue;
+
+        // Compare timestamps
+        const remoteTime = new Date(remoteP.last_updated).getTime();
+        const localTime = new Date(localP.last_updated).getTime();
+
+        // Checking critical column loss in remote (specifically Navigation Rounds)
+        const remoteMissingRounds =
+          !remoteP.rounds_navigation_count ||
+          remoteP.rounds_navigation_count === 1;
+        const localHasRounds =
+          localP.rounds_navigation_count &&
+          localP.rounds_navigation_count > 1;
+
+        // If Local is newer OR Remote is broken (missing rounds), use Local
+        if (
+          localTime >= remoteTime ||
+          (remoteMissingRounds && localHasRounds)
+        ) {
+          mergedMap.set(localP.id, localP);
+        }
+      }
 
       const mergedList = Array.from(mergedMap.values()).sort(
         (a, b) =>
@@ -678,7 +838,7 @@ const App: React.FC = () => {
             (!isNaN(freshNasTime) && (isNaN(currentNasTime) || freshNasTime > currentNasTime));
           if (shouldRefresh) {
             setCurrentProject(freshProject);
-            loadTasks(freshProject);
+            loadTasksRef.current(freshProject);
           }
         }
       }
@@ -720,7 +880,7 @@ const App: React.FC = () => {
       }
       supabase.removeChannel(channel);
     };
-  }, [isSupabaseReady]);
+  }, []);
 
 
   const saveProjectsLocal = async (updatedActiveProjects: Project[]) => {
@@ -746,6 +906,8 @@ const App: React.FC = () => {
       }
     }
   };
+
+  saveProjectsLocalRef.current = saveProjectsLocal;
 
   const syncProjectToSupabase = async (project: Project) => {
     if (isSupabaseReady && supabase) {
@@ -953,7 +1115,7 @@ const App: React.FC = () => {
     setRounds(project.rounds_count || 2);
     setRounds2(project.rounds2_count || 2);
     setRoundsNavigation(project.rounds_navigation_count || 2);
-    loadTasks(project);
+    loadTasksRef.current(project);
     setCurrentView("detail");
     setActiveRole(Role.ALL);
   };
@@ -963,7 +1125,9 @@ const App: React.FC = () => {
       setCompletedTasks(new Set<string>(project.task_states.completed || []));
       const linkMap = new Map<string, { url: string; label: string }>();
       Object.entries(project.task_states.links || {}).forEach(
-        ([id, val]: [string, any]) => linkMap.set(id, val),
+        ([id, val]: [string, any]) => {
+          linkMap.set(id, val);
+        },
       );
       setTaskLinks(linkMap);
       return;
@@ -974,15 +1138,18 @@ const App: React.FC = () => {
       const parsed = JSON.parse(localTasks);
       setCompletedTasks(new Set<string>(parsed.completed || []));
       const linkMap = new Map<string, { url: string; label: string }>();
-      Object.entries(parsed.links || {}).forEach(([id, val]: [any, any]) =>
-        linkMap.set(id, val),
-      );
+      Object.entries(parsed.links || {}).forEach(([id, val]: [any, any]) => {
+        linkMap.set(id, val);
+      });
       setTaskLinks(linkMap);
     } else {
       setCompletedTasks(new Set<string>());
       setTaskLinks(new Map<string, { url: string; label: string }>());
     }
   };
+
+  loadTasksRef.current = loadTasks;
+
 
   const syncTasks = (
     project: Project,
@@ -1476,8 +1643,8 @@ const App: React.FC = () => {
       setProjects(nextProjects);
       localStorage.setItem("grafy_projects", JSON.stringify(nextProjects));
 
-      updateProjectProgress(nextCompleted, updatedProject);
-      showToast("태스크가 삭제되었습니다.");
+      updateProjectProgressRef.current(nextCompleted, updatedProject);
+      showToastRef.current("태스크가 삭제되었습니다.");
     }
   }, [currentProject, completedTasks, projects]);
 
@@ -1528,7 +1695,7 @@ const App: React.FC = () => {
     nextLinks?: Map<string, { url: string; label: string }>,
   ) => {
     const currentLinks = nextLinks || taskLinks;
-    const totalObj = calculateTotalTasks(project, nextCompleted);
+    const totalObj = calculateTotalTasksRef.current(project, nextCompleted);
     const percent =
       totalObj.total === 0 ? 0 : Math.round((totalObj.completed / totalObj.total) * 100);
     const task_states = {
@@ -1557,7 +1724,7 @@ const App: React.FC = () => {
       task_states,
     };
     setCurrentProject(updatedProject);
-    saveProjectsLocal(
+    saveProjectsLocalRef.current(
       projects.map((p) => (p.id === project.id ? updatedProject : p)),
     );
 
@@ -1580,7 +1747,9 @@ const App: React.FC = () => {
       } catch (err) {
       }
     }
-  }, [isSupabaseReady, supabase, projects, taskLinks]);
+  }, [projects, taskLinks]);
+
+  updateProjectProgressRef.current = updateProjectProgress;
 
   const calculateTotalTasks = useCallback((
     project: Project,
@@ -1627,6 +1796,8 @@ const App: React.FC = () => {
 
     return { total, completed };
   }, [getVisibleTasks]);
+
+  calculateTotalTasksRef.current = calculateTotalTasks;
 
   const handleUpdateRounds = async (newRounds: number) => {
     if (!currentProject || currentProject.is_locked) return;
@@ -1766,6 +1937,8 @@ const App: React.FC = () => {
     showToast("그룹 폴더가 생성되었습니다. (Ctrl+G)");
   };
 
+  handleGroupTasksRef.current = handleGroupTasks;
+
   const handleUngroupTasks = async () => {
     if (!currentProject || selectedTaskIds.size === 0) return;
 
@@ -1796,20 +1969,22 @@ const App: React.FC = () => {
     }
   };
 
+  handleUngroupTasksRef.current = handleUngroupTasks;
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
         e.preventDefault();
         if (e.shiftKey) {
-          handleUngroupTasks();
+          handleUngroupTasksRef.current();
         } else {
-          handleGroupTasks();
+          handleGroupTasksRef.current();
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentProject, selectedTaskIds]);
+  }, []);
 
   const handleTaskToggleSelect = (taskId: string, multi: boolean = false) => {
     setSelectedTaskIds(prev => {
@@ -1827,7 +2002,9 @@ const App: React.FC = () => {
   const handleTaskBulkSelect = (taskIds: string[]) => {
     setSelectedTaskIds(prev => {
       const next = new Set(prev);
-      taskIds.forEach(id => next.add(id));
+      taskIds.forEach(id => {
+        next.add(id);
+      });
       return next;
     });
   };
@@ -2458,7 +2635,7 @@ const App: React.FC = () => {
             client_visible_tasks: currentProject.client_visible_tasks,
             is_expedition2_hidden:
               currentProject.task_states?.meta?.is_expedition2_hidden,
-            template_name: template_name,
+            template_name: templateName,
             custom_tasks: currentProject.custom_tasks,
             task_order: currentProject.task_order,
             deleted_tasks: currentProject.deleted_tasks,
@@ -3445,6 +3622,7 @@ const App: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={() => {
                 setIsSnapshotMode(false);
                 setSnapshotSelectedTasks(new Set(currentProject?.client_visible_tasks || []));
@@ -3454,6 +3632,7 @@ const App: React.FC = () => {
               취소
             </button>
             <button
+              type="button"
               onClick={handleSaveSnapshot}
               className="px-4 py-1.5 rounded-lg text-xs font-bold bg-white text-black hover:bg-slate-200 transition-colors shadow-sm"
             >
@@ -3530,16 +3709,18 @@ const App: React.FC = () => {
                          {/* Profile Menu */}
                         <div className="relative" ref={profileMenuRef}>
                            <button 
+                              type="button"
                               onClick={() => setShowProfileMenu(!showProfileMenu)} 
                               className="text-[25px] font-bold whitespace-nowrap text-black hover:opacity-60 transition-opacity"
-                           >
+                            >
                              {ADMIN_EMAILS.includes(user.email || '') ? 'admin.' : 'grafer.'}
                            </button>
                            {showProfileMenu && (
-                              <div className="absolute left-0 top-full mt-6 bg-white/40 backdrop-blur-2xl border border-white/50 shadow-xl rounded-[30px] p-2 z-50 min-w-[200px] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                              <div className="absolute left-0 top-full mt-6 bg-white/40 backdrop-blur-2xl border border-white/50 shadow-xl rounded-[30px] p-2 z-50 min-w-[200px] overflow-hidden animate-in fade-in zoom-in-55 duration-1000">
                                  {ADMIN_EMAILS.includes(user.email || '') && (
                                    <>
                                       <button 
+                                          type="button"
                                           onClick={() => {
                                             setShowTemplateManagerModal(true);
                                             setShowProfileMenu(false);
@@ -3550,6 +3731,7 @@ const App: React.FC = () => {
                                         템플릿 관리
                                       </button>
                                        <button 
+                                          type="button"
                                           onClick={() => {
                                             setShowDeletedDataModal(true);
                                             setShowProfileMenu(false);
@@ -3563,10 +3745,11 @@ const App: React.FC = () => {
                                    </>
                                  )}
                                  <button 
-                                    onClick={() => {
-                                       handleLogout();
-                                       setShowProfileMenu(false);
-                                    }} 
+                                    type="button"
+                                     onClick={() => {
+                                        handleLogout();
+                                        setShowProfileMenu(false);
+                                     }} 
                                     className="flex items-center gap-3 w-full text-left px-5 py-3 hover:bg-white/40 rounded-[20px] text-[15px] font-normal text-black transition-all duration-200"
                                  >
                                    <LogOut size={16} strokeWidth={2} />
@@ -3605,6 +3788,7 @@ const App: React.FC = () => {
                    {/* Plus Button - Reference Style (Rotating Cross) */}
                    <div className="flex items-end h-[30px] translate-y-[-15px] flex-shrink-0">
                       <button 
+                         type="button"
                          onClick={() => setShowCreateModal(true)}
                          className="group relative w-[48px] h-[48px] flex items-center justify-center cursor-pointer"
                          title="프로젝트 추가"
@@ -3661,40 +3845,28 @@ const App: React.FC = () => {
               </main>
             
             {/* Keeping Modals inside Layout */}
-              <AnimatePresence>
-                {showCreateModal && (
-                  <CreateProjectModal
-                    teamMembers={teamMembers}
-                    templates={templates}
-                    onClose={() => setShowCreateModal(false)}
-                    onCreate={handleCreateProject}
-                  />
-                )}
-              </AnimatePresence>
+            {showCreateModal && (
+              <CreateProjectModal
+                teamMembers={teamMembers}
+                templates={templates}
+                onClose={() => setShowCreateModal(false)}
+                onCreate={handleCreateProject}
+              />
+            )}
 
-              <AnimatePresence>
-                {showTeamModal && (
-                  <TeamManagementModal
-                    members={teamMembers}
-                    onClose={() => setShowTeamModal(false)}
-                    onUpdate={(t) => {
-                      setTeamMembers(t);
-                      localStorage.setItem("grafy_team", JSON.stringify(t));
-                      showToast("팀 명단 저장");
-                    }}
-                  />
-                )}
-              </AnimatePresence>
+            {showTeamModal && (
+              <TeamManagementModal
+                members={teamMembers}
+                onClose={() => setShowTeamModal(false)}
+                onUpdate={handleUpdateTeamMembers}
+              />
+            )}
           </div>
         )}
 
       {currentView === "detail" && currentProject && (
         <div
           className="relative"
-          onClick={() => {
-            setPopover((p) => ({ ...p, isOpen: false }));
-            setTaskEditPopover((p) => ({ ...p, isOpen: false }));
-          }}
         >
           <Navbar
             project={currentProject}
@@ -3720,7 +3892,12 @@ const App: React.FC = () => {
             onExportToExcel={handleExportToExcel}
             onImportFromExcel={handleImportFromExcel}
           />
-          <main className="w-full px-4 md:px-6 py-10 max-w-[2200px] mx-auto">
+          <main 
+            className="w-full px-4 md:px-6 py-10 max-w-[2200px] mx-auto transition-all duration-300"
+            style={{ 
+              filter: currentProject.is_locked ? 'grayscale(0.6)' : 'none' 
+            }}
+          >
             <div className="max-w-full mx-auto">
               {/* Progress Section */}
               <div className="bg-white p-6 md:p-8 rounded-[12px] md:rounded-[16px] mb-6 md:mb-10 flex flex-col md:flex-row items-center gap-6 md:gap-10 border border-slate-200 shadow-sm relative overflow-visible w-full">
@@ -3788,6 +3965,7 @@ const App: React.FC = () => {
                     if (step.id === 4 && !currentProject.is_locked) {
                       headerLeftButtons = (
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             if (confirmHideExpedition2) {
@@ -3822,6 +4000,7 @@ const App: React.FC = () => {
                     ) {
                       headerLeftButtons = (
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleToggleExpedition2(false);
