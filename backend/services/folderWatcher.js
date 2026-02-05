@@ -36,8 +36,9 @@ function startWatcher() {
     persistent: true,
     depth: 0,
     usePolling: true,
-    interval: 3000,
-    binaryInterval: 5000,
+    interval: 500,
+    binaryInterval: 500,
+    ignorePermissionErrors: true,
     awaitWriteFinish: {
       stabilityThreshold: 2000,
       pollInterval: 100,
@@ -129,10 +130,11 @@ async function handleFolderAdded(folderPath) {
   const folderName = path.basename(folderPath);
   console.log(`📁 새 폴더 감지: ${folderName}`);
 
-  const parseFolderName = require('./folderService').parseFolderName;
+    const { parseFolderName } = require('../utils/folderNameParser');
 
   try {
     const parsed = parseFolderName(folderName);
+    if (!parsed) return;
     const projectName = `${parsed.client} / ${parsed.projectName}`;
 
     const { data, error } = await supabase
@@ -175,14 +177,14 @@ async function handleFolderRenamed(renameData, newPath) {
 
   console.log(`📁 폴더명 변경 감지: ${oldName} → ${newName}`);
 
-  const parseFolderName = require('./folderService').parseFolderName;
-  const parseDate = require('./folderService').parseDate;
+  const { parseFolderName } = require('../utils/folderNameParser');
 
   try {
     const parsed = parseFolderName(newName);
+    if (!parsed) return;
     const projectName = `${parsed.client} / ${parsed.projectName}`;
-    const startDate = parseDate(parsed.startDate);
-    const endDate = parsed.endDate !== 'xxxxxx' ? parseDate(parsed.endDate) : null;
+    const startDate = parsed.startDate;
+    const endDate = parsed.endDate;
 
     const { data, error } = await supabase
       .from('projects')
