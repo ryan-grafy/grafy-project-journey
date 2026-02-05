@@ -173,10 +173,10 @@ function buildUpdatesFromParsed(parsed, folderPath, project) {
   // NAS 폴더명에 담당자가 있으면 NAS 기준 사용 (이름만 저장됨)
   // NAS 폴더명에 담당자가 없으면 기존 DB 값 유지
   // 이렇게 해야 사용자가 NAS에서 "예지"로 변경하면 DB도 "예지"가 됨
-  const pmName = responsible[0] || project?.pm_name || null;
-  const designerName = responsible[1] || project?.designer_name || null;
-  const designer2Name = responsible[2] || project?.designer_2_name || null;
-  const designer3Name = responsible[3] || project?.designer_3_name || null;
+  const pmName = project?.pm_name || responsible[0] || null;
+  const designerName = project?.designer_name || responsible[1] || null;
+  const designer2Name = project?.designer_2_name || responsible[2] || null;
+  const designer3Name = project?.designer_3_name || responsible[3] || null;
   
   return {
     name: `${parsed.client} / ${parsed.projectName}`,

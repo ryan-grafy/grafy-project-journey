@@ -69,15 +69,13 @@ function stripTitleAndSurname(rawName) {
     normalized = normalized.replace(titlePattern, "").trim();
   }
 
-  const hasSpace = /\s/.test(normalized);
-  const firstToken = normalized.split(/\s+/)[0];
-  if (!firstToken) return "";
+  if (!normalized) return "";
 
-  if (/^[가-힣]/.test(firstToken) && (hasSpace || firstToken.length >= 3)) {
-    return firstToken.slice(1);
+  if (/[가-힣]/.test(normalized)) {
+    return normalized.replace(/\s+/g, "");
   }
 
-  return firstToken;
+  return normalized.split(/\s+/)[0] || "";
 }
 
 function generateFolderName(projectData) {
