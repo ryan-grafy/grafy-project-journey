@@ -72,7 +72,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   
   // Custom grid template
-  const gridTemplate = "60px 140px 120px 180px 150px 1fr 400px 200px";
+  const gridTemplate = "60px 160px 120px 180px 150px 1fr 400px 200px";
 
   // General table font size is 14px
   const tableFontSize = "text-[14px]";
@@ -262,8 +262,8 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                       <div className="font-normal">프로젝트 종료</div>
                     ) : (
                       <>
-                        <div className="font-semibold">{formatDateWithDay(nextInfo.date)}</div>
-                        <div className="truncate opacity-80">{nextInfo.title}</div>
+                        <div className="font-normal">{formatDateWithDay(nextInfo.date)}</div>
+                        <div className="truncate opacity-100">{nextInfo.title}</div>
                       </>
                     )}
                  </div>
