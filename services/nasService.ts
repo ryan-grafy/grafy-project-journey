@@ -1,9 +1,9 @@
-const LOCAL_API_BASE = "http://127.0.0.1:3001/api";
+const DEV_API_BASE = "/api";
 const ENV_API_BASE = import.meta.env.VITE_NAS_API_BASE as string | undefined;
 const API_BASE = ENV_API_BASE
   ? ENV_API_BASE.replace(/\/+$/, "")
   : import.meta.env.DEV
-    ? LOCAL_API_BASE
+    ? DEV_API_BASE
     : `${window.location.origin}/api`;
 
 export async function createProjectFolder(data: {

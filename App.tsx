@@ -111,6 +111,8 @@ const App: React.FC = () => {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const isDataLoadedRef = React.useRef(false); // Track if initial data load is complete
+  const realtimeRefreshRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fetchProjectsRef = React.useRef<(isBackground?: boolean) => void>(() => undefined);
   const [locationKey, setLocationKey] = useState(0); // Track URL changes  // State for popover in step 3
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
@@ -688,12 +690,37 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchProjects(true);
-    }, 15000);
+    fetchProjectsRef.current = fetchProjects;
+  });
 
-    return () => clearInterval(interval);
+  useEffect(() => {
+    if (!isSupabaseReady || !supabase) return;
+
+    const channel = supabase
+      .channel("projects-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "projects" },
+        () => {
+          if (realtimeRefreshRef.current) {
+            clearTimeout(realtimeRefreshRef.current);
+          }
+          realtimeRefreshRef.current = setTimeout(() => {
+            fetchProjectsRef.current(true);
+          }, 400);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      if (realtimeRefreshRef.current) {
+        clearTimeout(realtimeRefreshRef.current);
+        realtimeRefreshRef.current = null;
+      }
+      supabase.removeChannel(channel);
+    };
   }, [isSupabaseReady]);
+
 
   const saveProjectsLocal = async (updatedActiveProjects: Project[]) => {
     setProjects(updatedActiveProjects);
