@@ -1,5 +1,6 @@
+const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 
 const supabase = createClient(
   process.env.SUPABASE_URL,

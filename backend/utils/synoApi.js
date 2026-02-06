@@ -1,5 +1,6 @@
+const path = require('path');
 const axios = require('axios');
-require('dotenv').config();
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 
 const NAS_URL = process.env.NAS_URL || 'https://grafymm.synology.me:5001';
 const USERNAME = process.env.NAS_USERNAME;
