@@ -2,8 +2,33 @@ const nasApi = require('../utils/synoApi');
 const supabase = require('../config/supabase');
 const { parseFolderName, generateFolderName } = require('../utils/folderNameParser');
 
+function normalizeBasePath(rawBasePath) {
+  if (!rawBasePath) return rawBasePath;
+
+  let normalized = String(rawBasePath).trim();
+  if (!normalized) return normalized;
+
+  normalized = normalized.replace(/\\/g, "/");
+  const uncMatch = normalized.match(/^\/\/[^/]+\/(.+)$/);
+  if (uncMatch) {
+    normalized = `/${uncMatch[1]}`;
+  }
+  normalized = normalized.replace(/\/+/g, "/").replace(/\/+$/g, "");
+  const shareMatch = normalized.match(/^\/([^/]+)(\/|$)/);
+  if (shareMatch && shareMatch[1].toLowerCase() === "grafy") {
+    normalized = `/GRAFY${normalized.slice(shareMatch[1].length + 1)}`;
+  }
+  return normalized;
+}
+
+const DEFAULT_NAS_BASE_PATH = '/GRAFY/#Project/# 2026 GRAFY. 프로젝트';
+const ENABLE_NAS_RENAME = process.env.NAS_SYNC_WRITE === 'true';
+const rawBasePath = process.env.NAS_BASE_PATH;
+const resolvedBasePath = rawBasePath && rawBasePath.includes('#')
+  ? rawBasePath
+  : DEFAULT_NAS_BASE_PATH;
 // folderService.js와 동일한 기준 경로 사용
-const NAS_BASE_PATH = process.env.NAS_BASE_PATH || '/GRAFY/#Project/# 2026 GRAFY. 프로젝트';
+const NAS_BASE_PATH = normalizeBasePath(resolvedBasePath);
 
 let lastNasFolderPaths = null;
 
@@ -46,41 +71,43 @@ async function syncNasFolders() {
     }
 
     // 3. DB -> NAS 변경 반영 (웹앱 수정사항)
-    for (const project of syncedProjects) {
-      if (!project.nas_folder_path) continue;
-      if (!nasFolderPaths.has(project.nas_folder_path)) continue;
-      if (renamedPaths.has(project.nas_folder_path)) continue;
+    if (ENABLE_NAS_RENAME) {
+      for (const project of syncedProjects) {
+        if (!project.nas_folder_path) continue;
+        if (!nasFolderPaths.has(project.nas_folder_path)) continue;
+        if (renamedPaths.has(project.nas_folder_path)) continue;
 
-      const nasFolder = nasFolderByPath.get(project.nas_folder_path);
-      if (!nasFolder) continue;
+        const nasFolder = nasFolderByPath.get(project.nas_folder_path);
+        if (!nasFolder) continue;
 
-      const desiredName = buildDesiredFolderName(project);
-      if (!desiredName || desiredName === nasFolder.name) continue;
+        const desiredName = buildDesiredFolderName(project);
+        if (!desiredName || desiredName === nasFolder.name) continue;
 
-      if (!shouldApplyDbChanges(project)) continue;
+        if (!shouldApplyDbChanges(project)) continue;
 
-      console.log(`[SYNC] DB 변경 감지: ${nasFolder.name} -> ${desiredName}`);
-      const result = await nasApi.renameFolder(project.nas_folder_path, desiredName);
-      if (result.success) {
-        const parentPath = project.nas_folder_path.split('/').slice(0, -1).join('/');
-        const newPath = `${parentPath}/${desiredName}`;
-        renamedPaths.add(project.nas_folder_path);
-        renamedPaths.add(newPath);
-        nasFolderPaths.delete(project.nas_folder_path);
-        nasFolderPaths.add(newPath);
-        nasFolderByPath.set(newPath, { ...nasFolder, name: desiredName, path: newPath });
-        project.nas_folder_path = newPath;
-        await supabase.updateProjectNASInfo(project.id, {
-          name: project.name,
-          start_date: project.start_date,
-          end_date: project.end_date,
-          pm_name: project.pm_name,
-          designer_name: project.designer_name,
-          designer_2_name: project.designer_2_name,
-          designer_3_name: project.designer_3_name,
-          nas_folder_path: newPath
-        });
-        console.log(`✅ [SYNC] NAS 폴더명 업데이트 완료: ${project.id}`);
+        console.log(`[SYNC] DB 변경 감지: ${nasFolder.name} -> ${desiredName}`);
+        const result = await nasApi.renameFolder(project.nas_folder_path, desiredName);
+        if (result.success) {
+          const parentPath = project.nas_folder_path.split('/').slice(0, -1).join('/');
+          const newPath = `${parentPath}/${desiredName}`;
+          renamedPaths.add(project.nas_folder_path);
+          renamedPaths.add(newPath);
+          nasFolderPaths.delete(project.nas_folder_path);
+          nasFolderPaths.add(newPath);
+          nasFolderByPath.set(newPath, { ...nasFolder, name: desiredName, path: newPath });
+          project.nas_folder_path = newPath;
+          await supabase.updateProjectNASInfo(project.id, {
+            name: project.name,
+            start_date: project.start_date,
+            end_date: project.end_date,
+            pm_name: project.pm_name,
+            designer_name: project.designer_name,
+            designer_2_name: project.designer_2_name,
+            designer_3_name: project.designer_3_name,
+            nas_folder_path: newPath
+          });
+          console.log(`✅ [SYNC] NAS 폴더명 업데이트 완료: ${project.id}`);
+        }
       }
     }
 

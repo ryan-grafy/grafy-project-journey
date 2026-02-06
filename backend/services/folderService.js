@@ -3,7 +3,31 @@ const FOLDER_STRUCTURE = require('../config/folderStructure');
 const { generateFolderName } = require('../utils/folderNameParser');
 const supabase = require('../config/supabase');
 
-const NAS_BASE_PATH = process.env.NAS_BASE_PATH || '/GRAFY/#Project/# 2026 GRAFY. 프로젝트';
+function normalizeBasePath(rawBasePath) {
+  if (!rawBasePath) return rawBasePath;
+
+  let normalized = String(rawBasePath).trim();
+  if (!normalized) return normalized;
+
+  normalized = normalized.replace(/\\/g, "/");
+  const uncMatch = normalized.match(/^\/\/[^/]+\/(.+)$/);
+  if (uncMatch) {
+    normalized = `/${uncMatch[1]}`;
+  }
+  normalized = normalized.replace(/\/+/g, "/").replace(/\/+$/g, "");
+  const shareMatch = normalized.match(/^\/([^/]+)(\/|$)/);
+  if (shareMatch && shareMatch[1].toLowerCase() === "grafy") {
+    normalized = `/GRAFY${normalized.slice(shareMatch[1].length + 1)}`;
+  }
+  return normalized;
+}
+
+const DEFAULT_NAS_BASE_PATH = '/GRAFY/#Project/# 2026 GRAFY. 프로젝트';
+const rawBasePath = process.env.NAS_BASE_PATH;
+const resolvedBasePath = rawBasePath && rawBasePath.includes('#')
+  ? rawBasePath
+  : DEFAULT_NAS_BASE_PATH;
+const NAS_BASE_PATH = normalizeBasePath(resolvedBasePath);
 
 function normalizeNasPath(inputPath) {
   if (!inputPath) return inputPath;
