@@ -17,7 +17,7 @@ export async function createProjectFolder(data: {
   try {
     console.log('📤 NAS 폴더 생성 요청:', data);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     
     const response = await fetch(`${API_BASE}/folder/create`, {
       method: 'POST',
