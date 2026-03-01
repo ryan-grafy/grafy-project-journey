@@ -1,0 +1,910 @@
+✅ Supabase 연결 성공
+==========================================
+🚀 Grafy NAS 백엔드 서버 시작 (v2.0)
+🌐 서버 주소: http://localhost:3001
+🔗 NAS API 주소: http://192.168.2.2:5000
+📁 NAS 기준 경로: \\\\192.168.2.2\\grafy\\
+==========================================
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:30:38
+[NAS API] 로그인 시도: grafy@http://192.168.2.2:5000
+⏲️ NAS 폴링 동기화 서비스 가동 (주기: 3초)
+🔄 폴더 감시 서비스 시작: \\\\192.168.2.2\\grafy\\
+✅ 폴더 감시 서비스가 시작되었습니다.
+✅ Synology NAS 로그인 성공
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:30:41
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:30:44
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:30:47
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:30:50
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:30:53
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:30:56
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:30:59
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:02
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:05
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:08
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:11
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:14
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:17
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:20
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:23
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:26
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:29
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:32
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:35
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:38
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:41
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:44
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:47
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:50
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:53
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:56
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:31:59
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:02
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:05
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:08
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[2026-02-06T06:32:09.565Z] POST /api/folder/create
+Payload: {
+  "name": "TestClient / NAS Smoke 0206C",
+  "startDate": "26-02-06",
+  "designerNames": []
+}
+[API] 폴더 생성 요청: {
+  name: 'TestClient / NAS Smoke 0206C',
+  startDate: '26-02-06',
+  pmName: undefined
+}
+🚀 [NAS API] 프로젝트 폴더 생성 시도
+   기본경로: /GRAFY/#Project/# 2026 GRAFY. 프로젝트
+   폴더이름: 260206-xxxxxx_TestClient_NAS Smoke 0206C_
+[NAS API] SYNO.FileStation.List.list
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206C_
+[NAS API] SYNO.FileStation.CreateFolder.create
+✅ 메인 폴더 생성 완료: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206C_
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206C_/##.최종 결과물
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ ##.최종 결과물
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206C_/##.최종 결과물/#발주서
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #발주서
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206C_/##.최종 결과물/#송부파일
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #송부파일
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206C_/##.최종 결과물/#폰트
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #폰트
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206C_/00. 계약서, 견적서, 마일스톤
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ 00. 계약서, 견적서, 마일스톤
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206C_/00. 계약서, 견적서, 마일스톤/#견적서
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #견적서
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206C_/00. 계약서, 견적서, 마일스톤/#견적서/#최종송부본
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #최종송부본
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206C_/00. 계약서, 견적서, 마일스톤/#계약서, 회사서류
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #계약서, 회사서류
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206C_/00. 계약서, 견적서, 마일스톤/#계약서, 회사서류/#최종송부본
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #최종송부본
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206C_/00. 계약서, 견적서, 마일스톤/#마일스톤
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #마일스톤
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206C_/00. 계약서, 견적서, 마일스톤/#마일스톤/#최종송부본
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #최종송부본
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206C_/00. 계약서, 견적서, 마일스톤/#품의서, 지출결의서
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #품의서, 지출결의서
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206C_/01. 송부 파일
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ 01. 송부 파일
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206C_/02. 작업물
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ 02. 작업물
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206C_/03. 수급 파일
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ 03. 수급 파일
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206C_/04. 기타
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ 04. 기타
+[0mPOST /api/folder/create [32m200[0m 1745.581 ms - 248[0m
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:11
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 4
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:14
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:17
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:20
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:23
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:26
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:29
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:32
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:35
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:38
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:41
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:44
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:47
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:50
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:53
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:56
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:32:59
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:02
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:05
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:08
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:11
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:14
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:17
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:20
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:23
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:26
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:29
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:32
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:35
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:38
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:41
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:44
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:47
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:50
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:53
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:33:56
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:00
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:03
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:06
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:09
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:12
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:15
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:18
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:21
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:24
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:27
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:30
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:33
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:36
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:39
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:42
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:45
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:48
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:51
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:54
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:34:57
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:00
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:03
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:06
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:09
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:12
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:15
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:18
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:21
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:24
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:27
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:30
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:33
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:36
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:39
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:42
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:45
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:48
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:51
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:54
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:35:57
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:00
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:03
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:06
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:09
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:12
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:15
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:18
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:21
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:24
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:27
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:30
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:33
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:36
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:39
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:42
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:45
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:48
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:51
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:54
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:36:57
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:00
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:03
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:06
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:09
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:12
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:15
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:18
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:21
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:24
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:27
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:30
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:33
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:36
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:39
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:42
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:45
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:48
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:51
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:54
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:37:57
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:00
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:03
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:06
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:09
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:12
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:15
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:18
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:21
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:24
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:27
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:30
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:33
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:36
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:39
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:42
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:45
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:48
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:51
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:54
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:38:57
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:00
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:03
+[NAS API] SYNO.FileStation.List.list
+[2026-02-06T06:39:04.097Z] POST /api/folder/create
+Payload: {
+  "name": "TestClient / NAS Smoke 0206D",
+  "startDate": "26-02-06",
+  "designerNames": []
+}
+[API] 폴더 생성 요청: {
+  name: 'TestClient / NAS Smoke 0206D',
+  startDate: '26-02-06',
+  pmName: undefined
+}
+🚀 [NAS API] 프로젝트 폴더 생성 시도
+   기본경로: /GRAFY/#Project/# 2026 GRAFY. 프로젝트
+   폴더이름: 260206-xxxxxx_TestClient_NAS Smoke 0206D_
+[NAS API] SYNO.FileStation.List.list
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206D_
+[NAS API] SYNO.FileStation.CreateFolder.create
+✅ 메인 폴더 생성 완료: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206D_
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206D_/##.최종 결과물
+[NAS API] SYNO.FileStation.CreateFolder.create
+[SYNC] 대상 프로젝트 수: 5
+[SYNC] NAS 동기화 정상 완료
+   └─ ##.최종 결과물
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206D_/##.최종 결과물/#발주서
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #발주서
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206D_/##.최종 결과물/#송부파일
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #송부파일
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206D_/##.최종 결과물/#폰트
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #폰트
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206D_/00. 계약서, 견적서, 마일스톤
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ 00. 계약서, 견적서, 마일스톤
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206D_/00. 계약서, 견적서, 마일스톤/#견적서
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #견적서
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206D_/00. 계약서, 견적서, 마일스톤/#견적서/#최종송부본
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #최종송부본
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206D_/00. 계약서, 견적서, 마일스톤/#계약서, 회사서류
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #계약서, 회사서류
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206D_/00. 계약서, 견적서, 마일스톤/#계약서, 회사서류/#최종송부본
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #최종송부본
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206D_/00. 계약서, 견적서, 마일스톤/#마일스톤
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #마일스톤
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206D_/00. 계약서, 견적서, 마일스톤/#마일스톤/#최종송부본
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #최종송부본
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206D_/00. 계약서, 견적서, 마일스톤/#품의서, 지출결의서
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ #품의서, 지출결의서
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206D_/01. 송부 파일
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ 01. 송부 파일
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206D_/02. 작업물
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ 02. 작업물
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206D_/03. 수급 파일
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ 03. 수급 파일
+[NAS API] 폴더 생성: /GRAFY/#Project/# 2026 GRAFY. 프로젝트/260206-xxxxxx_TestClient_NAS Smoke 0206D_/04. 기타
+[NAS API] SYNO.FileStation.CreateFolder.create
+   └─ 04. 기타
+[0mPOST /api/folder/create [32m200[0m 1718.608 ms - 248[0m
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:06
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:09
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:12
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:15
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:18
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:21
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:24
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:27
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:30
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:33
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:36
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:39
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:42
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:45
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:48
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:51
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:54
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:39:57
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:40:00
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:40:03
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:40:06
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료
+[SYNC] NAS 동기화 시작: 2026. 2. 6. 오후 3:40:10
+[NAS API] SYNO.FileStation.List.list
+[SYNC] 대상 프로젝트 수: 6
+[SYNC] NAS 동기화 정상 완료

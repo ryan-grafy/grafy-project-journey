@@ -16,11 +16,28 @@ const PORT = process.env.PORT || 3001;
 // app.use(helmet({
 //   crossOriginResourcePolicy: false,
 // }));
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const isOriginAllowed = (origin) => {
+  if (!origin || allowedOrigins.length === 0) return true;
+  if (allowedOrigins.includes(origin)) return true;
+  return allowedOrigins.some(
+    (allowed) => allowed.startsWith("*.") && origin.endsWith(allowed.slice(1)),
+  );
+};
+
 app.use(
   cors({
-    origin: true,
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) return callback(null, true);
+      return callback(null, false);
+    },
     methods: ["GET", "POST", "OPTIONS"],
     credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
 app.use(express.json());
